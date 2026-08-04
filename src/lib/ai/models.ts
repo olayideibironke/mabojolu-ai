@@ -1,13 +1,9 @@
 /**
- * Model registry.
+ * Central Mabojolu model registry.
  *
- * Capability metadata, context limits, and pricing live here rather than being
- * scattered through call sites. The admin cost view, context builder, and
- * provider adapters therefore read the same configuration.
- *
- * Pricing is USD per million tokens and is used only for internal estimates.
- * Local Ollama models have no per-token provider charge, although they still
- * consume the user's computer resources.
+ * Every model used by the application is defined here so the chat gateway,
+ * context builder, administration tools, and cost calculations share the same
+ * configuration.
  */
 
 export type ProviderId =
@@ -19,36 +15,41 @@ export interface ModelDefinition {
   id: string;
   providerId: ProviderId;
 
-  /** Identifier sent directly to the configured provider. */
+  /**
+   * Exact model identifier passed to the configured AI provider.
+   */
   providerModelId: string;
 
   displayName: string;
   description: string;
 
-  /** Total context budget available to the application. */
+  /**
+   * Total context budget exposed to Mabojolu.
+   */
   contextWindowTokens: number;
 
-  /** Maximum generated tokens allowed by Mabojolu for this model. */
+  /**
+   * Maximum response length allowed for this model.
+   */
   maxOutputTokens: number;
 
   capabilities: {
     streaming: boolean;
     vision: boolean;
     toolUse: boolean;
-
-    /**
-     * Whether the underlying model can perform internal reasoning.
-     * Mabojolu never exposes raw hidden reasoning traces.
-     */
     reasoning: boolean;
   };
 
+  /**
+   * Estimated provider pricing in USD per one million tokens.
+   *
+   * Local Ollama models have no external per-token charge.
+   */
   pricing: {
     inputPerMillionUsd: number;
     outputPerMillionUsd: number;
   };
 
-  /** Disabled models remain visible to administrators but cannot serve chat. */
   enabled: boolean;
 }
 
@@ -59,13 +60,34 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "qwen3.5:2b-q4_K_M",
     displayName: "Mabojolu Fast",
     description:
-      "Faster local intelligence for everyday questions, drafting, and quick assistance.",
+      "The quickest local response mode for short questions, simple drafting, everyday assistance, and lightweight image understanding.",
     contextWindowTokens: 16_384,
-    maxOutputTokens: 4_096,
+    maxOutputTokens: 2_048,
     capabilities: {
       streaming: true,
-      vision: false,
-      toolUse: false,
+      vision: true,
+      toolUse: true,
+      reasoning: true,
+    },
+    pricing: {
+      inputPerMillionUsd: 0,
+      outputPerMillionUsd: 0,
+    },
+    enabled: true,
+  },
+  {
+    id: "mabojolu-regular",
+    providerId: "ollama",
+    providerModelId: "qwen3.5:2b",
+    displayName: "Mabojolu Regular",
+    description:
+      "A balanced local response mode for general conversations, writing, summaries, routine planning, and image understanding.",
+    contextWindowTokens: 16_384,
+    maxOutputTokens: 3_072,
+    capabilities: {
+      streaming: true,
+      vision: true,
+      toolUse: true,
       reasoning: true,
     },
     pricing: {
@@ -80,25 +102,13 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "qwen3.5:4b",
     displayName: "Mabojolu Quality",
     description:
-      "Higher-quality local intelligence for analysis, detailed writing, planning, and technical work.",
+      "The strongest available local response mode for analysis, complex planning, technical work, detailed writing, and richer image understanding.",
     contextWindowTokens: 32_768,
-    maxOutputTokens: 8_192,
+    maxOutputTokens: 4_096,
     capabilities: {
       streaming: true,
-
-      /*
-       * The current Mabojolu Ollama adapter sends text conversations only.
-       * This can become true after image attachments are connected to the
-       * provider request format and tested.
-       */
-      vision: false,
-
-      /*
-       * Tool execution remains disabled until the permission-based Mabojolu
-       * Agent system is implemented.
-       */
-      toolUse: false,
-
+      vision: true,
+      toolUse: true,
       reasoning: true,
     },
     pricing: {
@@ -113,7 +123,7 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "claude-opus-5",
     displayName: "Mabojolu Core",
     description:
-      "Deep cloud intelligence reserved for complex analysis, planning, and professional work.",
+      "Deep cloud intelligence reserved for future complex analysis, planning, and professional work.",
     contextWindowTokens: 1_000_000,
     maxOutputTokens: 128_000,
     capabilities: {
@@ -134,7 +144,7 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "claude-sonnet-5",
     displayName: "Mabojolu Swift",
     description:
-      "Balanced cloud intelligence reserved for everyday professional work.",
+      "Balanced cloud intelligence reserved for future everyday professional work.",
     contextWindowTokens: 1_000_000,
     maxOutputTokens: 128_000,
     capabilities: {
@@ -155,7 +165,7 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "mock-1",
     displayName: "Mabojolu Development Mock",
     description:
-      "Deterministic responder used for development and automated testing.",
+      "Deterministic responder used for local development and automated testing.",
     contextWindowTokens: 200_000,
     maxOutputTokens: 4_096,
     capabilities: {
@@ -191,15 +201,13 @@ export function modelsForProvider(
 }
 
 /**
- * Return the first enabled model registered for a provider.
- *
- * A missing model is an application configuration error rather than a
- * recoverable user condition.
+ * Returns the first enabled model registered for the requested provider.
  */
 export function defaultModelFor(
   providerId: ProviderId,
 ): ModelDefinition {
-  const model = modelsForProvider(providerId)[0];
+  const model =
+    modelsForProvider(providerId)[0];
 
   if (!model) {
     throw new Error(
@@ -210,7 +218,9 @@ export function defaultModelFor(
   return model;
 }
 
-/** Estimate the provider charge for one completed generation. */
+/**
+ * Estimates the external provider cost for a completed generation.
+ */
 export function estimateCostUsd(
   model: ModelDefinition,
   usage: {
@@ -232,8 +242,8 @@ export function estimateCostUsd(
 /**
  * Conservative token estimate used for context budgeting.
  *
- * This is not a provider tokenizer. It intentionally overestimates so the
- * application is less likely to exceed a model's actual context limit.
+ * This is not a provider-specific tokenizer. The estimate intentionally leaves
+ * additional safety room before the model context limit is reached.
  */
 export function estimateTokens(
   text: string,

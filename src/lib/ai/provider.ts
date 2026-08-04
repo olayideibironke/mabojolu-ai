@@ -1,62 +1,121 @@
 import type { UsageRecord } from "@/types/chat";
+
 import type { ModelDefinition } from "./models";
 
 /**
  * Provider-independent gateway contract.
  *
- * The chat product depends on this interface only. Adding a provider means
- * writing an adapter, not touching route handlers or UI, which is what keeps
- * the product portable.
+ * Mabojolu depends on this interface rather than on an individual provider's
+ * SDK or API shape. Adding or replacing a provider therefore does not require
+ * changing the route handler or chat interface.
  */
 
-/** A message after normalization, ready for any provider. */
+/**
+ * Image prepared for an AI provider.
+ *
+ * The browser data URL prefix is removed during context construction. Providers
+ * receive only validated base64 image data plus its MIME type.
+ */
+export interface NormalizedImage {
+  /** Original filename retained for debugging and future UI metadata. */
+  name: string;
+
+  mimeType:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp";
+
+  /** Base64 image content without the data URL prefix. */
+  base64Data: string;
+}
+
+/**
+ * A normalized conversation message ready for any configured provider.
+ *
+ * Images are optional because ordinary text conversations should remain small.
+ */
 export interface NormalizedMessage {
   role: "user" | "assistant";
   content: string;
+
+  /**
+   * Vision attachments associated with this user turn.
+   *
+   * Assistant messages should not contain images in the current Mabojolu
+   * implementation.
+   */
+  images?: NormalizedImage[];
 }
 
 export interface GenerationRequest {
   model: ModelDefinition;
+
   /** Server-controlled instructions. Never supplied by the browser. */
   systemPrompt: string;
+
   messages: NormalizedMessage[];
+
   maxOutputTokens: number;
+
   /**
-   * Cancels the provider request. Wired to the client disconnecting or to the
-   * user pressing stop, so an abandoned generation stops being billed.
+   * Cancels the provider request.
+   *
+   * This is connected to the user pressing stop, navigating away, or closing
+   * the browser request.
    */
   signal: AbortSignal;
+
   /**
-   * Deduplication key. Lets a retried request be recognized rather than
-   * silently producing a second billable generation.
+   * Deduplication key used so a retried request is recognized as the same
+   * logical generation instead of silently creating another one.
    */
   idempotencyKey?: string;
 }
 
 export type GenerationChunk =
-  | { type: "text"; text: string }
-  /** Progress signal only. Raw model reasoning is never forwarded. */
-  | { type: "progress"; label: string }
+  | {
+      type: "text";
+      text: string;
+    }
+  | {
+      /**
+       * Progress status only.
+       *
+       * Raw private reasoning is never forwarded to the browser.
+       */
+      type: "progress";
+      label: string;
+    }
   | {
       type: "finish";
-      finishReason: "end_turn" | "max_tokens" | "aborted" | "refusal";
+
+      finishReason:
+        | "end_turn"
+        | "max_tokens"
+        | "aborted"
+        | "refusal";
+
       usage?: UsageRecord;
     };
 
 export interface AiProvider {
   readonly id: string;
+
   /**
-   * Whether this provider can serve traffic right now.
+   * Whether this provider can currently serve requests.
    *
-   * Checked before a request is attempted so a missing credential produces a
-   * clear configuration error rather than a provider exception.
+   * This is checked before generation begins so missing configuration produces
+   * a clear Mabojolu error instead of an unclear provider failure.
    */
   isConfigured(): boolean;
+
   /**
-   * Stream a generation.
+   * Stream one generation.
    *
-   * Implementations must throw `ChatError` for every failure and must not leak
-   * provider-specific detail into the thrown message.
+   * Provider implementations must normalize failures into Mabojolu ChatError
+   * instances and must never expose credentials or internal provider details.
    */
-  stream(request: GenerationRequest): AsyncIterable<GenerationChunk>;
+  stream(
+    request: GenerationRequest,
+  ): AsyncIterable<GenerationChunk>;
 }

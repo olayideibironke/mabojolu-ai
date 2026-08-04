@@ -1,24 +1,55 @@
 import "server-only";
 
-import { ChatError, chatError } from "../errors";
+import { chatError } from "@/lib/ai/errors";
 import type {
   AiProvider,
   GenerationChunk,
   GenerationRequest,
-} from "../provider";
+  NormalizedMessage,
+} from "@/lib/ai/provider";
 
 interface OllamaProviderOptions {
   baseUrl: string;
   timeoutMs: number;
-  keepAlive?: string;
+  keepAlive: string;
 }
 
-interface OllamaChatChunk {
-  message?: {
-    role?: string;
-    content?: string;
-    thinking?: string;
+interface OllamaChatMessage {
+  role: "system" | "user" | "assistant";
+  content: string;
+  images?: string[];
+}
+
+interface OllamaChatRequest {
+  model: string;
+  messages: OllamaChatMessage[];
+  stream: true;
+
+  /**
+   * Mabojolu currently hides private reasoning and requests only the final
+   * answer. Ollama supports disabling thinking with this field for compatible
+   * Qwen models.
+   */
+  think: false;
+
+  keep_alive: string;
+
+  options: {
+    num_predict: number;
   };
+}
+
+interface OllamaStreamMessage {
+  role?: string;
+  content?: string;
+  thinking?: string;
+  images?: unknown;
+}
+
+interface OllamaStreamChunk {
+  model?: string;
+  created_at?: string;
+  message?: OllamaStreamMessage;
   done?: boolean;
   done_reason?: string;
   prompt_eval_count?: number;
@@ -26,194 +57,499 @@ interface OllamaChatChunk {
   error?: string;
 }
 
-/**
- * Local Ollama provider.
- *
- * Runs entirely through the Ollama HTTP API on the user's computer.
- * No cloud API credential or paid provider token is required.
- */
-export class OllamaProvider implements AiProvider {
+function normalizeBaseUrl(
+  baseUrl: string,
+): string {
+  return baseUrl
+    .trim()
+    .replace(/\/+$/, "");
+}
+
+function toOllamaMessage(
+  message: NormalizedMessage,
+): OllamaChatMessage {
+  const images =
+    message.images?.map(
+      (image) => image.base64Data,
+    );
+
+  return {
+    role: message.role,
+    content: message.content,
+
+    ...(images && images.length > 0
+      ? {
+          images,
+        }
+      : {}),
+  };
+}
+
+function buildMessages(
+  request: GenerationRequest,
+): OllamaChatMessage[] {
+  return [
+    {
+      role: "system",
+      content: request.systemPrompt,
+    },
+
+    ...request.messages.map(
+      toOllamaMessage,
+    ),
+  ];
+}
+
+function createCombinedSignal(input: {
+  requestSignal: AbortSignal;
+  timeoutMs: number;
+}): {
+  signal: AbortSignal;
+  timedOut: () => boolean;
+  cleanup: () => void;
+} {
+  const controller =
+    new AbortController();
+
+  let timeoutTriggered = false;
+
+  const abortFromRequest = () => {
+    controller.abort(
+      input.requestSignal.reason,
+    );
+  };
+
+  if (input.requestSignal.aborted) {
+    abortFromRequest();
+  } else {
+    input.requestSignal.addEventListener(
+      "abort",
+      abortFromRequest,
+      {
+        once: true,
+      },
+    );
+  }
+
+  const timeout = setTimeout(() => {
+    timeoutTriggered = true;
+
+    controller.abort(
+      new DOMException(
+        "Ollama request timed out.",
+        "TimeoutError",
+      ),
+    );
+  }, input.timeoutMs);
+
+  return {
+    signal: controller.signal,
+
+    timedOut: () =>
+      timeoutTriggered,
+
+    cleanup: () => {
+      clearTimeout(timeout);
+
+      input.requestSignal.removeEventListener(
+        "abort",
+        abortFromRequest,
+      );
+    },
+  };
+}
+
+async function readErrorDetail(
+  response: Response,
+): Promise<string | undefined> {
+  try {
+    const body =
+      (await response.json()) as {
+        error?: unknown;
+      };
+
+    return typeof body.error ===
+      "string"
+      ? body.error
+      : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function translateHttpFailure(input: {
+  status: number;
+  detail?: string;
+}): ReturnType<typeof chatError> {
+  const cause = input.detail
+    ? new Error(input.detail)
+    : new Error(
+        `Ollama returned HTTP ${input.status}.`,
+      );
+
+  if (input.status === 400) {
+    return chatError(
+      "invalid_request",
+      {
+        message:
+          "Ollama could not process that message or image. Try a smaller image or another response mode.",
+        cause,
+      },
+    );
+  }
+
+  if (input.status === 404) {
+    return chatError(
+      "provider_unavailable",
+      {
+        message:
+          "The selected local model is not installed. Choose another response mode or install the model.",
+        cause,
+      },
+    );
+  }
+
+  if (input.status === 408) {
+    return chatError(
+      "provider_timeout",
+      {
+        cause,
+      },
+    );
+  }
+
+  if (input.status === 429) {
+    return chatError(
+      "rate_limited",
+      {
+        message:
+          "The local AI service is busy. Wait a moment and try again.",
+        cause,
+      },
+    );
+  }
+
+  if (input.status >= 500) {
+    return chatError(
+      "provider_unavailable",
+      {
+        message:
+          "Ollama is temporarily unavailable. Confirm it is running and try again.",
+        cause,
+      },
+    );
+  }
+
+  return chatError(
+    "provider_unavailable",
+    {
+      cause,
+    },
+  );
+}
+
+function translateConnectionFailure(
+  cause: unknown,
+  timedOut: boolean,
+  requestAborted: boolean,
+): ReturnType<typeof chatError> {
+  if (requestAborted) {
+    return chatError(
+      "aborted",
+      {
+        cause,
+      },
+    );
+  }
+
+  if (timedOut) {
+    return chatError(
+      "provider_timeout",
+      {
+        message:
+          "The local model took too long to respond. Try Fast mode or send a smaller image.",
+        cause,
+      },
+    );
+  }
+
+  return chatError(
+    "provider_unavailable",
+    {
+      message:
+        "Mabojolu could not connect to Ollama. Confirm Ollama is running and try again.",
+      cause,
+    },
+  );
+}
+
+function finishReason(
+  chunk: OllamaStreamChunk,
+  maxOutputTokens: number,
+): "end_turn" | "max_tokens" {
+  if (
+    chunk.done_reason === "length" ||
+    (typeof chunk.eval_count ===
+      "number" &&
+      chunk.eval_count >=
+        maxOutputTokens)
+  ) {
+    return "max_tokens";
+  }
+
+  return "end_turn";
+}
+
+export class OllamaProvider
+  implements AiProvider
+{
   readonly id = "ollama";
 
   private readonly baseUrl: string;
   private readonly timeoutMs: number;
   private readonly keepAlive: string;
 
-  constructor(options: OllamaProviderOptions) {
-    this.baseUrl = options.baseUrl.replace(/\/+$/, "");
-    this.timeoutMs = options.timeoutMs;
-    this.keepAlive = options.keepAlive ?? "5m";
+  constructor(
+    options: OllamaProviderOptions,
+  ) {
+    this.baseUrl =
+      normalizeBaseUrl(
+        options.baseUrl,
+      );
+
+    this.timeoutMs =
+      options.timeoutMs;
+
+    this.keepAlive =
+      options.keepAlive;
   }
 
   isConfigured(): boolean {
-    return this.baseUrl.length > 0;
+    return (
+      this.baseUrl.length > 0 &&
+      this.timeoutMs > 0 &&
+      this.keepAlive.trim()
+        .length > 0
+    );
   }
 
   async *stream(
     request: GenerationRequest,
   ): AsyncIterable<GenerationChunk> {
-    const controller = new AbortController();
-    let timedOut = false;
-
-    const forwardRequestAbort = () => {
-      controller.abort(request.signal.reason);
-    };
-
-    if (request.signal.aborted) {
-      forwardRequestAbort();
-    } else {
-      request.signal.addEventListener(
-        "abort",
-        forwardRequestAbort,
-        { once: true },
+    if (!this.isConfigured()) {
+      throw chatError(
+        "provider_not_configured",
+        {
+          message:
+            "Ollama is not configured correctly. Check the local Ollama settings.",
+        },
       );
     }
 
-    const timeout = setTimeout(() => {
-      timedOut = true;
+    const combined =
+      createCombinedSignal({
+        requestSignal:
+          request.signal,
 
-      controller.abort(
-        new DOMException(
-          "The local model response timed out.",
-          "TimeoutError",
-        ),
-      );
-    }, this.timeoutMs);
+        timeoutMs:
+          this.timeoutMs,
+      });
+
+    const body: OllamaChatRequest = {
+      model:
+        request.model
+          .providerModelId,
+
+      messages:
+        buildMessages(request),
+
+      stream: true,
+
+      /**
+       * Thinking is disabled because Mabojolu does not expose private reasoning
+       * traces. Only final response text is streamed to the interface.
+       */
+      think: false,
+
+      keep_alive:
+        this.keepAlive,
+
+      options: {
+        num_predict:
+          request.maxOutputTokens,
+      },
+    };
+
+    let response: Response;
 
     try {
-      yield {
-        type: "progress",
-        label: "Thinking",
-      };
-
-      let response: Response;
-
-      try {
-        response = await fetch(`${this.baseUrl}/api/chat`, {
+      response = await fetch(
+        `${this.baseUrl}/api/chat`,
+        {
           method: "POST",
+
           headers: {
-            "Content-Type": "application/json",
+            "Content-Type":
+              "application/json",
           },
-          body: JSON.stringify({
-            model: request.model.providerModelId,
-            messages: [
-              {
-                role: "system",
-                content: request.systemPrompt,
-              },
-              ...request.messages.map((message) => ({
-                role: message.role,
-                content: message.content,
-              })),
-            ],
-            stream: true,
 
-            /*
-             * Thinking-capable models may produce a separate reasoning field.
-             * Mabojolu never sends that private reasoning trace to the browser.
-             */
-            think: false,
+          body: JSON.stringify(
+            body,
+          ),
 
-            keep_alive: this.keepAlive,
+          signal:
+            combined.signal,
 
-            options: {
-              num_predict: Math.min(
-                request.maxOutputTokens,
-                request.model.maxOutputTokens,
-              ),
-            },
-          }),
-          signal: controller.signal,
           cache: "no-store",
-        });
-      } catch (cause) {
-        if (request.signal.aborted) {
-          yield {
-            type: "finish",
-            finishReason: "aborted",
-          };
-          return;
-        }
+        },
+      );
+    } catch (cause) {
+      combined.cleanup();
 
-        if (timedOut) {
-          throw chatError("provider_timeout", { cause });
-        }
+      throw translateConnectionFailure(
+        cause,
+        combined.timedOut(),
+        request.signal.aborted,
+      );
+    }
 
-        throw chatError("provider_unavailable", {
+    if (!response.ok) {
+      const detail =
+        await readErrorDetail(
+          response,
+        );
+
+      combined.cleanup();
+
+      throw translateHttpFailure({
+        status: response.status,
+        detail,
+      });
+    }
+
+    if (!response.body) {
+      combined.cleanup();
+
+      throw chatError(
+        "provider_unavailable",
+        {
           message:
-            "Mabojolu could not reach the local AI engine. Make sure Ollama is running.",
-          cause,
-        });
-      }
+            "Ollama returned an empty response. Please try again.",
+        },
+      );
+    }
 
-      if (!response.ok) {
-        throw await translateHttpError(response);
-      }
+    const reader =
+      response.body.getReader();
 
-      if (!response.body) {
-        throw chatError("provider_unavailable", {
-          message:
-            "The local AI engine returned an empty response.",
-        });
-      }
+    const decoder =
+      new TextDecoder();
 
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
+    let buffer = "";
+    let sawText = false;
+    let receivedFinish = false;
 
-      let buffer = "";
-      let receivedFinishChunk = false;
-
+    try {
       while (true) {
-        const result = await reader.read();
+        const result =
+          await reader.read();
 
         if (result.done) {
           break;
         }
 
-        buffer += decoder.decode(result.value, {
-          stream: true,
-        });
+        buffer += decoder.decode(
+          result.value,
+          {
+            stream: true,
+          },
+        );
 
-        const lines = buffer.split("\n");
-        buffer = lines.pop() ?? "";
+        const lines =
+          buffer.split(/\r?\n/);
+
+        buffer =
+          lines.pop() ?? "";
 
         for (const line of lines) {
-          const chunk = parseChunk(line);
+          const trimmed =
+            line.trim();
 
-          if (!chunk) {
+          if (!trimmed) {
             continue;
           }
 
-          if (chunk.error) {
-            throw chatError("provider_unavailable", {
-              message:
-                "The local AI engine could not complete that response.",
-              cause: new Error(chunk.error),
-            });
+          let chunk:
+            OllamaStreamChunk;
+
+          try {
+            chunk =
+              JSON.parse(
+                trimmed,
+              ) as OllamaStreamChunk;
+          } catch (cause) {
+            throw chatError(
+              "provider_unavailable",
+              {
+                message:
+                  "Ollama returned an unreadable response. Please try again.",
+                cause,
+              },
+            );
           }
 
-          const content = chunk.message?.content;
+          if (chunk.error) {
+            throw chatError(
+              "provider_unavailable",
+              {
+                message:
+                  "Ollama could not complete that request. Try again or choose another response mode.",
+                cause:
+                  new Error(
+                    chunk.error,
+                  ),
+              },
+            );
+          }
 
-          if (content) {
+          const text =
+            chunk.message
+              ?.content ?? "";
+
+          if (text.length > 0) {
+            sawText = true;
+
             yield {
               type: "text",
-              text: content,
+              text,
             };
           }
 
+          /**
+           * The `thinking` field is deliberately ignored. Mabojolu never
+           * forwards private reasoning traces to the browser.
+           */
+
           if (chunk.done) {
-            receivedFinishChunk = true;
+            receivedFinish = true;
 
             yield {
               type: "finish",
-              finishReason: mapFinishReason(
-                chunk.done_reason,
-              ),
+
+              finishReason:
+                finishReason(
+                  chunk,
+                  request.maxOutputTokens,
+                ),
+
               usage: {
                 inputTokens:
-                  chunk.prompt_eval_count ?? 0,
+                  chunk.prompt_eval_count ??
+                  0,
+
                 outputTokens:
-                  chunk.eval_count ?? 0,
+                  chunk.eval_count ??
+                  0,
               },
             };
 
@@ -222,41 +558,80 @@ export class OllamaProvider implements AiProvider {
         }
       }
 
-      buffer += decoder.decode();
+      /**
+       * Process a final JSON object that may not end with a newline.
+       */
+      const trailing =
+        `${buffer}${decoder.decode()}`
+          .trim();
 
-      const finalChunk = parseChunk(buffer);
+      if (trailing.length > 0) {
+        let chunk:
+          OllamaStreamChunk;
 
-      if (finalChunk) {
-        if (finalChunk.error) {
-          throw chatError("provider_unavailable", {
-            message:
-              "The local AI engine could not complete that response.",
-            cause: new Error(finalChunk.error),
-          });
+        try {
+          chunk =
+            JSON.parse(
+              trailing,
+            ) as OllamaStreamChunk;
+        } catch (cause) {
+          throw chatError(
+            "provider_unavailable",
+            {
+              message:
+                "Ollama returned an incomplete response. Please try again.",
+              cause,
+            },
+          );
         }
 
-        const content = finalChunk.message?.content;
+        if (chunk.error) {
+          throw chatError(
+            "provider_unavailable",
+            {
+              message:
+                "Ollama could not complete that request. Try again or choose another response mode.",
+              cause:
+                new Error(
+                  chunk.error,
+                ),
+            },
+          );
+        }
 
-        if (content) {
+        const text =
+          chunk.message
+            ?.content ?? "";
+
+        if (text.length > 0) {
+          sawText = true;
+
           yield {
             type: "text",
-            text: content,
+            text,
           };
         }
 
-        if (finalChunk.done) {
-          receivedFinishChunk = true;
+        if (chunk.done) {
+          receivedFinish = true;
 
           yield {
             type: "finish",
-            finishReason: mapFinishReason(
-              finalChunk.done_reason,
-            ),
+
+            finishReason:
+              finishReason(
+                chunk,
+                request.maxOutputTokens,
+              ),
+
             usage: {
               inputTokens:
-                finalChunk.prompt_eval_count ?? 0,
+                chunk.prompt_eval_count ??
+                0,
+
               outputTokens:
-                finalChunk.eval_count ?? 0,
+                chunk.eval_count ??
+                0,
             },
           };
 
@@ -264,158 +639,82 @@ export class OllamaProvider implements AiProvider {
         }
       }
 
-      if (request.signal.aborted) {
+      if (
+        request.signal.aborted
+      ) {
         yield {
           type: "finish",
-          finishReason: "aborted",
+          finishReason:
+            "aborted",
         };
+
         return;
       }
 
-      if (!receivedFinishChunk) {
-        throw chatError("provider_unavailable", {
-          message:
-            "The local AI response ended unexpectedly. Please try again.",
-        });
+      if (!receivedFinish) {
+        yield {
+          type: "finish",
+
+          finishReason:
+            sawText
+              ? "end_turn"
+              : "refusal",
+        };
       }
     } catch (cause) {
-      if (request.signal.aborted) {
+      if (
+        request.signal.aborted
+      ) {
         yield {
           type: "finish",
-          finishReason: "aborted",
+          finishReason:
+            "aborted",
         };
+
         return;
       }
 
-      if (timedOut) {
-        throw chatError("provider_timeout", { cause });
+      if (
+        combined.timedOut()
+      ) {
+        throw chatError(
+          "provider_timeout",
+          {
+            message:
+              "The local model took too long to respond. Try Fast mode or send a smaller image.",
+            cause,
+          },
+        );
       }
 
-      if (cause instanceof ChatError) {
-        throw cause;
+      if (
+        cause instanceof Error &&
+        cause.name ===
+          "AbortError"
+      ) {
+        throw chatError(
+          "provider_unavailable",
+          {
+            message:
+              "The Ollama connection ended unexpectedly. Please try again.",
+            cause,
+          },
+        );
       }
 
-      throw chatError("provider_unavailable", {
-        cause,
-      });
+      throw cause;
     } finally {
-      clearTimeout(timeout);
+      combined.cleanup();
 
-      request.signal.removeEventListener(
-        "abort",
-        forwardRequestAbort,
-      );
-
-      if (!controller.signal.aborted) {
-        controller.abort();
+      try {
+        await reader.cancel();
+      } catch {
+        /**
+         * The stream may already be closed. No action is needed.
+         */
       }
+
+      reader.releaseLock();
     }
   }
-}
-
-function parseChunk(
-  line: string,
-): OllamaChatChunk | null {
-  const cleaned = line.trim();
-
-  if (!cleaned) {
-    return null;
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(cleaned);
-
-    if (
-      typeof parsed !== "object" ||
-      parsed === null ||
-      Array.isArray(parsed)
-    ) {
-      throw new Error(
-        "Ollama returned a non-object stream chunk.",
-      );
-    }
-
-    return parsed as OllamaChatChunk;
-  } catch (cause) {
-    throw chatError("provider_unavailable", {
-      message:
-        "The local AI engine returned an invalid response.",
-      cause,
-    });
-  }
-}
-
-function mapFinishReason(
-  reason: string | undefined,
-): "end_turn" | "max_tokens" {
-  if (
-    reason === "length" ||
-    reason === "max_tokens"
-  ) {
-    return "max_tokens";
-  }
-
-  return "end_turn";
-}
-
-async function translateHttpError(
-  response: Response,
-): Promise<ChatError> {
-  let providerDetail = `Ollama HTTP ${response.status}`;
-
-  try {
-    const payload: unknown = await response.json();
-
-    if (
-      typeof payload === "object" &&
-      payload !== null &&
-      "error" in payload &&
-      typeof payload.error === "string"
-    ) {
-      providerDetail = payload.error;
-    }
-  } catch {
-    // Keep the status-based server log detail.
-  }
-
-  const cause = new Error(providerDetail);
-
-  if (response.status === 404) {
-    return chatError("provider_not_configured", {
-      message:
-        "The configured local AI model is not installed. Install it in Ollama and try again.",
-      cause,
-    });
-  }
-
-  if (response.status === 429) {
-    return chatError("rate_limited", {
-      message:
-        "The local AI engine is busy. Please wait a moment and try again.",
-      cause,
-    });
-  }
-
-  if (
-    response.status === 408 ||
-    response.status === 504
-  ) {
-    return chatError("provider_timeout", {
-      cause,
-    });
-  }
-
-  if (response.status === 400) {
-    return chatError("invalid_request", {
-      message:
-        "The local AI engine could not process that request.",
-      cause,
-    });
-  }
-
-  return chatError("provider_unavailable", {
-    message:
-      "The local AI engine is temporarily unavailable. Please try again.",
-    cause,
-  });
 }

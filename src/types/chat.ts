@@ -1,17 +1,20 @@
 /**
- * Shared chat types.
+ * Shared Mabojolu chat types.
  *
- * These cross the browser/server boundary, so they stay free of server-only
- * imports and describe only data that is safe to send to a client.
+ * These types cross the browser and server boundary, so they contain only data
+ * that is safe to send to the client. Provider credentials and server-only
+ * implementation details must never be added here.
  */
 
-export type MessageRole = "user" | "assistant";
+export type MessageRole =
+  | "user"
+  | "assistant";
 
 /**
- * Delivery state of a single message.
+ * Delivery state of one message.
  *
- * `interrupted` is a first-class outcome, not an error: the user stopped
- * generation and the partial text is intentionally kept.
+ * Interrupted is a valid outcome rather than an error because the user may
+ * intentionally stop generation while keeping the partial response.
  */
 export type MessageStatus =
   | "pending"
@@ -20,28 +23,72 @@ export type MessageStatus =
   | "interrupted"
   | "failed";
 
-export type FeedbackRating = "up" | "down";
+export type FeedbackRating =
+  | "up"
+  | "down";
+
+/**
+ * Image attached to a user message.
+ *
+ * `dataUrl` contains the browser-readable preview and the base64 image payload
+ * used for the current local Ollama vision request.
+ *
+ * Only validated JPEG, PNG, and WebP images should reach this structure.
+ */
+export interface ChatImageAttachment {
+  /** Client-generated stable identifier. */
+  id: string;
+
+  /** Original display name selected by the user. */
+  name: string;
+
+  /** Validated image MIME type. */
+  mimeType:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp";
+
+  /** Original file size before base64 encoding. */
+  sizeBytes: number;
+
+  /**
+   * Complete data URL, for example:
+   * data:image/png;base64,iVBORw0KGgo...
+   */
+  dataUrl: string;
+}
 
 export interface ChatMessage {
   id: string;
+
   /**
-   * The database identifier, once the server has assigned one.
+   * Database identifier assigned by the server.
    *
-   * Distinct from `id` because a message is rendered optimistically with a
-   * client-generated id before the server has stored it. Actions that address a
-   * stored row, such as feedback, need this one; React keys and local updates use
-   * `id`, which never changes and so cannot remount a mid-stream component.
+   * This remains separate from `id` because optimistic messages need a stable
+   * client identifier before the database row exists.
    */
   serverId?: string;
+
   role: MessageRole;
   content: string;
   status: MessageStatus;
-  /** ISO 8601. Assigned by whichever side created the message. */
+
+  /** ISO 8601 timestamp. */
   createdAt: string;
-  /** Present on assistant messages once a provider has responded. */
+
+  /**
+   * Images included with a user message.
+   *
+   * Assistant messages normally leave this undefined.
+   */
+  attachments?: ChatImageAttachment[];
+
+  /** Present on assistant messages after a provider starts responding. */
   model?: string;
-  /** Set when `status` is `failed`. Safe for display. */
+
+  /** Safe display error when the message status is failed. */
   error?: ChatErrorPayload;
+
   feedback?: FeedbackRating;
 }
 
@@ -53,7 +100,11 @@ export interface Conversation {
   messages: ChatMessage[];
 }
 
-/** Conversation summary for the sidebar; excludes message bodies. */
+/**
+ * Conversation summary used in the sidebar.
+ *
+ * Message bodies and attachment data are intentionally excluded.
+ */
 export interface ConversationSummary {
   id: string;
   title: string;
@@ -63,10 +114,10 @@ export interface ConversationSummary {
 }
 
 /**
- * Stable, machine-readable error codes.
+ * Stable machine-readable error codes.
  *
- * The UI maps these to copy and to whether a retry is worth offering, so they
- * are part of the API contract rather than an implementation detail.
+ * The client uses these values to determine display text and whether retrying
+ * can reasonably succeed.
  */
 export type ChatErrorCode =
   | "invalid_request"
@@ -86,14 +137,19 @@ export type ChatErrorCode =
 
 export interface ChatErrorPayload {
   code: ChatErrorCode;
-  /** User-facing message. Never contains a stack trace or credential. */
+
+  /** User-facing message without stack traces or credentials. */
   message: string;
+
   retryable: boolean;
-  /** Seconds to wait before retrying. Only set for `rate_limited`. */
+
+  /** Present only for rate-limited responses. */
   retryAfterSeconds?: number;
 }
 
-/** Token accounting for one generation, used for usage and cost reporting. */
+/**
+ * Token accounting for one completed generation.
+ */
 export interface UsageRecord {
   inputTokens: number;
   outputTokens: number;
@@ -102,30 +158,41 @@ export interface UsageRecord {
 }
 
 /**
- * Server-sent events emitted by the chat route.
- *
- * A discriminated union so the client parser is exhaustive and adding an event
- * type is a compile error at every consumer until handled.
+ * Server-sent events emitted by the chat API.
  */
 export type ChatStreamEvent =
   | {
       type: "start";
-      /** Server-assigned id of the assistant message being written. */
+
+      /** Server identifier for the assistant message being written. */
       messageId: string;
+
       model: string;
+
       /**
-       * The conversation this reply belongs to.
-       *
-       * Present so the client learns the id of a conversation the server just
-       * created, without a second round trip.
+       * Included when the server creates a new conversation during this
+       * request.
        */
       conversationId?: string;
     }
-  | { type: "delta"; text: string }
-  | { type: "status"; label: string }
+  | {
+      type: "delta";
+      text: string;
+    }
+  | {
+      type: "status";
+      label: string;
+    }
   | {
       type: "done";
-      finishReason: "end_turn" | "max_tokens" | "aborted" | "refusal";
+      finishReason:
+        | "end_turn"
+        | "max_tokens"
+        | "aborted"
+        | "refusal";
       usage?: UsageRecord;
     }
-  | { type: "error"; error: ChatErrorPayload };
+  | {
+      type: "error";
+      error: ChatErrorPayload;
+    };

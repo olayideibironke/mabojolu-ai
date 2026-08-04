@@ -23,32 +23,17 @@ import { MenuIcon } from "@/components/ui/icons";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { useChat } from "@/hooks/use-chat";
 import { useConversations } from "@/hooks/use-conversations";
+import type { ChatImageAttachment } from "@/types/chat";
 
 import { Composer } from "./composer";
+import { ConversationMap } from "./conversation-map";
 import { EmptyState } from "./empty-state";
 import { Message } from "./message";
 
-/**
- * Application shell.
- *
- * Coordinates the sidebar, transcript, composer, model preference, and
- * settings dialog.
- *
- * Conversation logic lives in useChat and history logic lives in
- * useConversations.
- *
- * The selected local model is stored in the browser so Fast or Quality remains
- * selected after a refresh.
- */
-
 interface ChatShellProps {
-  /** Whether a session exists. */
   isSignedIn: boolean;
-
   userEmail?: string;
   isAdmin?: boolean;
-
-  /** Indicates where conversation records are currently stored. */
   persistenceKind: "local" | "supabase";
 }
 
@@ -61,9 +46,6 @@ const MODEL_CHANGE_EVENT =
 const DEFAULT_MODEL_ID: MabojoluModelId =
   "mabojolu-local";
 
-/**
- * Provides a fallback when browser storage is restricted or unavailable.
- */
 let inMemoryModelPreference: MabojoluModelId =
   DEFAULT_MODEL_ID;
 
@@ -72,13 +54,11 @@ function isMabojoluModelId(
 ): value is MabojoluModelId {
   return (
     value === "mabojolu-fast" ||
+    value === "mabojolu-regular" ||
     value === "mabojolu-local"
   );
 }
 
-/**
- * Client snapshot for React's external-store integration.
- */
 function getModelPreferenceSnapshot(): MabojoluModelId {
   try {
     const storedValue =
@@ -94,25 +74,18 @@ function getModelPreferenceSnapshot(): MabojoluModelId {
     }
   } catch {
     /*
-     * Browser storage may be unavailable in restricted privacy environments.
-     * The in-memory preference still works for the current session.
+     * The in-memory preference remains available when browser storage is
+     * restricted.
      */
   }
 
   return inMemoryModelPreference;
 }
 
-/**
- * Server snapshot must remain stable so server HTML and the first client render
- * match during hydration.
- */
 function getServerModelPreferenceSnapshot(): MabojoluModelId {
   return DEFAULT_MODEL_ID;
 }
 
-/**
- * Subscribe to preference changes from this tab and other browser tabs.
- */
 function subscribeToModelPreference(
   callback: () => void,
 ): () => void {
@@ -162,21 +135,13 @@ function saveModelPreference(
     );
   } catch {
     /*
-     * The current browser session can still use the in-memory preference.
+     * The selected mode still works for the current browser session.
      */
   }
 
   window.dispatchEvent(
     new Event(MODEL_CHANGE_EVENT),
   );
-}
-
-function modelLabel(
-  modelId: MabojoluModelId,
-): string {
-  return modelId === "mabojolu-fast"
-    ? "Fast"
-    : "Quality";
 }
 
 export function ChatShell({
@@ -191,6 +156,11 @@ export function ChatShell({
   const [
     activeConversationId,
     setActiveConversationId,
+  ] = useState<string | null>(null);
+
+  const [
+    activeMessageId,
+    setActiveMessageId,
   ] = useState<string | null>(null);
 
   const [
@@ -222,8 +192,8 @@ export function ChatShell({
     [],
   );
 
-  /** Reload the sidebar after conversation changes. */
-  const refreshHistory = history.refresh;
+  const refreshHistory =
+    history.refresh;
 
   const handleConversationChanged =
     useCallback(
@@ -283,9 +253,116 @@ export function ChatShell({
     isStreaming,
   );
 
-  /**
-   * Restore the conversation identified in the URL.
-   */
+  useEffect(() => {
+    const root =
+      containerRef.current;
+
+    if (
+      !root ||
+      messages.length === 0
+    ) {
+      return;
+    }
+
+    const messageNodes =
+      Array.from(
+        root.querySelectorAll<HTMLElement>(
+          "[data-message-id]",
+        ),
+      );
+
+    if (
+      messageNodes.length === 0
+    ) {
+      return;
+    }
+
+    const observer =
+      new IntersectionObserver(
+        (entries) => {
+          const visibleEntries =
+            entries
+              .filter(
+                (entry) =>
+                  entry.isIntersecting,
+              )
+              .sort(
+                (
+                  first,
+                  second,
+                ) => {
+                  if (
+                    second.intersectionRatio !==
+                    first.intersectionRatio
+                  ) {
+                    return (
+                      second.intersectionRatio -
+                      first.intersectionRatio
+                    );
+                  }
+
+                  return (
+                    Math.abs(
+                      first.boundingClientRect
+                        .top,
+                    ) -
+                    Math.abs(
+                      second.boundingClientRect
+                        .top,
+                    )
+                  );
+                },
+              );
+
+          const mostVisible =
+            visibleEntries[0];
+
+          if (!mostVisible) {
+            return;
+          }
+
+          const messageId = (
+            mostVisible.target as HTMLElement
+          ).dataset.messageId;
+
+          if (!messageId) {
+            return;
+          }
+
+          setActiveMessageId(
+            (current) =>
+              current === messageId
+                ? current
+                : messageId,
+          );
+        },
+        {
+          root,
+          rootMargin:
+            "-12% 0px -45% 0px",
+          threshold: [
+            0.05,
+            0.25,
+            0.5,
+            0.75,
+          ],
+        },
+      );
+
+    messageNodes.forEach(
+      (node) => {
+        observer.observe(node);
+      },
+    );
+
+    return () => {
+      observer.disconnect();
+    };
+  }, [
+    containerRef,
+    messages,
+  ]);
+
   const restoredRef = useRef(false);
 
   useEffect(() => {
@@ -343,9 +420,6 @@ export function ChatShell({
     loadMessages,
   ]);
 
-  /**
-   * Refresh the sidebar when a generation finishes.
-   */
   const wasStreamingRef =
     useRef(false);
 
@@ -369,6 +443,7 @@ export function ChatShell({
       reset();
 
       setActiveConversationId(null);
+      setActiveMessageId(null);
       setIsSidebarOpen(false);
 
       setConversationEpoch(
@@ -419,6 +494,8 @@ export function ChatShell({
         setActiveConversationId(
           conversationId,
         );
+
+        setActiveMessageId(null);
 
         setConversationEpoch(
           (value) => value + 1,
@@ -472,12 +549,43 @@ export function ChatShell({
     );
 
   const handleSend = useCallback(
-    (content: string) => {
-      send(content);
+    (
+      content: string,
+      attachments:
+        ChatImageAttachment[] = [],
+    ) => {
+      send(
+        content,
+        attachments,
+      );
+
       setIsSidebarOpen(false);
     },
     [send],
   );
+
+  const jumpToMessage =
+    useCallback(
+      (messageId: string) => {
+        const target =
+          document.getElementById(
+            `message-${messageId}`,
+          );
+
+        if (!target) {
+          return;
+        }
+
+        setActiveMessageId(messageId);
+
+        target.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
+      },
+      [],
+    );
 
   const lastAssistantId =
     useMemo(() => {
@@ -500,9 +608,6 @@ export function ChatShell({
 
   const hasMessages =
     messages.length > 0;
-
-  const activeModelLabel =
-    modelLabel(selectedModelId);
 
   return (
     <div className="h-dvh overflow-hidden bg-surface-base text-text-primary">
@@ -567,18 +672,6 @@ export function ChatShell({
             <p className="truncate px-1 text-sm font-semibold">
               Mabojolu
             </p>
-
-            <button
-              type="button"
-              onClick={() =>
-                setIsSettingsOpen(true)
-              }
-              aria-label={`Current response mode: ${activeModelLabel}. Open settings to change it.`}
-              title="Change response mode"
-              className="inline-flex h-7 items-center rounded-full border border-border-subtle bg-surface-raised px-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
-            >
-              {activeModelLabel}
-            </button>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -633,27 +726,39 @@ export function ChatShell({
                 >
                   {messages.map(
                     (message) => (
-                      <Message
+                      <div
                         key={message.id}
-                        message={message}
-                        isLastAssistant={
-                          message.id ===
-                          lastAssistantId
+                        id={`message-${message.id}`}
+                        data-message-id={
+                          message.id
                         }
-                        isStreaming={
-                          isStreaming
-                        }
-                        onRetry={retry}
-                        onRegenerate={
-                          regenerate
-                        }
-                        onEdit={
-                          editUserMessage
-                        }
-                        onFeedback={
-                          setFeedback
-                        }
-                      />
+                        className="scroll-mt-24"
+                      >
+                        <Message
+                          message={
+                            message
+                          }
+                          isLastAssistant={
+                            message.id ===
+                            lastAssistantId
+                          }
+                          isStreaming={
+                            isStreaming
+                          }
+                          onRetry={
+                            retry
+                          }
+                          onRegenerate={
+                            regenerate
+                          }
+                          onEdit={
+                            editUserMessage
+                          }
+                          onFeedback={
+                            setFeedback
+                          }
+                        />
+                      </div>
                     ),
                   )}
                 </div>
@@ -668,7 +773,9 @@ export function ChatShell({
                       aria-hidden="true"
                     >
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted" />
+
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:150ms]" />
+
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:300ms]" />
                     </span>
 
@@ -691,9 +798,25 @@ export function ChatShell({
             }
             disabled={!isSignedIn}
             disabledReason="Sign in to start a conversation."
+            selectedModelId={
+              selectedModelId
+            }
+            onModelChange={
+              changeModel
+            }
           />
         </main>
       </div>
+
+      <ConversationMap
+        messages={messages}
+        activeMessageId={
+          activeMessageId
+        }
+        onJumpToMessage={
+          jumpToMessage
+        }
+      />
 
       <SettingsDialog
         isOpen={isSettingsOpen}

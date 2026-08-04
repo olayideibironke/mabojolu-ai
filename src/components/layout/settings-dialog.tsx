@@ -19,6 +19,7 @@ import {
 
 export type MabojoluModelId =
   | "mabojolu-fast"
+  | "mabojolu-regular"
   | "mabojolu-local";
 
 interface ModelOption {
@@ -35,18 +36,27 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Fast",
     label: "Mabojolu Fast",
     description:
-      "Quicker local responses with lower memory and processor demand.",
+      "The quickest local response mode with the lowest processor demand.",
     bestFor:
-      "Everyday questions, short drafts, quick explanations, and general assistance.",
+      "Short questions, quick explanations, simple drafting, and everyday assistance.",
+  },
+  {
+    id: "mabojolu-regular",
+    name: "Regular",
+    label: "Mabojolu Regular",
+    description:
+      "A balanced local mode with stronger responses while remaining responsive.",
+    bestFor:
+      "General conversations, routine writing, summaries, planning, and most daily tasks.",
   },
   {
     id: "mabojolu-local",
     name: "Quality",
     label: "Mabojolu Quality",
     description:
-      "Stronger local responses with more detailed reasoning and writing.",
+      "The strongest available local mode with more detailed reasoning and writing.",
     bestFor:
-      "Analysis, planning, longer writing, technical work, and difficult questions.",
+      "Analysis, technical work, complex planning, longer writing, and difficult questions.",
   },
 ];
 
@@ -141,7 +151,7 @@ export function SettingsDialog({
     MODEL_OPTIONS.find(
       (option) =>
         option.id === selectedModelId,
-    ) ?? MODEL_OPTIONS[0];
+    ) ?? MODEL_OPTIONS[1];
 
   return (
     <dialog
@@ -184,12 +194,12 @@ export function SettingsDialog({
             </h3>
 
             <p className="mt-1 text-xs leading-5 text-text-secondary">
-              Choose between faster answers and
-              stronger local response quality.
+              Choose the balance of speed and response
+              quality that works best for your task.
             </p>
           </div>
 
-          <fieldset className="mt-3 grid gap-3 sm:grid-cols-2">
+          <fieldset className="mt-3 grid gap-3">
             <legend className="sr-only">
               Choose a Mabojolu response mode
             </legend>
@@ -257,9 +267,9 @@ export function SettingsDialog({
             </p>
 
             <p className="mt-1 text-[11px] leading-5 text-text-muted">
-              The selected mode applies to your next
-              message. It does not interrupt a response
-              already being generated.
+              Your selection applies to the next message.
+              It does not interrupt an answer already being
+              generated.
             </p>
           </div>
         </section>
@@ -322,7 +332,7 @@ export function SettingsDialog({
           ) : (
             <p className="mt-1 text-xs leading-5 text-text-secondary">
               Your conversations are stored in the
-              configured database and are associated with
+              configured database and associated with
               your account.
             </p>
           )}

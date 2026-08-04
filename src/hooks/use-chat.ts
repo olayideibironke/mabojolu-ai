@@ -14,33 +14,21 @@ import {
 } from "@/lib/utilities/ids";
 import type {
   ChatErrorPayload,
+  ChatImageAttachment,
   ChatMessage,
   FeedbackRating,
 } from "@/types/chat";
 
-/**
- * Chat state and transport.
- *
- * All conversation mutation lives here so the components stay presentational.
- *
- * An interrupted generation must not corrupt the conversation. Partial text is
- * kept and marked interrupted.
- *
- * Retry must not duplicate a message. Retrying replaces the failed assistant
- * turn in place and reuses the same idempotency key.
- *
- * The selected model is supplied by the parent and included with every new
- * generation, retry, regeneration, and edited-message request.
- */
-
 export interface UseChatResult {
   messages: ChatMessage[];
   isStreaming: boolean;
-
-  /** Progress label from the server, such as Thinking. */
   statusLabel: string | null;
 
-  send: (content: string) => void;
+  send: (
+    content: string,
+    attachments?: ChatImageAttachment[],
+  ) => void;
+
   stop: () => void;
   retry: () => void;
 
@@ -60,30 +48,63 @@ export interface UseChatResult {
 
   reset: () => void;
 
-  /** Replace the transcript when a stored conversation is opened. */
   loadMessages: (
     messages: ChatMessage[],
     conversationId: string,
   ) => void;
 
-  /** True when the last assistant turn failed and can be retried. */
   canRetry: boolean;
 }
 
 export interface UseChatOptions {
-  /** Called once the server has created or updated a conversation. */
   onConversationChanged?: (
     conversationId: string,
   ) => void;
 
-  /**
-   * Mabojolu model selected by the user.
-   *
-   * Examples:
-   * mabojolu-fast
-   * mabojolu-local
-   */
   modelId?: string;
+}
+
+interface RequestMessage {
+  id: string;
+  role: ChatMessage["role"];
+  content: string;
+  createdAt: string;
+  attachments?: ChatImageAttachment[];
+}
+
+/**
+ * Prepare one browser message for the chat API.
+ *
+ * Image data is included only when attachments exist, keeping ordinary text
+ * requests small.
+ */
+function prepareRequestMessage(
+  message: ChatMessage,
+): RequestMessage {
+  const attachments =
+    message.attachments?.map(
+      (attachment) => ({
+        id: attachment.id,
+        name: attachment.name,
+        mimeType: attachment.mimeType,
+        sizeBytes: attachment.sizeBytes,
+        dataUrl: attachment.dataUrl,
+      }),
+    );
+
+  return {
+    id: message.id,
+    role: message.role,
+    content: message.content,
+    createdAt: message.createdAt,
+
+    ...(attachments &&
+    attachments.length > 0
+      ? {
+          attachments,
+        }
+      : {}),
+  };
 }
 
 export function useChat(
@@ -99,19 +120,9 @@ export function useChat(
   const [statusLabel, setStatusLabel] =
     useState<string | null>(null);
 
-  /**
-   * The conversation currently being appended to.
-   *
-   * A ref is used because asynchronous stream callbacks must always read the
-   * latest conversation without depending on captured React state.
-   */
   const conversationIdRef =
     useRef<string | null>(null);
 
-  /**
-   * Keep the conversation-changed callback current without forcing every chat
-   * callback to be recreated whenever the parent renders.
-   */
   const onConversationChangedRef = useRef(
     options.onConversationChanged,
   );
@@ -121,18 +132,13 @@ export function useChat(
       options.onConversationChanged;
   }, [options.onConversationChanged]);
 
-  /**
-   * Keep the selected model current for future generations.
-   *
-   * A model change does not interrupt an answer already being generated. It
-   * applies to the next send, retry, regeneration, or edited-message request.
-   */
   const modelIdRef = useRef(
     options.modelId,
   );
 
   useEffect(() => {
-    modelIdRef.current = options.modelId;
+    modelIdRef.current =
+      options.modelId;
   }, [options.modelId]);
 
   const controllerRef =
@@ -141,27 +147,14 @@ export function useChat(
   const idempotencyKeyRef =
     useRef<string | null>(null);
 
-  /**
-   * Guards against a late stream writing into a conversation that has already
-   * changed.
-   */
   const generationRef = useRef(0);
 
-  /**
-   * Abort any active generation when the component unmounts.
-   */
   useEffect(() => {
     return () => {
       controllerRef.current?.abort();
     };
   }, []);
 
-  /**
-   * Run one generation against the supplied history.
-   *
-   * The history already contains the user turn and ends with the placeholder
-   * assistant message identified by assistantId.
-   */
   const run = useCallback(
     (
       history: ChatMessage[],
@@ -171,12 +164,15 @@ export function useChat(
       const generation =
         generationRef.current + 1;
 
-      generationRef.current = generation;
+      generationRef.current =
+        generation;
 
       const controller =
         new AbortController();
 
-      controllerRef.current = controller;
+      controllerRef.current =
+        controller;
+
       idempotencyKeyRef.current =
         idempotencyKey;
 
@@ -187,7 +183,8 @@ export function useChat(
       let receivedText = false;
 
       const isCurrent = () =>
-        generationRef.current === generation;
+        generationRef.current ===
+        generation;
 
       const patchAssistant = (
         patch: Partial<ChatMessage>,
@@ -204,6 +201,17 @@ export function useChat(
         );
       };
 
+      const requestMessages =
+        history
+          .filter(
+            (message) =>
+              message.id !==
+              assistantId,
+          )
+          .map(
+            prepareRequestMessage,
+          );
+
       void streamChat(
         {
           ...(conversationIdRef.current
@@ -213,17 +221,7 @@ export function useChat(
               }
             : {}),
 
-          messages: history
-            .filter(
-              (message) =>
-                message.id !== assistantId,
-            )
-            .map((message) => ({
-              id: message.id,
-              role: message.role,
-              content: message.content,
-              createdAt: message.createdAt,
-            })),
+          messages: requestMessages,
 
           ...(modelIdRef.current
             ? {
@@ -298,23 +296,27 @@ export function useChat(
 
             setIsStreaming(false);
             setStatusLabel(null);
-            controllerRef.current = null;
+            controllerRef.current =
+              null;
 
             if (
-              finishReason === "aborted"
+              finishReason ===
+              "aborted"
             ) {
               if (receivedText) {
                 patchAssistant({
                   content: accumulated,
-                  status: "interrupted",
+                  status:
+                    "interrupted",
                 });
               } else {
-                setMessages((current) =>
-                  current.filter(
-                    (message) =>
-                      message.id !==
-                      assistantId,
-                  ),
+                setMessages(
+                  (current) =>
+                    current.filter(
+                      (message) =>
+                        message.id !==
+                        assistantId,
+                    ),
                 );
               }
 
@@ -322,13 +324,15 @@ export function useChat(
             }
 
             if (
-              finishReason === "refusal" &&
+              finishReason ===
+                "refusal" &&
               !receivedText
             ) {
               patchAssistant({
                 status: "failed",
                 error: {
-                  code: "provider_refused",
+                  code:
+                    "provider_refused",
                   message:
                     "Mabojolu was unable to answer that request. Try rephrasing it.",
                   retryable: false,
@@ -353,7 +357,8 @@ export function useChat(
 
             setIsStreaming(false);
             setStatusLabel(null);
-            controllerRef.current = null;
+            controllerRef.current =
+              null;
 
             patchAssistant({
               content: accumulated,
@@ -368,11 +373,17 @@ export function useChat(
   );
 
   const send = useCallback(
-    (content: string) => {
-      const trimmed = content.trim();
+    (
+      content: string,
+      attachments:
+        ChatImageAttachment[] = [],
+    ) => {
+      const trimmed =
+        content.trim();
 
       if (
-        trimmed.length === 0 ||
+        (trimmed.length === 0 &&
+          attachments.length === 0) ||
         isStreaming
       ) {
         return;
@@ -383,9 +394,23 @@ export function useChat(
       const userMessage: ChatMessage = {
         id: createId(),
         role: "user",
-        content: trimmed,
+        content:
+          trimmed.length > 0
+            ? trimmed
+            : "Please describe the attached image.",
         status: "complete",
         createdAt: timestamp,
+
+        ...(attachments.length > 0
+          ? {
+              attachments:
+                attachments.map(
+                  (attachment) => ({
+                    ...attachment,
+                  }),
+                ),
+            }
+          : {}),
       };
 
       const assistantMessage: ChatMessage = {
@@ -421,12 +446,6 @@ export function useChat(
     controllerRef.current?.abort();
   }, []);
 
-  /**
-   * Retry the last failed assistant turn.
-   *
-   * The previous idempotency key is reused so the server recognizes the same
-   * logical request instead of creating a duplicate.
-   */
   const retry = useCallback(() => {
     if (isStreaming) {
       return;
@@ -454,7 +473,10 @@ export function useChat(
     };
 
     const next = [
-      ...messages.slice(0, lastIndex),
+      ...messages.slice(
+        0,
+        lastIndex,
+      ),
       resetMessage,
     ];
 
@@ -472,12 +494,6 @@ export function useChat(
     run,
   ]);
 
-  /**
-   * Regenerate an assistant reply.
-   *
-   * The selected reply and everything after it are discarded. Mabojolu then
-   * responds again using the currently selected model.
-   */
   const regenerate = useCallback(
     (
       assistantMessageId: string,
@@ -510,7 +526,10 @@ export function useChat(
       };
 
       const next = [
-        ...messages.slice(0, index),
+        ...messages.slice(
+          0,
+          index,
+        ),
         placeholder,
       ];
 
@@ -529,17 +548,13 @@ export function useChat(
     ],
   );
 
-  /**
-   * Edit a user message and generate a new response from that point.
-   *
-   * Later turns are discarded because they answered the previous wording.
-   */
   const editUserMessage = useCallback(
     (
       messageId: string,
       content: string,
     ) => {
-      const trimmed = content.trim();
+      const trimmed =
+        content.trim();
 
       if (
         trimmed.length === 0 ||
@@ -557,7 +572,8 @@ export function useChat(
 
       if (
         index === -1 ||
-        messages[index].role !== "user"
+        messages[index].role !==
+          "user"
       ) {
         return;
       }
@@ -577,7 +593,10 @@ export function useChat(
       };
 
       const next = [
-        ...messages.slice(0, index),
+        ...messages.slice(
+          0,
+          index,
+        ),
         edited,
         placeholder,
       ];
@@ -597,9 +616,6 @@ export function useChat(
     ],
   );
 
-  /**
-   * Record message feedback optimistically, then save it on the server.
-   */
   const setFeedback = useCallback(
     (
       messageId: string,
@@ -608,7 +624,8 @@ export function useChat(
       const target =
         messages.find(
           (message) =>
-            message.id === messageId,
+            message.id ===
+            messageId,
         );
 
       if (!target) {
@@ -702,19 +719,18 @@ export function useChat(
     [messages],
   );
 
-  /**
-   * Replace the current transcript with a stored conversation.
-   */
   const loadMessages = useCallback(
     (
       loaded: ChatMessage[],
       conversationId: string,
     ) => {
       controllerRef.current?.abort();
-      controllerRef.current = null;
+      controllerRef.current =
+        null;
 
       generationRef.current += 1;
-      idempotencyKeyRef.current = null;
+      idempotencyKeyRef.current =
+        null;
 
       conversationIdRef.current =
         conversationId;
@@ -722,6 +738,18 @@ export function useChat(
       setMessages(
         loaded.map((message) => ({
           ...message,
+
+          ...(message.attachments
+            ? {
+                attachments:
+                  message.attachments.map(
+                    (attachment) => ({
+                      ...attachment,
+                    }),
+                  ),
+              }
+            : {}),
+
           serverId: message.id,
         })),
       );
@@ -732,16 +760,17 @@ export function useChat(
     [],
   );
 
-  /**
-   * Start a clean conversation.
-   */
   const reset = useCallback(() => {
     controllerRef.current?.abort();
-    controllerRef.current = null;
+    controllerRef.current =
+      null;
 
     generationRef.current += 1;
-    idempotencyKeyRef.current = null;
-    conversationIdRef.current = null;
+    idempotencyKeyRef.current =
+      null;
+
+    conversationIdRef.current =
+      null;
 
     setMessages([]);
     setIsStreaming(false);
@@ -755,7 +784,8 @@ export function useChat(
     !isStreaming &&
     last?.role === "assistant" &&
     last.status === "failed" &&
-    (last.error?.retryable ?? false);
+    (last.error?.retryable ??
+      false);
 
   return {
     messages,
