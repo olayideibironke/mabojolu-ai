@@ -6,12 +6,11 @@ import { z } from "zod";
  * Server environment contract.
  *
  * Every value here is server-only. Nothing in this module may be imported from
- * a Client Component: the `server-only` import above turns that mistake into a
- * build error instead of a leaked credential.
+ * a Client Component. The `server-only` import above turns that mistake into a
+ * build error instead of leaking private configuration.
  *
- * Validation is lazy (see `serverEnv()`), so the application still builds and
- * runs in mock mode before any provider credential exists. A missing credential
- * must fail safely at request time with a useful message, not crash the build.
+ * Validation is lazy through `serverEnv()`, so Mabojolu can still build and run
+ * in mock mode before any cloud-provider credential exists.
  */
 const serverEnvSchema = z.object({
   NODE_ENV: z
@@ -19,18 +18,49 @@ const serverEnvSchema = z.object({
     .default("development"),
 
   /**
-   * Which provider the gateway talks to. `mock` needs no credential and is the
-   * default so development and automated tests work with zero setup.
+   * Which provider the gateway uses.
+   *
+   * mock:
+   * Deterministic local responder for development and automated tests.
+   *
+   * ollama:
+   * Real local AI running through the Ollama desktop service.
+   *
+   * anthropic:
+   * Cloud AI requiring an Anthropic API key.
    */
-  AI_PROVIDER: z.enum(["mock", "anthropic"]).default("mock"),
+  AI_PROVIDER: z
+    .enum(["mock", "ollama", "anthropic"])
+    .default("mock"),
 
   ANTHROPIC_API_KEY: z.string().min(1).optional(),
 
-  /** Overrides the registry default model. Must be an id the registry knows. */
+  /**
+   * Local Ollama HTTP endpoint.
+   *
+   * 127.0.0.1 is preferred over localhost because it avoids unnecessary
+   * hostname-resolution differences between Windows environments.
+   */
+  OLLAMA_BASE_URL: z
+    .string()
+    .url()
+    .default("http://127.0.0.1:11434"),
+
+  /**
+   * How long Ollama should keep the selected model loaded in memory after a
+   * response. Ollama accepts values such as 5m, 30m, or 0.
+   */
+  OLLAMA_KEEP_ALIVE: z.string().min(1).default("5m"),
+
+  /** Overrides the registry default model. Must be a known model id. */
   MABOJOLU_DEFAULT_MODEL: z.string().min(1).optional(),
 
   /** Upper bound on generated tokens per response. */
-  MABOJOLU_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(8192),
+  MABOJOLU_MAX_OUTPUT_TOKENS: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(8192),
 
   /** Provider request timeout in milliseconds. */
   MABOJOLU_REQUEST_TIMEOUT_MS: z.coerce
@@ -39,7 +69,7 @@ const serverEnvSchema = z.object({
     .positive()
     .default(120_000),
 
-  /** Maximum characters accepted in a single user message. */
+  /** Maximum characters accepted in one user message. */
   MABOJOLU_MAX_MESSAGE_CHARS: z.coerce
     .number()
     .int()
@@ -61,7 +91,11 @@ const serverEnvSchema = z.object({
     .default(120_000),
 
   /** Requests allowed per rate-limit window, per identity. */
-  MABOJOLU_RATE_LIMIT_MAX: z.coerce.number().int().positive().default(30),
+  MABOJOLU_RATE_LIMIT_MAX: z.coerce
+    .number()
+    .int()
+    .positive()
+    .default(30),
 
   /** Rate-limit window length in milliseconds. */
   MABOJOLU_RATE_LIMIT_WINDOW_MS: z.coerce
@@ -73,32 +107,36 @@ const serverEnvSchema = z.object({
   /**
    * Where conversations are stored.
    *
-   *   local     JSON file under .mabojolu-data. No credentials. Development only.
-   *   supabase  Postgres with row-level security. Requires the keys below.
+   * local:
+   * JSON file under .mabojolu-data. Development only.
+   *
+   * supabase:
+   * PostgreSQL with row-level security.
    */
-  PERSISTENCE: z.enum(["local", "supabase"]).default("local"),
+  PERSISTENCE: z
+    .enum(["local", "supabase"])
+    .default("local"),
 
   /**
    * How users authenticate.
    *
-   *   dev       A fixed local identity, so ownership boundaries and per-user
-   *             behaviour are exercisable without an auth provider. Refuses to
-   *             run in production.
-   *   supabase  Real email magic-link authentication.
+   * dev:
+   * Fixed local identities for development. Refuses to run in production.
+   *
+   * supabase:
+   * Real Supabase authentication.
    */
   AUTH_MODE: z.enum(["dev", "supabase"]).default("dev"),
 
-  // Safe to expose to the browser. The anon key is protected by row-level
-  // security, which is why RLS being correct is load-bearing.
+  // Safe to expose to the browser. The anon key is protected through RLS.
   NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
   NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
   /**
-   * Bypasses row-level security entirely.
+   * Bypasses row-level security.
    *
-   * Server-only, and used only where an operation genuinely cannot be performed
-   * as the user: writing usage and safety rows, and moving an attachment through
-   * its processing lifecycle.
+   * This key must remain server-side and should be used only where an operation
+   * genuinely cannot be performed as the authenticated user.
    */
   SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
 
@@ -131,21 +169,22 @@ const serverEnvSchema = z.object({
     .default(10_485_760),
 
   /**
-   * Are attachment uploads enabled?
+   * Whether attachment uploads are enabled.
    *
-   * Off by default. The architecture is complete and tested, but broad upload
-   * access should be a deliberate decision made after the storage controls have
-   * been verified against a real Supabase project.
+   * Disabled by default until production storage controls are verified.
    */
   MABOJOLU_ATTACHMENTS_ENABLED: z
     .enum(["true", "false"])
     .default("false")
     .transform((value) => value === "true"),
 
-  /** Daily spend ceiling in USD. Zero disables the check. */
-  MABOJOLU_DAILY_COST_LIMIT_USD: z.coerce.number().nonnegative().default(0),
+  /** Daily cloud-provider spending ceiling. Zero disables the check. */
+  MABOJOLU_DAILY_COST_LIMIT_USD: z.coerce
+    .number()
+    .nonnegative()
+    .default(0),
 
-  /** Serves a maintenance notice instead of chat. */
+  /** Serves a maintenance notice instead of starting chat generations. */
   MABOJOLU_MAINTENANCE_MODE: z
     .enum(["true", "false"])
     .default("false")
@@ -155,8 +194,14 @@ const serverEnvSchema = z.object({
 export type ServerEnv = z.infer<typeof serverEnvSchema>;
 
 export type EnvValidationResult =
-  | { ok: true; env: ServerEnv }
-  | { ok: false; issues: string[] };
+  | {
+      ok: true;
+      env: ServerEnv;
+    }
+  | {
+      ok: false;
+      issues: string[];
+    };
 
 let cached: EnvValidationResult | null = null;
 
@@ -167,7 +212,8 @@ function validate(): EnvValidationResult {
     return {
       ok: false,
       issues: parsed.error.issues.map(
-        (issue) => `${issue.path.join(".") || "(root)"}: ${issue.message}`,
+        (issue) =>
+          `${issue.path.join(".") || "(root)"}: ${issue.message}`,
       ),
     };
   }
@@ -175,95 +221,116 @@ function validate(): EnvValidationResult {
   const env = parsed.data;
   const issues: string[] = [];
 
-  // Cross-field rules the schema cannot express on its own.
-  if (env.AI_PROVIDER === "anthropic" && !env.ANTHROPIC_API_KEY) {
+  /*
+   * Anthropic requires a credential. Ollama and mock mode do not require any
+   * API key.
+   */
+  if (
+    env.AI_PROVIDER === "anthropic" &&
+    !env.ANTHROPIC_API_KEY
+  ) {
     issues.push(
-      "ANTHROPIC_API_KEY: required when AI_PROVIDER is \"anthropic\". " +
-        "Create a key at https://platform.claude.com and add it to .env.local.",
+      'ANTHROPIC_API_KEY: required when AI_PROVIDER is "anthropic". ' +
+        "Create an Anthropic API key and add it to .env.local.",
     );
   }
 
   if (env.PERSISTENCE === "supabase") {
     if (!env.NEXT_PUBLIC_SUPABASE_URL) {
       issues.push(
-        'NEXT_PUBLIC_SUPABASE_URL: required when PERSISTENCE is "supabase". ' +
-          "Find it in your Supabase project under Settings, then API.",
+        'NEXT_PUBLIC_SUPABASE_URL: required when PERSISTENCE is "supabase".',
       );
     }
+
     if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
       issues.push(
-        'NEXT_PUBLIC_SUPABASE_ANON_KEY: required when PERSISTENCE is "supabase". ' +
-          "Find it in your Supabase project under Settings, then API.",
+        'NEXT_PUBLIC_SUPABASE_ANON_KEY: required when PERSISTENCE is "supabase".',
       );
     }
+
     if (!env.SUPABASE_SERVICE_ROLE_KEY) {
       issues.push(
-        'SUPABASE_SERVICE_ROLE_KEY: required when PERSISTENCE is "supabase", ' +
-          "for server-side usage and safety writes. Keep it server-only.",
+        'SUPABASE_SERVICE_ROLE_KEY: required when PERSISTENCE is "supabase". ' +
+          "Keep this value server-only.",
       );
     }
   }
 
-  if (env.AUTH_MODE === "supabase" && !env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (
+    env.AUTH_MODE === "supabase" &&
+    !env.NEXT_PUBLIC_SUPABASE_URL
+  ) {
     issues.push(
       'NEXT_PUBLIC_SUPABASE_URL: required when AUTH_MODE is "supabase".',
     );
   }
 
+  if (
+    env.AUTH_MODE === "supabase" &&
+    !env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  ) {
+    issues.push(
+      'NEXT_PUBLIC_SUPABASE_ANON_KEY: required when AUTH_MODE is "supabase".',
+    );
+  }
+
   /*
-   * Refuse to start in production with development stand-ins.
-   *
-   * This is the single most important cross-field rule here. Dev auth trusts a
-   * cookie with no verification, and local persistence has no row-level
-   * security. Shipping either to production would expose every user's
-   * conversations, so a misconfigured deploy must fail loudly at boot rather
-   * than serve traffic insecurely.
+   * Refuse to serve production traffic with development-only authentication or
+   * local JSON persistence.
    */
   if (env.NODE_ENV === "production") {
     if (env.AUTH_MODE === "dev") {
       issues.push(
-        'AUTH_MODE: "dev" cannot be used in production. It trusts an ' +
-          'unverified cookie as identity. Set AUTH_MODE="supabase".',
+        'AUTH_MODE: "dev" cannot be used in production. Set AUTH_MODE="supabase".',
       );
     }
+
     if (env.PERSISTENCE === "local") {
       issues.push(
-        'PERSISTENCE: "local" cannot be used in production. It is a single ' +
-          "JSON file with no row-level security and does not survive an " +
-          'ephemeral filesystem. Set PERSISTENCE="supabase".',
+        'PERSISTENCE: "local" cannot be used in production. ' +
+          'Set PERSISTENCE="supabase".',
       );
     }
   }
 
   if (issues.length > 0) {
-    return { ok: false, issues };
+    return {
+      ok: false,
+      issues,
+    };
   }
 
-  return { ok: true, env };
+  return {
+    ok: true,
+    env,
+  };
 }
 
 /**
- * Validated server environment, or a structured failure.
+ * Return the validated server environment or a structured failure.
  *
- * Callers decide how to react. The chat route turns a failure into a
- * configuration error the user can act on; it never surfaces raw values.
+ * Callers decide how to respond. Raw environment values are never exposed to
+ * the browser.
  */
 export function inspectServerEnv(): EnvValidationResult {
   cached ??= validate();
+
   return cached;
 }
 
 /**
- * Validated server environment, throwing when invalid.
+ * Return the validated server environment and throw when it is invalid.
  *
- * Use only where a failure genuinely cannot be handled locally.
+ * Use only where a configuration failure cannot be handled locally.
  */
 export function serverEnv(): ServerEnv {
   const result = inspectServerEnv();
 
   if (!result.ok) {
     throw new Error(
-      `Invalid server environment:\n${result.issues.map((i) => `  - ${i}`).join("\n")}`,
+      `Invalid server environment:\n${result.issues
+        .map((issue) => `  - ${issue}`)
+        .join("\n")}`,
     );
   }
 

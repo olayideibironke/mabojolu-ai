@@ -12,34 +12,39 @@ import {
   type ModelDefinition,
   type ProviderId,
 } from "./models";
-import type { AiProvider, GenerationChunk } from "./provider";
+import type {
+  AiProvider,
+  GenerationChunk,
+} from "./provider";
 import { AnthropicProvider } from "./providers/anthropic";
 import { MockProvider } from "./providers/mock";
+import { OllamaProvider } from "./providers/ollama";
 
 /**
- * The model gateway.
+ * Mabojolu model gateway.
  *
- * Single place where a provider is chosen and a request is assembled. Route
- * handlers depend on this rather than on any provider SDK, which is what lets a
- * provider change without touching the product.
+ * This is the single place where an AI provider is selected and configured.
+ * Routes and UI components remain independent of Anthropic, Ollama, or mock
+ * implementation details.
  */
 
 const providerCache = new Map<ProviderId, AiProvider>();
 
 function getProvider(providerId: ProviderId): AiProvider {
-  const cached = providerCache.get(providerId);
-  if (cached) {
-    return cached;
+  const cachedProvider = providerCache.get(providerId);
+
+  if (cachedProvider) {
+    return cachedProvider;
   }
 
   const envResult = inspectServerEnv();
+
   if (!envResult.ok) {
-    // Surfaced as a configuration problem, with details logged server-side
-    // only so environment contents never reach the browser.
     console.error(
       "[mabojolu] invalid environment",
       envResult.issues.join("; "),
     );
+
     throw chatError("provider_not_configured", {
       message:
         "Mabojolu is not configured correctly. Check the server environment variables.",
@@ -48,28 +53,70 @@ function getProvider(providerId: ProviderId): AiProvider {
 
   const env = envResult.env;
 
-  const provider: AiProvider =
-    providerId === "anthropic"
-      ? new AnthropicProvider({
-          apiKey: env.ANTHROPIC_API_KEY,
-          timeoutMs: env.MABOJOLU_REQUEST_TIMEOUT_MS,
-        })
-      : new MockProvider({
-          chunkDelayMs: env.NODE_ENV === "test" ? 0 : 18,
-        });
+  let provider: AiProvider;
+
+  switch (providerId) {
+    case "anthropic":
+      provider = new AnthropicProvider({
+        apiKey: env.ANTHROPIC_API_KEY,
+        timeoutMs: env.MABOJOLU_REQUEST_TIMEOUT_MS,
+      });
+      break;
+
+    case "ollama":
+      provider = new OllamaProvider({
+        baseUrl: env.OLLAMA_BASE_URL,
+        timeoutMs: env.MABOJOLU_REQUEST_TIMEOUT_MS,
+        keepAlive: env.OLLAMA_KEEP_ALIVE,
+      });
+      break;
+
+    case "mock":
+      provider = new MockProvider({
+        chunkDelayMs:
+          env.NODE_ENV === "test" ? 0 : 18,
+      });
+      break;
+
+    default: {
+      const unsupportedProvider: never = providerId;
+
+      throw chatError("provider_not_configured", {
+        message:
+          "The selected Mabojolu AI provider is not supported.",
+        cause: new Error(
+          `Unsupported provider: ${unsupportedProvider}`,
+        ),
+      });
+    }
+  }
 
   providerCache.set(providerId, provider);
+
   return provider;
 }
 
-/** Resolve the model to use, honoring an explicit request then configuration. */
-export function resolveModel(requestedModelId?: string): ModelDefinition {
+/**
+ * Resolve the model for the current environment.
+ *
+ * An explicitly requested model must belong to the configured provider.
+ * Mabojolu never silently substitutes a cloud model for a local model or the
+ * other way around.
+ */
+export function resolveModel(
+  requestedModelId?: string,
+): ModelDefinition {
   const envResult = inspectServerEnv();
-  const providerId: ProviderId = envResult.ok ? envResult.env.AI_PROVIDER : "mock";
+
+  const providerId: ProviderId = envResult.ok
+    ? envResult.env.AI_PROVIDER
+    : "mock";
 
   const candidateId =
     requestedModelId ??
-    (envResult.ok ? envResult.env.MABOJOLU_DEFAULT_MODEL : undefined);
+    (envResult.ok
+      ? envResult.env.MABOJOLU_DEFAULT_MODEL
+      : undefined);
 
   if (candidateId) {
     const model = findModel(candidateId);
@@ -80,11 +127,10 @@ export function resolveModel(requestedModelId?: string): ModelDefinition {
       });
     }
 
-    // A model belonging to another provider cannot be served by the configured
-    // one. Fail clearly instead of silently substituting a different model.
     if (model.providerId !== providerId) {
       throw chatError("invalid_request", {
-        message: "That model is not available in this environment.",
+        message:
+          "That model is not available in this environment.",
       });
     }
 
@@ -111,16 +157,22 @@ export interface GatewayStream {
 }
 
 /**
- * Assemble and start a generation.
+ * Assemble and start one AI generation.
  *
- * Throws `ChatError` before any streaming begins for configuration and
- * validation problems, so the caller can respond with a proper status code
- * rather than an error embedded mid-stream.
+ * Configuration and validation failures occur before streaming starts, allowing
+ * the chat route to return a clear HTTP response instead of a broken stream.
  */
-export function startGeneration(request: GatewayRequest): GatewayStream {
+export function startGeneration(
+  request: GatewayRequest,
+): GatewayStream {
   const envResult = inspectServerEnv();
+
   if (!envResult.ok) {
-    console.error("[mabojolu] invalid environment", envResult.issues.join("; "));
+    console.error(
+      "[mabojolu] invalid environment",
+      envResult.issues.join("; "),
+    );
+
     throw chatError("provider_not_configured", {
       message:
         "Mabojolu is not configured correctly. Check the server environment variables.",
@@ -135,7 +187,10 @@ export function startGeneration(request: GatewayRequest): GatewayStream {
     throw chatError("provider_not_configured");
   }
 
-  const prompt = getSystemPrompt(request.promptVersion);
+  const prompt = getSystemPrompt(
+    request.promptVersion,
+  );
+
   const maxOutputTokens = Math.min(
     env.MABOJOLU_MAX_OUTPUT_TOKENS,
     model.maxOutputTokens,
@@ -146,13 +201,15 @@ export function startGeneration(request: GatewayRequest): GatewayStream {
     systemPrompt: prompt.content,
     model,
     maxOutputTokens,
-    contextTokenBudget: env.MABOJOLU_CONTEXT_TOKEN_BUDGET,
+    contextTokenBudget:
+      env.MABOJOLU_CONTEXT_TOKEN_BUDGET,
   });
 
   return {
     model,
     promptVersion: prompt.version,
-    estimatedInputTokens: context.estimatedInputTokens,
+    estimatedInputTokens:
+      context.estimatedInputTokens,
     droppedMessages: context.droppedMessages,
     chunks: provider.stream({
       model,
@@ -165,7 +222,12 @@ export function startGeneration(request: GatewayRequest): GatewayStream {
   };
 }
 
-/** Test-only: clear memoized providers so env changes take effect. */
+/**
+ * Test-only escape hatch.
+ *
+ * Environment-dependent provider instances are cached between requests, so
+ * automated tests must clear this map when changing environment variables.
+ */
 export function resetProviderCache(): void {
   providerCache.clear();
 }
