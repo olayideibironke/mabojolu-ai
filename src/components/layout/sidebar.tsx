@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import {
   useCallback,
   useEffect,
@@ -384,12 +385,12 @@ export function Sidebar({
 
         <div className="border-t border-border-subtle p-3">
           {isAdmin ? (
-            <a
+            <Link
               href="/admin"
               className="mb-1 flex h-10 w-full items-center gap-2 rounded-xl px-4 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
             >
               <span className="flex-1 text-left">Admin</span>
-            </a>
+            </Link>
           ) : null}
 
           <Button

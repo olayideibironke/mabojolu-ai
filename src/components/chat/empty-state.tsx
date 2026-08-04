@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import { BrandMark } from "@/components/ui/brand-mark";
 
 /**
@@ -78,12 +80,12 @@ export function EmptyState({
               Your conversations are saved to your account so you can return to
               them.
             </p>
-            <a
+            <Link
               href="/sign-in"
               className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-surface-inverse px-4 text-sm font-medium text-text-inverse transition-opacity hover:opacity-90"
             >
               Sign in
-            </a>
+            </Link>
           </div>
         ) : (
         <div className="grid gap-3 sm:grid-cols-2">

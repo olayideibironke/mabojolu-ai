@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { SettingsDialog } from "@/components/layout/settings-dialog";
@@ -266,14 +267,14 @@ export function ChatShell({
                 {userEmail}
               </span>
             ) : (
-              /* A real link, not a button: it navigates, so it must be
+              /* A link, not a button: it navigates, so it must be
                  middle-clickable and open in a new tab like any other link. */
-              <a
+              <Link
                 href="/sign-in"
                 className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-surface-inverse px-3 text-xs font-medium text-text-inverse transition-opacity hover:opacity-90"
               >
                 Sign in
-              </a>
+              </Link>
             )}
           </div>
         </header>
