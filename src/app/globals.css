@@ -1,26 +1,398 @@
 @import "tailwindcss";
 
+/**
+ * Mabojolu design tokens.
+ *
+ * Every colour is a semantic token rather than a raw palette value, so light
+ * and dark are the same component code with a different token set. Components
+ * must not hardcode neutral shades: that is what made the previous single-file
+ * page impossible to theme.
+ *
+ * Dark mode is driven by a `data-theme` attribute on <html> so an explicit user
+ * choice can override the OS preference. The `system` setting resolves to a
+ * concrete value before paint (see ThemeScript) to avoid a flash.
+ */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  color-scheme: light;
+
+  /* Surfaces, from furthest back to closest to the reader. */
+  --surface-sunken: #efefec;
+  --surface-base: #f7f7f5;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --surface-inverse: #16150f;
+
+  /* Text. */
+  --text-primary: #16150f;
+  --text-secondary: #56534a;
+  --text-muted: #767268;
+  --text-inverse: #f7f7f5;
+
+  /* Lines. */
+  --border-subtle: #e4e2dc;
+  --border-default: #d5d2ca;
+  --border-strong: #b4b0a6;
+
+  /* Brand accent. A warm ochre, chosen to sit apart from the blues and
+     purples that dominate this category. */
+  --accent: #8a5d14;
+  --accent-hover: #6f4c0c;
+  --accent-contrast: #ffffff;
+  --accent-subtle: #f6efe1;
+
+  --danger: #a4262c;
+  --danger-subtle: #fbecec;
+  --success: #2f6b3f;
+
+  --focus-ring: #8a5d14;
+
+  --shadow-sm: 0 1px 2px rgb(22 21 15 / 0.05);
+  --shadow-md: 0 4px 12px rgb(22 21 15 / 0.08);
+  --shadow-lg: 0 12px 32px rgb(22 21 15 / 0.12);
+
+  --radius-sm: 0.5rem;
+  --radius-md: 0.75rem;
+  --radius-lg: 1rem;
+  --radius-xl: 1.625rem;
+}
+
+[data-theme="dark"] {
+  color-scheme: dark;
+
+  --surface-sunken: #14140f;
+  --surface-base: #1b1a15;
+  --surface-raised: #24231d;
+  --surface-overlay: #2b2a23;
+  --surface-inverse: #f2f1ec;
+
+  --text-primary: #f2f1ec;
+  --text-secondary: #b8b5ac;
+  --text-muted: #99958c;
+  --text-inverse: #16150f;
+
+  --border-subtle: #302e27;
+  --border-default: #3d3b32;
+  --border-strong: #565349;
+
+  /* Lightened so it keeps sufficient contrast against the dark surfaces. */
+  --accent: #d9a850;
+  --accent-hover: #ecbc63;
+  --accent-contrast: #16150f;
+  --accent-subtle: #2e2717;
+
+  --danger: #f1a0a4;
+  --danger-subtle: #3a1f21;
+  --success: #8fc79f;
+
+  --focus-ring: #d9a850;
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 4px 12px rgb(0 0 0 / 0.4);
+  --shadow-lg: 0 12px 32px rgb(0 0 0 / 0.5);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-surface-sunken: var(--surface-sunken);
+  --color-surface-base: var(--surface-base);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-surface-inverse: var(--surface-inverse);
+
+  --color-text-primary: var(--text-primary);
+  --color-text-secondary: var(--text-secondary);
+  --color-text-muted: var(--text-muted);
+  --color-text-inverse: var(--text-inverse);
+
+  --color-border-subtle: var(--border-subtle);
+  --color-border-default: var(--border-default);
+  --color-border-strong: var(--border-strong);
+
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-contrast: var(--accent-contrast);
+  --color-accent-subtle: var(--accent-subtle);
+
+  --color-danger: var(--danger);
+  --color-danger-subtle: var(--danger-subtle);
+  --color-success: var(--success);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+/* The scaffold set a hardcoded Arial stack, which overrode the loaded font.
+   Use the variable font that layout.tsx actually loads. */
+body {
+  background: var(--surface-base);
+  color: var(--text-primary);
+  font-family: var(--font-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* A single visible focus style everywhere, so keyboard users are never lost.
+   `:focus-visible` keeps it off mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+/* Respect a reduced-motion preference rather than assuming animation is safe.
+   Kept near-zero rather than `none` so transitionend still fires. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
   }
 }
 
-body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+/* Visually hidden but available to screen readers, for live status text. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* Streaming caret. Marked aria-hidden at the call site. */
+@keyframes mabojolu-caret {
+  0%,
+  45% {
+    opacity: 1;
+  }
+  55%,
+  100% {
+    opacity: 0.15;
+  }
+}
+
+.mabojolu-caret {
+  display: inline-block;
+  width: 0.45rem;
+  height: 1.05em;
+  margin-left: 0.125rem;
+  vertical-align: text-bottom;
+  background: var(--text-muted);
+  border-radius: 1px;
+  animation: mabojolu-caret 1s steps(1, end) infinite;
+}
+
+/*
+ * Markdown rendering.
+ *
+ * Scoped to `.mabojolu-prose` so assistant output cannot restyle the app
+ * chrome, and written as plain CSS so no typography plugin is needed.
+ */
+.mabojolu-prose {
+  font-size: 0.9375rem;
+  line-height: 1.7;
+  color: var(--text-primary);
+  overflow-wrap: break-word;
+}
+
+.mabojolu-prose > * + * {
+  margin-top: 1rem;
+}
+
+.mabojolu-prose h1,
+.mabojolu-prose h2,
+.mabojolu-prose h3,
+.mabojolu-prose h4 {
+  font-weight: 600;
+  line-height: 1.3;
+  letter-spacing: -0.01em;
+}
+
+.mabojolu-prose h1 { font-size: 1.375rem; }
+.mabojolu-prose h2 { font-size: 1.1875rem; }
+.mabojolu-prose h3 { font-size: 1.0625rem; }
+.mabojolu-prose h4 { font-size: 1rem; }
+
+.mabojolu-prose h1 + *,
+.mabojolu-prose h2 + *,
+.mabojolu-prose h3 + * {
+  margin-top: 0.5rem;
+}
+
+.mabojolu-prose ul,
+.mabojolu-prose ol {
+  padding-left: 1.5rem;
+}
+
+.mabojolu-prose ul { list-style: disc; }
+.mabojolu-prose ol { list-style: decimal; }
+
+.mabojolu-prose li + li {
+  margin-top: 0.35rem;
+}
+
+.mabojolu-prose li > ul,
+.mabojolu-prose li > ol {
+  margin-top: 0.35rem;
+}
+
+.mabojolu-prose a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.mabojolu-prose a:hover {
+  color: var(--accent-hover);
+}
+
+.mabojolu-prose blockquote {
+  padding-left: 1rem;
+  border-left: 3px solid var(--border-default);
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.mabojolu-prose strong { font-weight: 600; }
+
+/* Inline code only. Fenced blocks are handled by CodeBlock. */
+.mabojolu-prose :not(pre) > code {
+  padding: 0.15em 0.35em;
+  font-family: var(--font-mono), ui-monospace, monospace;
+  font-size: 0.875em;
+  background: var(--surface-sunken);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+}
+
+.mabojolu-prose hr {
+  border: 0;
+  border-top: 1px solid var(--border-subtle);
+}
+
+/* Tables scroll horizontally inside their own wrapper rather than widening the
+   page, which is what keeps the layout free of horizontal overflow. */
+.mabojolu-table-wrapper {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.mabojolu-prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.mabojolu-prose th,
+.mabojolu-prose td {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.mabojolu-prose th {
+  background: var(--surface-sunken);
+  font-weight: 600;
+}
+
+.mabojolu-prose tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/*
+ * Syntax highlighting.
+ *
+ * A small token set mapped to our own theme variables, so highlighted code
+ * follows light and dark mode instead of shipping two vendor stylesheets.
+ */
+.hljs-comment,
+.hljs-quote {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.hljs-keyword,
+.hljs-selector-tag,
+.hljs-literal,
+.hljs-section,
+.hljs-doctag,
+.hljs-type,
+.hljs-name,
+.hljs-strong {
+  color: #a3436f;
+  font-weight: 600;
+}
+
+.hljs-string,
+.hljs-title,
+.hljs-attr,
+.hljs-attribute,
+.hljs-symbol,
+.hljs-bullet,
+.hljs-addition {
+  color: #2f6b3f;
+}
+
+.hljs-number,
+.hljs-regexp,
+.hljs-variable,
+.hljs-template-variable,
+.hljs-link {
+  color: #8a5d14;
+}
+
+.hljs-built_in,
+.hljs-builtin-name,
+.hljs-class .hljs-title,
+.hljs-function .hljs-title {
+  color: #2b5f8f;
+}
+
+.hljs-deletion {
+  color: var(--danger);
+}
+
+.hljs-emphasis {
+  font-style: italic;
+}
+
+[data-theme="dark"] .hljs-keyword,
+[data-theme="dark"] .hljs-selector-tag,
+[data-theme="dark"] .hljs-literal,
+[data-theme="dark"] .hljs-section,
+[data-theme="dark"] .hljs-doctag,
+[data-theme="dark"] .hljs-type,
+[data-theme="dark"] .hljs-name,
+[data-theme="dark"] .hljs-strong {
+  color: #e79ab8;
+}
+
+[data-theme="dark"] .hljs-string,
+[data-theme="dark"] .hljs-title,
+[data-theme="dark"] .hljs-attr,
+[data-theme="dark"] .hljs-attribute,
+[data-theme="dark"] .hljs-symbol,
+[data-theme="dark"] .hljs-bullet,
+[data-theme="dark"] .hljs-addition {
+  color: #a3d9b1;
+}
+
+[data-theme="dark"] .hljs-number,
+[data-theme="dark"] .hljs-regexp,
+[data-theme="dark"] .hljs-variable,
+[data-theme="dark"] .hljs-template-variable,
+[data-theme="dark"] .hljs-link {
+  color: #e8c07d;
+}
+
+[data-theme="dark"] .hljs-built_in,
+[data-theme="dark"] .hljs-builtin-name,
+[data-theme="dark"] .hljs-class .hljs-title,
+[data-theme="dark"] .hljs-function .hljs-title {
+  color: #93c1e8;
 }
