@@ -715,14 +715,14 @@ export function ChatShell({
                 isSignedIn={isSignedIn}
               />
             ) : (
-              <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
+              <div className="mx-auto w-full max-w-[1120px] px-4 py-8 sm:px-6">
                 <div
                   role="feed"
                   aria-busy={
                     isStreaming
                   }
                   aria-label="Conversation"
-                  className="space-y-7"
+                  className="mx-auto max-w-[1040px] space-y-7"
                 >
                   {messages.map(
                     (message) => (

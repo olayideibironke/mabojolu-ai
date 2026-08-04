@@ -4,7 +4,6 @@ import Image from "next/image";
 import {
   useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   type ChangeEvent,
@@ -57,6 +56,9 @@ type SpeechRecognitionLike = EventTarget & {
   continuous: boolean;
   interimResults: boolean;
   lang: string;
+  maxAlternatives: number;
+
+  onstart: (() => void) | null;
 
   onresult:
     | ((
@@ -70,16 +72,20 @@ type SpeechRecognitionLike = EventTarget & {
       ) => void)
     | null;
 
-  onend:
-    | (() => void)
-    | null;
+  onend: (() => void) | null;
 
   start: () => void;
   stop: () => void;
+  abort: () => void;
 };
 
 type SpeechRecognitionConstructorLike =
   new () => SpeechRecognitionLike;
+
+type VoiceStatus =
+  | "idle"
+  | "requesting"
+  | "listening";
 
 declare global {
   interface Window {
@@ -118,12 +124,14 @@ const ACCEPTED_IMAGE_TYPES = new Set<
 ]);
 
 const MAX_IMAGE_COUNT = 4;
-const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_BYTES =
+  10 * 1024 * 1024;
 
 function createAttachmentId(): string {
   if (
     typeof crypto !== "undefined" &&
-    typeof crypto.randomUUID === "function"
+    typeof crypto.randomUUID ===
+      "function"
   ) {
     return crypto.randomUUID();
   }
@@ -229,6 +237,91 @@ function removeTextareaChrome(
     "none",
     "important",
   );
+}
+
+function joinTranscript(
+  ...parts: string[]
+): string {
+  return parts
+    .map((part) => part.trim())
+    .filter(
+      (part) => part.length > 0,
+    )
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function releaseMediaStream(
+  stream: MediaStream,
+): void {
+  for (const track of stream.getTracks()) {
+    track.stop();
+  }
+}
+
+function detachRecognitionHandlers(
+  recognition: SpeechRecognitionLike,
+): void {
+  recognition.onstart = null;
+  recognition.onresult = null;
+  recognition.onerror = null;
+  recognition.onend = null;
+}
+
+function permissionErrorMessage(
+  cause: unknown,
+): string {
+  if (!(cause instanceof DOMException)) {
+    return "Mabojolu could not access the microphone. Check the browser microphone settings and try again.";
+  }
+
+  switch (cause.name) {
+    case "NotAllowedError":
+    case "SecurityError":
+      return "Microphone access is blocked. Allow microphone access for this site in Chrome, then try again.";
+
+    case "NotFoundError":
+      return "No microphone was found. Connect or enable a microphone, then try again.";
+
+    case "NotReadableError":
+    case "AbortError":
+      return "The microphone could not be opened. Close any other app using it, then try again.";
+
+    case "TypeError":
+      return "Microphone access requires localhost or a secure HTTPS connection.";
+
+    default:
+      return "Mabojolu could not access the microphone. Check the browser microphone settings and try again.";
+  }
+}
+
+function recognitionErrorMessage(
+  error: string,
+): string | null {
+  switch (error) {
+    case "aborted":
+      return null;
+
+    case "not-allowed":
+    case "service-not-allowed":
+      return "Voice input is blocked. Allow microphone access for this site in Chrome, then try again.";
+
+    case "audio-capture":
+      return "The microphone is unavailable. Check that it is connected and not being used by another app.";
+
+    case "no-speech":
+      return "I did not hear any speech. Try again and speak after the microphone shows Listening.";
+
+    case "network":
+      return "Chrome's speech service could not be reached. Check your internet connection and try again.";
+
+    case "language-not-supported":
+      return "The browser speech service does not support the selected language.";
+
+    default:
+      return "Voice input stopped unexpectedly. Please try again.";
+  }
 }
 
 function PaperclipIcon() {
@@ -367,9 +460,18 @@ export function Composer({
   );
 
   const [
-    isListening,
-    setIsListening,
-  ] = useState(false);
+    voiceStatus,
+    setVoiceStatus,
+  ] = useState<VoiceStatus>(
+    "idle",
+  );
+
+  const [
+    voiceError,
+    setVoiceError,
+  ] = useState<string | null>(
+    null,
+  );
 
   const textareaRef =
     useRef<HTMLTextAreaElement | null>(
@@ -386,20 +488,23 @@ export function Composer({
       null,
     );
 
-  const recognitionConstructor =
-    useMemo(() => {
-      if (
-        typeof window === "undefined"
-      ) {
-        return null;
-      }
+  const voiceAttemptRef =
+    useRef(0);
 
-      return (
-        window.SpeechRecognition ??
-        window.webkitSpeechRecognition ??
-        null
-      );
-    }, []);
+  const voiceBaseDraftRef =
+    useRef("");
+
+  const voiceFinalTranscriptRef =
+    useRef("");
+
+  const userStoppedVoiceRef =
+    useRef(false);
+
+  const isListening =
+    voiceStatus === "listening";
+
+  const isRequestingMicrophone =
+    voiceStatus === "requesting";
 
   const assignTextareaRef =
     useCallback(
@@ -443,6 +548,61 @@ export function Composer({
         )}px`;
     }, []);
 
+  const abortVoiceInput =
+    useCallback(() => {
+      voiceAttemptRef.current += 1;
+      userStoppedVoiceRef.current =
+        true;
+
+      const recognition =
+        recognitionRef.current;
+
+      recognitionRef.current =
+        null;
+
+      if (recognition) {
+        detachRecognitionHandlers(
+          recognition,
+        );
+
+        try {
+          recognition.abort();
+        } catch {
+          // Recognition may already be closed.
+        }
+      }
+
+      setVoiceStatus("idle");
+    }, []);
+
+  const stopVoiceInput =
+    useCallback(() => {
+      voiceAttemptRef.current += 1;
+      userStoppedVoiceRef.current =
+        true;
+
+      const recognition =
+        recognitionRef.current;
+
+      if (!recognition) {
+        setVoiceStatus("idle");
+        return;
+      }
+
+      try {
+        recognition.stop();
+      } catch {
+        detachRecognitionHandlers(
+          recognition,
+        );
+
+        recognitionRef.current =
+          null;
+
+        setVoiceStatus("idle");
+      }
+    }, []);
+
   useEffect(() => {
     resizeTextarea();
   }, [
@@ -466,21 +626,57 @@ export function Composer({
   }, [focusKey]);
 
   useEffect(() => {
+    if (
+      !disabled &&
+      !isStreaming
+    ) {
+      return;
+    }
+
+    voiceAttemptRef.current += 1;
+    userStoppedVoiceRef.current =
+      true;
+
+    const recognition =
+      recognitionRef.current;
+
+    if (!recognition) {
+      return;
+    }
+
+    try {
+      recognition.abort();
+    } catch {
+      // Recognition may already be ending.
+    }
+  }, [
+    disabled,
+    isStreaming,
+  ]);
+
+  useEffect(() => {
     return () => {
+      voiceAttemptRef.current += 1;
+
       const recognition =
         recognitionRef.current;
+
+      recognitionRef.current =
+        null;
 
       if (!recognition) {
         return;
       }
 
-      recognition.onresult = null;
-      recognition.onerror = null;
-      recognition.onend = null;
-      recognition.stop();
+      detachRecognitionHandlers(
+        recognition,
+      );
 
-      recognitionRef.current =
-        null;
+      try {
+        recognition.abort();
+      } catch {
+        // Recognition may already be closed.
+      }
     };
   }, []);
 
@@ -491,14 +687,15 @@ export function Composer({
 
       if (
         (!trimmed &&
-          attachments.length === 0) ||
+          attachments.length ===
+            0) ||
         disabled ||
         isStreaming
       ) {
         return;
       }
 
-      recognitionRef.current?.stop();
+      abortVoiceInput();
 
       onSend(
         trimmed,
@@ -508,6 +705,13 @@ export function Composer({
       setDraft("");
       setAttachments([]);
       setAttachmentError(null);
+      setVoiceError(null);
+
+      voiceBaseDraftRef.current =
+        "";
+
+      voiceFinalTranscriptRef.current =
+        "";
 
       if (
         fileInputRef.current
@@ -516,6 +720,7 @@ export function Composer({
           "";
       }
     }, [
+      abortVoiceInput,
       attachments,
       disabled,
       draft,
@@ -570,11 +775,22 @@ export function Composer({
           event.currentTarget,
         );
 
+        if (
+          voiceStatus !== "idle"
+        ) {
+          abortVoiceInput();
+        }
+
+        setVoiceError(null);
+
         setDraft(
           event.currentTarget.value,
         );
       },
-      [],
+      [
+        abortVoiceInput,
+        voiceStatus,
+      ],
     );
 
   const openImagePicker =
@@ -733,33 +949,143 @@ export function Composer({
       [],
     );
 
-  const handleToggleListening =
-    useCallback(() => {
-      if (disabled) {
-        return;
-      }
-
-      if (isListening) {
-        recognitionRef.current?.stop();
-        return;
-      }
-
+  const startVoiceInput =
+    useCallback(async () => {
       if (
-        !recognitionConstructor
+        disabled ||
+        isStreaming
       ) {
         return;
       }
 
-      const recognition =
-        new recognitionConstructor();
+      const RecognitionConstructor =
+        window.SpeechRecognition ??
+        window.webkitSpeechRecognition ??
+        null;
 
-      recognition.continuous = true;
-      recognition.interimResults = true;
-      recognition.lang = "en-US";
+      if (
+        !RecognitionConstructor
+      ) {
+        setVoiceError(
+          "Voice input is not supported by this browser. Open Mabojolu in the latest Google Chrome.",
+        );
+
+        setVoiceStatus("idle");
+        return;
+      }
+
+      if (
+        !navigator.mediaDevices
+          ?.getUserMedia
+      ) {
+        setVoiceError(
+          "Microphone access is unavailable. Open Mabojolu through localhost or a secure HTTPS connection.",
+        );
+
+        setVoiceStatus("idle");
+        return;
+      }
+
+      setVoiceError(null);
+      setVoiceStatus("requesting");
+
+      const attempt =
+        voiceAttemptRef.current + 1;
+
+      voiceAttemptRef.current =
+        attempt;
+
+      let permissionStream:
+        MediaStream;
+
+      try {
+        permissionStream =
+          await navigator.mediaDevices.getUserMedia(
+            {
+              audio: true,
+              video: false,
+            },
+          );
+      } catch (cause) {
+        if (
+          voiceAttemptRef.current !==
+          attempt
+        ) {
+          return;
+        }
+
+        setVoiceError(
+          permissionErrorMessage(
+            cause,
+          ),
+        );
+
+        setVoiceStatus("idle");
+        return;
+      }
+
+      releaseMediaStream(
+        permissionStream,
+      );
+
+      if (
+        voiceAttemptRef.current !==
+          attempt ||
+        disabled ||
+        isStreaming
+      ) {
+        setVoiceStatus("idle");
+        return;
+      }
+
+      const recognition =
+        new RecognitionConstructor();
+
+      recognition.continuous =
+        true;
+
+      recognition.interimResults =
+        true;
+
+      recognition.maxAlternatives =
+        1;
+
+      recognition.lang =
+        navigator.language ||
+        "en-US";
+
+      voiceBaseDraftRef.current =
+        draft.trim();
+
+      voiceFinalTranscriptRef.current =
+        "";
+
+      userStoppedVoiceRef.current =
+        false;
+
+      recognition.onstart = () => {
+        if (
+          recognitionRef.current !==
+          recognition
+        ) {
+          return;
+        }
+
+        setVoiceStatus(
+          "listening",
+        );
+      };
 
       recognition.onresult = (
         event,
       ) => {
+        if (
+          recognitionRef.current !==
+          recognition
+        ) {
+          return;
+        }
+
         let finalText = "";
         let interimText = "";
 
@@ -778,48 +1104,73 @@ export function Composer({
             "";
 
           if (result.isFinal) {
-            finalText += transcript;
+            finalText =
+              joinTranscript(
+                finalText,
+                transcript,
+              );
           } else {
-            interimText +=
-              transcript;
+            interimText =
+              joinTranscript(
+                interimText,
+                transcript,
+              );
           }
         }
 
-        const combined =
-          `${finalText}${interimText}`.trim();
-
-        if (!combined) {
-          return;
+        if (
+          finalText.length > 0
+        ) {
+          voiceFinalTranscriptRef.current =
+            joinTranscript(
+              voiceFinalTranscriptRef.current,
+              finalText,
+            );
         }
 
         setDraft(
-          (current) => {
-            const existing =
-              current.trim();
-
-            if (!existing) {
-              return combined;
-            }
-
-            return `${existing} ${combined}`
-              .replace(
-                /\s+/g,
-                " ",
-              )
-              .trim();
-          },
+          joinTranscript(
+            voiceBaseDraftRef.current,
+            voiceFinalTranscriptRef.current,
+            interimText,
+          ),
         );
       };
 
-      recognition.onerror = () => {
-        setIsListening(false);
+      recognition.onerror = (
+        event,
+      ) => {
+        const message =
+          recognitionErrorMessage(
+            event.error,
+          );
+
+        const wasStoppedByUser =
+          userStoppedVoiceRef.current;
+
+        if (
+          message &&
+          !wasStoppedByUser
+        ) {
+          setVoiceError(message);
+        }
+
+        setVoiceStatus("idle");
       };
 
       recognition.onend = () => {
-        setIsListening(false);
+        if (
+          recognitionRef.current ===
+          recognition
+        ) {
+          recognitionRef.current =
+            null;
+        }
 
-        recognitionRef.current =
-          null;
+        setVoiceStatus("idle");
+
+        userStoppedVoiceRef.current =
+          false;
 
         textareaRef.current?.focus();
       };
@@ -827,12 +1178,53 @@ export function Composer({
       recognitionRef.current =
         recognition;
 
-      recognition.start();
-      setIsListening(true);
+      try {
+        recognition.start();
+      } catch {
+        detachRecognitionHandlers(
+          recognition,
+        );
+
+        recognitionRef.current =
+          null;
+
+        setVoiceStatus("idle");
+
+        setVoiceError(
+          "Voice input could not start. Wait a moment and try again.",
+        );
+      }
+    }, [
+      disabled,
+      draft,
+      isStreaming,
+    ]);
+
+  const handleToggleListening =
+    useCallback(() => {
+      if (
+        disabled ||
+        isStreaming
+      ) {
+        return;
+      }
+
+      if (
+        isListening ||
+        isRequestingMicrophone
+      ) {
+        stopVoiceInput();
+        return;
+      }
+
+      void startVoiceInput();
     }, [
       disabled,
       isListening,
-      recognitionConstructor,
+      isRequestingMicrophone,
+      isStreaming,
+      startVoiceInput,
+      stopVoiceInput,
     ]);
 
   const canSend =
@@ -848,11 +1240,22 @@ export function Composer({
       )
     : attachments.length > 0
       ? "Ask Mabojolu about these images"
-      : "Message Mabojolu";
+      : isListening
+        ? "Listening..."
+        : "Message Mabojolu";
+
+  const voiceStatusMessage =
+    voiceError
+      ? voiceError
+      : isRequestingMicrophone
+        ? "Requesting microphone access..."
+        : isListening
+          ? "Listening. Speak now, then click the microphone again to stop."
+          : null;
 
   return (
     <div className="shrink-0 bg-surface-base/95 px-4 pb-5 pt-3 backdrop-blur">
-      <div className="mx-auto w-full max-w-[720px]">
+      <div className="mx-auto w-full max-w-[1120px]">
         <form
           onSubmit={handleSubmit}
           className="rounded-[28px] border border-border-subtle bg-surface-raised px-4 pb-3 pt-3 shadow-sm"
@@ -946,7 +1349,7 @@ export function Composer({
             rows={1}
             disabled={disabled}
             placeholder={placeholder}
-            aria-describedby="composer-hint"
+            aria-describedby="composer-hint voice-input-status"
             className="block max-h-[220px] min-h-[32px] w-full resize-none appearance-none overflow-y-auto !border-0 bg-transparent p-0 text-[16px] leading-7 text-text-primary !outline-none !ring-0 placeholder:text-text-muted !shadow-none focus:!border-0 focus:!outline-none focus:!ring-0 focus:!shadow-none focus-visible:!border-0 focus-visible:!outline-none focus-visible:!ring-0 focus-visible:!shadow-none disabled:cursor-not-allowed disabled:opacity-60"
           />
 
@@ -1006,20 +1409,32 @@ export function Composer({
                 onClick={
                   handleToggleListening
                 }
+                disabled={
+                  disabled ||
+                  isStreaming
+                }
                 aria-label={
-                  isListening
+                  isListening ||
+                  isRequestingMicrophone
                     ? "Stop voice input"
                     : "Start voice input"
+                }
+                aria-pressed={
+                  isListening
                 }
                 title={
                   isListening
                     ? "Stop voice input"
-                    : "Start voice input"
+                    : isRequestingMicrophone
+                      ? "Cancel microphone request"
+                      : "Start voice input"
                 }
-                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors ${
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full border transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
                   isListening
-                    ? "border-border-default bg-surface-base text-text-primary"
-                    : "border-border-subtle bg-surface-base text-text-muted hover:text-text-primary"
+                    ? "border-danger bg-danger-subtle text-danger"
+                    : isRequestingMicrophone
+                      ? "animate-pulse border-border-default bg-surface-base text-text-primary"
+                      : "border-border-subtle bg-surface-base text-text-muted hover:text-text-primary"
                 }`}
               >
                 <MicrophoneIcon />
@@ -1064,12 +1479,30 @@ export function Composer({
         ) : null}
 
         <p
+          id="voice-input-status"
+          role={
+            voiceError
+              ? "alert"
+              : undefined
+          }
+          aria-live="polite"
+          className={`mt-2 text-center text-[11px] leading-4 ${
+            voiceError
+              ? "text-danger"
+              : "text-text-muted"
+          }`}
+        >
+          {voiceStatusMessage}
+        </p>
+
+        <p
           id="composer-hint"
           className="sr-only"
         >
           Press Enter to send. Press Shift plus Enter
-          for a new line. You may attach up to four
-          JPEG, PNG, or WebP images.
+          for a new line. Use the microphone for voice
+          input. You may attach up to four JPEG, PNG, or
+          WebP images.
         </p>
       </div>
     </div>
