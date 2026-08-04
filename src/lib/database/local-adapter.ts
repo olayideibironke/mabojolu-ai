@@ -59,6 +59,7 @@ interface StoredMessage {
   feedback: FeedbackRating | null;
   feedbackNote: string | null;
   createdAt: string;
+
   /** Ordering key. A timestamp alone can collide within the same millisecond. */
   sequence: number;
 }
@@ -114,6 +115,7 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
   readonly kind = "local" as const;
 
   private readonly filePath: string;
+
   private cache: Database | null = null;
 
   /**
@@ -128,6 +130,7 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
   constructor(options: { directory?: string } = {}) {
     const directory =
       options.directory ?? path.join(process.cwd(), ".mabojolu-data");
+
     this.filePath = path.join(directory, "database.json");
   }
 
@@ -136,15 +139,19 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
   }
 
   /** Run an operation with exclusive access to the store. */
-  private run<T>(operation: (db: Database) => Promise<T> | T): Promise<T> {
+  private run<T>(
+    operation: (db: Database) => Promise<T> | T,
+  ): Promise<T> {
     const next = this.queue.then(async () => {
       const db = await this.load();
+
       return operation(db);
     });
 
     // Keep the chain alive even when an operation rejects, or one failure would
     // permanently wedge every later call.
     this.queue = next.catch(() => undefined);
+
     return next;
   }
 
@@ -155,11 +162,26 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
 
     try {
       const raw = await readFile(this.filePath, "utf8");
+
       const parsed = JSON.parse(raw) as Database;
 
       // A file from an older or corrupted shape starts clean rather than
       // throwing on every request. This is development data.
-      this.cache = parsed.version === 1 ? parsed : emptyDatabase();
+      if (parsed.version !== 1) {
+        this.cache = emptyDatabase();
+
+        return this.cache;
+      }
+
+      // Attachments created before message-level persistence did not contain a
+      // `messageId`. Normalize those development rows to the current shape so
+      // existing local conversations remain readable after this upgrade.
+      parsed.attachments = parsed.attachments.map((attachment) => ({
+        ...attachment,
+        messageId: attachment.messageId ?? null,
+      }));
+
+      this.cache = parsed;
     } catch {
       this.cache = emptyDatabase();
     }
@@ -174,18 +196,31 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
    * leave a truncated JSON file that fails to parse on next start.
    */
   private async persist(db: Database): Promise<void> {
-    await mkdir(path.dirname(this.filePath), { recursive: true });
+    await mkdir(path.dirname(this.filePath), {
+      recursive: true,
+    });
 
     const temporary = `${this.filePath}.${process.pid}.tmp`;
-    await writeFile(temporary, JSON.stringify(db, null, 2), "utf8");
+
+    await writeFile(
+      temporary,
+      JSON.stringify(db, null, 2),
+      "utf8",
+    );
+
     await rename(temporary, this.filePath);
   }
 
   // --- Profiles -----------------------------------------------------------
 
-  async getProfile(userId: string): Promise<Profile | null> {
+  async getProfile(
+    userId: string,
+  ): Promise<Profile | null> {
     return this.run(
-      (db) => db.profiles.find((profile) => profile.id === userId) ?? null,
+      (db) =>
+        db.profiles.find(
+          (profile) => profile.id === userId,
+        ) ?? null,
     );
   }
 
@@ -195,14 +230,19 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     displayName?: string | null;
   }): Promise<Profile> {
     return this.run(async (db) => {
-      const existing = db.profiles.find((profile) => profile.id === input.id);
+      const existing = db.profiles.find(
+        (profile) => profile.id === input.id,
+      );
 
       if (existing) {
         existing.email = input.email;
+
         if (input.displayName !== undefined) {
           existing.displayName = input.displayName;
         }
+
         await this.persist(db);
+
         return existing;
       }
 
@@ -210,14 +250,21 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
         id: input.id,
         email: input.email,
         displayName: input.displayName ?? null,
+
         // The first profile becomes admin so the admin area is reachable in
         // local development without a manual database edit.
-        role: db.profiles.length === 0 ? "admin" : "user",
+        role:
+          db.profiles.length === 0
+            ? "admin"
+            : "user",
+
         createdAt: new Date().toISOString(),
       };
 
       db.profiles.push(profile);
+
       await this.persist(db);
+
       return profile;
     });
   }
@@ -228,7 +275,9 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     input: CreateConversationInput,
   ): Promise<Conversation> {
     return this.run(async (db) => {
-      const now = new Date().toISOString();
+      const now =
+        new Date().toISOString();
+
       const row: StoredConversation = {
         id: input.id ?? randomUUID(),
         userId: input.userId,
@@ -239,9 +288,13 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       };
 
       db.conversations.push(row);
+
       await this.persist(db);
 
-      return { ...toConversation(row), messages: [] };
+      return {
+        ...toConversation(row),
+        messages: [],
+      };
     });
   }
 
@@ -264,23 +317,40 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       }
 
       const messages = db.messages
-        .filter((message) => message.conversationId === conversationId)
-        .sort((a, b) => a.sequence - b.sequence)
+        .filter(
+          (message) =>
+            message.conversationId === conversationId,
+        )
+        .sort(
+          (first, second) =>
+            first.sequence - second.sequence,
+        )
         .map(toChatMessage);
 
-      return { ...toConversation(row), messages };
+      return {
+        ...toConversation(row),
+        messages,
+      };
     });
   }
 
   async listConversations(
     userId: string,
-    options: { search?: string; limit?: number } = {},
+    options: {
+      search?: string;
+      limit?: number;
+    } = {},
   ): Promise<ConversationSummary[]> {
     return this.run((db) => {
-      const search = options.search?.trim().toLowerCase();
+      const search =
+        options.search
+          ?.trim()
+          .toLowerCase();
 
       let rows = db.conversations.filter(
-        (row) => row.userId === userId && row.deletedAt === null,
+        (row) =>
+          row.userId === userId &&
+          row.deletedAt === null,
       );
 
       if (search) {
@@ -291,28 +361,46 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
             .filter(
               (message) =>
                 message.userId === userId &&
-                message.content.toLowerCase().includes(search),
+                message.content
+                  .toLowerCase()
+                  .includes(search),
             )
-            .map((message) => message.conversationId),
+            .map(
+              (message) =>
+                message.conversationId,
+            ),
         );
 
         rows = rows.filter(
           (row) =>
-            row.title.toLowerCase().includes(search) || matchingIds.has(row.id),
+            row.title
+              .toLowerCase()
+              .includes(search) ||
+            matchingIds.has(row.id),
         );
       }
 
       return rows
-        .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
-        .slice(0, options.limit ?? 100)
+        .sort((first, second) =>
+          second.updatedAt.localeCompare(
+            first.updatedAt,
+          ),
+        )
+        .slice(
+          0,
+          options.limit ?? 100,
+        )
         .map((row) => ({
           id: row.id,
           title: row.title,
           createdAt: row.createdAt,
           updatedAt: row.updatedAt,
-          messageCount: db.messages.filter(
-            (message) => message.conversationId === row.id,
-          ).length,
+
+          messageCount:
+            db.messages.filter(
+              (message) =>
+                message.conversationId === row.id,
+            ).length,
         }));
     });
   }
@@ -335,8 +423,12 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       }
 
       row.title = title;
-      row.updatedAt = new Date().toISOString();
+
+      row.updatedAt =
+        new Date().toISOString();
+
       await this.persist(db);
+
       return true;
     });
   }
@@ -348,27 +440,42 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     return this.run(async (db) => {
       const row = db.conversations.find(
         (candidate) =>
-          candidate.id === conversationId && candidate.userId === userId,
+          candidate.id === conversationId &&
+          candidate.userId === userId,
       );
 
-      if (!row || row.deletedAt !== null) {
+      if (
+        !row ||
+        row.deletedAt !== null
+      ) {
         return false;
       }
 
       // A hard delete of the conversation and its messages, because the user
       // asked for deletion and a soft-deleted row that still holds their words
-      // would not honour that.
-      db.conversations = db.conversations.filter(
-        (candidate) => candidate.id !== conversationId,
-      );
-      db.messages = db.messages.filter(
-        (message) => message.conversationId !== conversationId,
-      );
-      db.attachments = db.attachments.filter(
-        (attachment) => attachment.conversationId !== conversationId,
-      );
+      // would not honor that.
+      db.conversations =
+        db.conversations.filter(
+          (candidate) =>
+            candidate.id !== conversationId,
+        );
+
+      db.messages =
+        db.messages.filter(
+          (message) =>
+            message.conversationId !==
+            conversationId,
+        );
+
+      db.attachments =
+        db.attachments.filter(
+          (attachment) =>
+            attachment.conversationId !==
+            conversationId,
+        );
 
       await this.persist(db);
+
       return true;
     });
   }
@@ -380,11 +487,14 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     await this.run(async (db) => {
       const row = db.conversations.find(
         (candidate) =>
-          candidate.id === conversationId && candidate.userId === userId,
+          candidate.id === conversationId &&
+          candidate.userId === userId,
       );
 
       if (row) {
-        row.updatedAt = new Date().toISOString();
+        row.updatedAt =
+          new Date().toISOString();
+
         await this.persist(db);
       }
     });
@@ -392,19 +502,24 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
 
   // --- Messages -----------------------------------------------------------
 
-  async appendMessage(input: AppendMessageInput): Promise<ChatMessage> {
+  async appendMessage(
+    input: AppendMessageInput,
+  ): Promise<ChatMessage> {
     return this.run(async (db) => {
-      const conversation = db.conversations.find(
-        (candidate) =>
-          candidate.id === input.conversationId &&
-          candidate.userId === input.userId &&
-          candidate.deletedAt === null,
-      );
+      const conversation =
+        db.conversations.find(
+          (candidate) =>
+            candidate.id === input.conversationId &&
+            candidate.userId === input.userId &&
+            candidate.deletedAt === null,
+        );
 
       // Refuse to write into a conversation the caller does not own, rather than
       // silently creating an orphaned message.
       if (!conversation) {
-        throw new Error("Conversation not found for this user.");
+        throw new Error(
+          "Conversation not found for this user.",
+        );
       }
 
       // Idempotency: a retry carrying the same client id returns the existing
@@ -412,28 +527,37 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       if (input.clientId) {
         const existing = db.messages.find(
           (message) =>
-            message.conversationId === input.conversationId &&
+            message.conversationId ===
+              input.conversationId &&
             message.clientId === input.clientId,
         );
 
         if (existing) {
-          return toChatMessage(existing);
+          return toChatMessage(
+            existing,
+          );
         }
       }
 
-      const now = new Date().toISOString();
+      const now =
+        new Date().toISOString();
+
       const row: StoredMessage = {
         id: randomUUID(),
-        conversationId: input.conversationId,
+        conversationId:
+          input.conversationId,
         userId: input.userId,
-        clientId: input.clientId ?? null,
+        clientId:
+          input.clientId ?? null,
         role: input.role,
         content: input.content,
         status: input.status,
         model: input.model ?? null,
-        promptVersion: input.promptVersion ?? null,
+        promptVersion:
+          input.promptVersion ?? null,
         usage: input.usage ?? null,
-        errorCode: input.errorCode ?? null,
+        errorCode:
+          input.errorCode ?? null,
         feedback: null,
         feedbackNote: null,
         createdAt: now,
@@ -441,10 +565,13 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       };
 
       db.nextSequence += 1;
+
       db.messages.push(row);
+
       conversation.updatedAt = now;
 
       await this.persist(db);
+
       return toChatMessage(row);
     });
   }
@@ -461,19 +588,42 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
   ): Promise<boolean> {
     return this.run(async (db) => {
       const row = db.messages.find(
-        (message) => message.id === messageId && message.userId === userId,
+        (message) =>
+          message.id === messageId &&
+          message.userId === userId,
       );
 
       if (!row) {
         return false;
       }
 
-      if (patch.content !== undefined) row.content = patch.content;
-      if (patch.status !== undefined) row.status = patch.status;
-      if (patch.usage !== undefined) row.usage = patch.usage;
-      if (patch.errorCode !== undefined) row.errorCode = patch.errorCode;
+      if (
+        patch.content !== undefined
+      ) {
+        row.content = patch.content;
+      }
+
+      if (
+        patch.status !== undefined
+      ) {
+        row.status = patch.status;
+      }
+
+      if (
+        patch.usage !== undefined
+      ) {
+        row.usage = patch.usage;
+      }
+
+      if (
+        patch.errorCode !== undefined
+      ) {
+        row.errorCode =
+          patch.errorCode;
+      }
 
       await this.persist(db);
+
       return true;
     });
   }
@@ -491,7 +641,9 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
           message.clientId === clientId,
       );
 
-      return row ? toChatMessage(row) : null;
+      return row
+        ? toChatMessage(row)
+        : null;
     });
   }
 
@@ -512,15 +664,45 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
         return false;
       }
 
+      const removedMessageIds =
+        new Set(
+          db.messages
+            .filter(
+              (message) =>
+                message.conversationId === conversationId &&
+                message.userId === userId &&
+                message.sequence >= anchor.sequence,
+            )
+            .map(
+              (message) =>
+                message.id,
+            ),
+        );
+
       // Everything from the anchor onward is dropped, because those turns
       // answered a question that no longer exists.
-      db.messages = db.messages.filter(
-        (message) =>
-          message.conversationId !== conversationId ||
-          message.sequence < anchor.sequence,
-      );
+      db.messages =
+        db.messages.filter(
+          (message) =>
+            message.conversationId !== conversationId ||
+            message.sequence < anchor.sequence,
+        );
+
+      // Message-owned attachments must follow the messages they belong to.
+      // Conversation-level attachments have a null message id and remain.
+      db.attachments =
+        db.attachments.filter(
+          (attachment) =>
+            attachment.userId !== userId ||
+            attachment.conversationId !== conversationId ||
+            attachment.messageId === null ||
+            !removedMessageIds.has(
+              attachment.messageId,
+            ),
+        );
 
       await this.persist(db);
+
       return true;
     });
   }
@@ -535,7 +717,9 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
   ): Promise<boolean> {
     return this.run(async (db) => {
       const row = db.messages.find(
-        (message) => message.id === messageId && message.userId === userId,
+        (message) =>
+          message.id === messageId &&
+          message.userId === userId,
       );
 
       if (!row) {
@@ -543,37 +727,52 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       }
 
       row.feedback = rating;
-      row.feedbackNote = note ?? null;
+
+      row.feedbackNote =
+        note ?? null;
+
       await this.persist(db);
+
       return true;
     });
   }
 
   // --- Usage and safety ---------------------------------------------------
 
-  async recordUsage(input: UsageEventInput): Promise<void> {
+  async recordUsage(
+    input: UsageEventInput,
+  ): Promise<void> {
     await this.run(async (db) => {
       db.usageEvents.push({
         ...input,
         id: randomUUID(),
-        createdAt: new Date().toISOString(),
+        createdAt:
+          new Date().toISOString(),
       });
+
       await this.persist(db);
     });
   }
 
-  async recordSafetyEvent(input: SafetyEventInput): Promise<void> {
+  async recordSafetyEvent(
+    input: SafetyEventInput,
+  ): Promise<void> {
     await this.run(async (db) => {
       db.safetyEvents.push({
         ...input,
         id: randomUUID(),
-        createdAt: new Date().toISOString(),
+        createdAt:
+          new Date().toISOString(),
       });
+
       await this.persist(db);
     });
   }
 
-  async countRecentMessages(userId: string, sinceIso: string): Promise<number> {
+  async countRecentMessages(
+    userId: string,
+    sinceIso: string,
+  ): Promise<number> {
     return this.run(
       (db) =>
         db.messages.filter(
@@ -587,36 +786,66 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
 
   // --- Attachments --------------------------------------------------------
 
-  async createAttachment(input: AttachmentInput): Promise<AttachmentRecord> {
+  async createAttachment(
+    input: AttachmentInput,
+  ): Promise<AttachmentRecord> {
     return this.run(async (db) => {
-      const owns = db.conversations.some(
-        (candidate) =>
-          candidate.id === input.conversationId &&
-          candidate.userId === input.userId &&
-          candidate.deletedAt === null,
-      );
+      const ownsConversation =
+        db.conversations.some(
+          (candidate) =>
+            candidate.id === input.conversationId &&
+            candidate.userId === input.userId &&
+            candidate.deletedAt === null,
+        );
 
-      if (!owns) {
-        throw new Error("Conversation not found for this user.");
+      if (!ownsConversation) {
+        throw new Error(
+          "Conversation not found for this user.",
+        );
+      }
+
+      if (input.messageId) {
+        const ownsMessage =
+          db.messages.some(
+            (message) =>
+              message.id === input.messageId &&
+              message.conversationId === input.conversationId &&
+              message.userId === input.userId,
+          );
+
+        if (!ownsMessage) {
+          throw new Error(
+            "Message not found for this user.",
+          );
+        }
       }
 
       const row: StoredAttachment = {
         id: randomUUID(),
         userId: input.userId,
-        conversationId: input.conversationId,
+        conversationId:
+          input.conversationId,
+        messageId:
+          input.messageId ?? null,
         filename: input.filename,
         mimeType: input.mimeType,
         sizeBytes: input.sizeBytes,
-        storagePath: input.storagePath,
+        storagePath:
+          input.storagePath,
+
         // Starts pending. Nothing may treat the file as readable until the
         // processing step marks it ready.
         status: "pending",
+
         failureReason: null,
-        createdAt: new Date().toISOString(),
+        createdAt:
+          new Date().toISOString(),
       };
 
       db.attachments.push(row);
+
       await this.persist(db);
+
       return stripUserId(row);
     });
   }
@@ -625,12 +854,16 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     attachmentId: string,
     userId: string,
     status: AttachmentRecord["status"],
-    options: { failureReason?: string; storagePath?: string } = {},
+    options: {
+      failureReason?: string;
+      storagePath?: string;
+    } = {},
   ): Promise<boolean> {
     return this.run(async (db) => {
       const row = db.attachments.find(
         (attachment) =>
-          attachment.id === attachmentId && attachment.userId === userId,
+          attachment.id === attachmentId &&
+          attachment.userId === userId,
       );
 
       if (!row) {
@@ -638,16 +871,39 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       }
 
       row.status = status;
-      row.failureReason = options.failureReason ?? null;
+
+      row.failureReason =
+        options.failureReason ?? null;
 
       // Recorded only once the bytes are actually in storage, so the row cannot
       // point at an object that does not exist.
-      if (options.storagePath !== undefined) {
-        row.storagePath = options.storagePath;
+      if (
+        options.storagePath !== undefined
+      ) {
+        row.storagePath =
+          options.storagePath;
       }
 
       await this.persist(db);
+
       return true;
+    });
+  }
+
+  async getAttachment(
+    attachmentId: string,
+    userId: string,
+  ): Promise<AttachmentRecord | null> {
+    return this.run((db) => {
+      const row = db.attachments.find(
+        (attachment) =>
+          attachment.id === attachmentId &&
+          attachment.userId === userId,
+      );
+
+      return row
+        ? stripUserId(row)
+        : null;
     });
   }
 
@@ -671,18 +927,26 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     userId: string,
   ): Promise<boolean> {
     return this.run(async (db) => {
-      const before = db.attachments.length;
+      const before =
+        db.attachments.length;
 
-      db.attachments = db.attachments.filter(
-        (attachment) =>
-          !(attachment.id === attachmentId && attachment.userId === userId),
-      );
+      db.attachments =
+        db.attachments.filter(
+          (attachment) =>
+            !(
+              attachment.id === attachmentId &&
+              attachment.userId === userId
+            ),
+        );
 
-      if (db.attachments.length === before) {
+      if (
+        db.attachments.length === before
+      ) {
         return false;
       }
 
       await this.persist(db);
+
       return true;
     });
   }
@@ -691,96 +955,210 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
 
   async getAdminMetrics(): Promise<AdminMetrics> {
     return this.run((db) => {
-      const usageByModel = new Map<string, AdminMetrics["usageByModel"][number]>();
+      const usageByModel =
+        new Map<
+          string,
+          AdminMetrics["usageByModel"][number]
+        >();
 
-      for (const event of db.usageEvents) {
-        const key = `${event.provider}:${event.model}`;
-        const existing = usageByModel.get(key) ?? {
-          provider: event.provider,
-          model: event.model,
-          requests: 0,
-          inputTokens: 0,
-          outputTokens: 0,
-          estimatedCostUsd: 0,
-        };
+      for (
+        const event of db.usageEvents
+      ) {
+        const key =
+          `${event.provider}:${event.model}`;
+
+        const existing =
+          usageByModel.get(key) ?? {
+            provider:
+              event.provider,
+            model: event.model,
+            requests: 0,
+            inputTokens: 0,
+            outputTokens: 0,
+            estimatedCostUsd: 0,
+          };
 
         existing.requests += 1;
-        existing.inputTokens += event.inputTokens;
-        existing.outputTokens += event.outputTokens;
-        existing.estimatedCostUsd += event.estimatedCostUsd;
-        usageByModel.set(key, existing);
+
+        existing.inputTokens +=
+          event.inputTokens;
+
+        existing.outputTokens +=
+          event.outputTokens;
+
+        existing.estimatedCostUsd +=
+          event.estimatedCostUsd;
+
+        usageByModel.set(
+          key,
+          existing,
+        );
       }
 
-      const errorCounts = new Map<string, number>();
-      for (const message of db.messages) {
+      const errorCounts =
+        new Map<string, number>();
+
+      for (
+        const message of db.messages
+      ) {
         if (message.errorCode) {
           errorCounts.set(
             message.errorCode,
-            (errorCounts.get(message.errorCode) ?? 0) + 1,
+            (errorCounts.get(
+              message.errorCode,
+            ) ?? 0) + 1,
           );
         }
       }
 
-      const safetyCounts = new Map<
-        string,
-        AdminMetrics["safetyEvents"][number]
-      >();
-      for (const event of db.safetyEvents) {
-        const key = `${event.kind}:${event.severity}`;
-        const existing = safetyCounts.get(key) ?? {
-          kind: event.kind,
-          severity: event.severity,
-          count: 0,
-        };
+      const safetyCounts =
+        new Map<
+          string,
+          AdminMetrics["safetyEvents"][number]
+        >();
+
+      for (
+        const event of db.safetyEvents
+      ) {
+        const key =
+          `${event.kind}:${event.severity}`;
+
+        const existing =
+          safetyCounts.get(key) ?? {
+            kind: event.kind,
+            severity:
+              event.severity,
+            count: 0,
+          };
+
         existing.count += 1;
-        safetyCounts.set(key, existing);
+
+        safetyCounts.set(
+          key,
+          existing,
+        );
       }
 
       return {
-        userCount: db.profiles.length,
-        conversationCount: db.conversations.filter(
-          (row) => row.deletedAt === null,
-        ).length,
-        messageCount: db.messages.length,
-        usageByModel: [...usageByModel.values()].sort(
-          (a, b) => b.estimatedCostUsd - a.estimatedCostUsd,
+        userCount:
+          db.profiles.length,
+
+        conversationCount:
+          db.conversations.filter(
+            (row) =>
+              row.deletedAt === null,
+          ).length,
+
+        messageCount:
+          db.messages.length,
+
+        usageByModel: [
+          ...usageByModel.values(),
+        ].sort(
+          (first, second) =>
+            second.estimatedCostUsd -
+            first.estimatedCostUsd,
         ),
+
         feedback: {
-          up: db.messages.filter((message) => message.feedback === "up").length,
-          down: db.messages.filter((message) => message.feedback === "down")
-            .length,
+          up: db.messages.filter(
+            (message) =>
+              message.feedback === "up",
+          ).length,
+
+          down: db.messages.filter(
+            (message) =>
+              message.feedback === "down",
+          ).length,
         },
-        recentErrors: [...errorCounts.entries()]
-          .map(([code, count]) => ({ code, count }))
-          .sort((a, b) => b.count - a.count),
-        safetyEvents: [...safetyCounts.values()].sort(
-          (a, b) => b.count - a.count,
+
+        recentErrors: [
+          ...errorCounts.entries(),
+        ]
+          .map(
+            ([code, count]) => ({
+              code,
+              count,
+            }),
+          )
+          .sort(
+            (first, second) =>
+              second.count -
+              first.count,
+          ),
+
+        safetyEvents: [
+          ...safetyCounts.values(),
+        ].sort(
+          (first, second) =>
+            second.count -
+            first.count,
         ),
       };
     });
   }
 
-  async deleteAllUserData(userId: string): Promise<void> {
+  async deleteAllUserData(
+    userId: string,
+  ): Promise<void> {
     await this.run(async (db) => {
-      db.conversations = db.conversations.filter((row) => row.userId !== userId);
-      db.messages = db.messages.filter((row) => row.userId !== userId);
-      db.attachments = db.attachments.filter((row) => row.userId !== userId);
-      db.profiles = db.profiles.filter((row) => row.id !== userId);
+      db.conversations =
+        db.conversations.filter(
+          (row) =>
+            row.userId !== userId,
+        );
+
+      db.messages =
+        db.messages.filter(
+          (row) =>
+            row.userId !== userId,
+        );
+
+      db.attachments =
+        db.attachments.filter(
+          (row) =>
+            row.userId !== userId,
+        );
+
+      db.profiles =
+        db.profiles.filter(
+          (row) =>
+            row.id !== userId,
+        );
+
       // Usage events are retained but unlinked, so aggregate cost reporting
       // survives an account deletion without keeping personal data.
-      db.usageEvents = db.usageEvents.map((event) =>
-        event.userId === userId ? { ...event, userId: "deleted-user" } : event,
-      );
-      db.safetyEvents = db.safetyEvents.map((event) =>
-        event.userId === userId ? { ...event, userId: null } : event,
-      );
+      db.usageEvents =
+        db.usageEvents.map(
+          (event) =>
+            event.userId === userId
+              ? {
+                  ...event,
+                  userId:
+                    "deleted-user",
+                }
+              : event,
+        );
+
+      db.safetyEvents =
+        db.safetyEvents.map(
+          (event) =>
+            event.userId === userId
+              ? {
+                  ...event,
+                  userId: null,
+                }
+              : event,
+        );
 
       await this.persist(db);
     });
   }
 }
 
-function toConversation(row: StoredConversation): Omit<Conversation, "messages"> {
+function toConversation(
+  row: StoredConversation,
+): Omit<Conversation, "messages"> {
   return {
     id: row.id,
     title: row.title,
@@ -789,15 +1167,27 @@ function toConversation(row: StoredConversation): Omit<Conversation, "messages">
   };
 }
 
-function toChatMessage(row: StoredMessage): ChatMessage {
+function toChatMessage(
+  row: StoredMessage,
+): ChatMessage {
   return {
     id: row.id,
     role: row.role,
     content: row.content,
     status: row.status,
     createdAt: row.createdAt,
-    ...(row.model ? { model: row.model } : {}),
-    ...(row.feedback ? { feedback: row.feedback } : {}),
+
+    ...(row.model
+      ? {
+          model: row.model,
+        }
+      : {}),
+
+    ...(row.feedback
+      ? {
+          feedback: row.feedback,
+        }
+      : {}),
   };
 }
 
@@ -808,16 +1198,22 @@ function toChatMessage(row: StoredMessage): ChatMessage {
  * because an unused binding is itself lint noise and this states the returned
  * shape explicitly.
  */
-function stripUserId(row: StoredAttachment): AttachmentRecord {
+function stripUserId(
+  row: StoredAttachment,
+): AttachmentRecord {
   return {
     id: row.id,
-    conversationId: row.conversationId,
+    conversationId:
+      row.conversationId,
+    messageId: row.messageId,
     filename: row.filename,
     mimeType: row.mimeType,
     sizeBytes: row.sizeBytes,
-    storagePath: row.storagePath,
+    storagePath:
+      row.storagePath,
     status: row.status,
-    failureReason: row.failureReason,
+    failureReason:
+      row.failureReason,
     createdAt: row.createdAt,
   };
 }
