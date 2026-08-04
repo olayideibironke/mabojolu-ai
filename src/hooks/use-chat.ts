@@ -241,13 +241,20 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         createdAt: timestamp,
       };
 
-      setMessages((current) => {
-        const next = [...current, userMessage, assistantMessage];
-        run(next, assistantMessage.id, createId());
-        return next;
-      });
+      /*
+       * The next transcript is computed here, not inside the state updater.
+       *
+       * A `setMessages` callback must be pure. React deliberately double-invokes
+       * updaters in development to surface impure ones, so starting a request
+       * inside the updater fired it twice and created two conversations six
+       * milliseconds apart. State is set from a plain value, and the request is
+       * started afterwards, exactly once.
+       */
+      const next = [...messages, userMessage, assistantMessage];
+      setMessages(next);
+      run(next, assistantMessage.id, createId());
     },
-    [isStreaming, run],
+    [isStreaming, messages, run],
   );
 
   const stop = useCallback(() => {
@@ -265,26 +272,26 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
       return;
     }
 
-    setMessages((current) => {
-      const lastIndex = current.length - 1;
-      const last = current[lastIndex];
+    const lastIndex = messages.length - 1;
+    const last = messages[lastIndex];
 
-      if (!last || last.role !== "assistant" || last.status !== "failed") {
-        return current;
-      }
+    if (!last || last.role !== "assistant" || last.status !== "failed") {
+      return;
+    }
 
-      const reset: ChatMessage = {
-        ...last,
-        content: "",
-        status: "pending",
-        error: undefined,
-      };
-      const next = [...current.slice(0, lastIndex), reset];
+    const reset: ChatMessage = {
+      ...last,
+      content: "",
+      status: "pending",
+      error: undefined,
+    };
+    const next = [...messages.slice(0, lastIndex), reset];
 
-      run(next, reset.id, idempotencyKeyRef.current ?? createId());
-      return next;
-    });
-  }, [isStreaming, run]);
+    setMessages(next);
+    // Reuses the previous key, so the server recognizes this as the same logical
+    // request rather than billing a second generation.
+    run(next, reset.id, idempotencyKeyRef.current ?? createId());
+  }, [isStreaming, messages, run]);
 
   /**
    * Regenerate an assistant reply.
@@ -299,29 +306,29 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         return;
       }
 
-      setMessages((current) => {
-        const index = current.findIndex(
-          (message) => message.id === assistantMessageId,
-        );
+      const index = messages.findIndex(
+        (message) => message.id === assistantMessageId,
+      );
 
-        if (index < 1 || current[index].role !== "assistant") {
-          return current;
-        }
+      if (index < 1 || messages[index].role !== "assistant") {
+        return;
+      }
 
-        const placeholder: ChatMessage = {
-          id: createId(),
-          role: "assistant",
-          content: "",
-          status: "pending",
-          createdAt: nowIso(),
-        };
-        const next = [...current.slice(0, index), placeholder];
+      const placeholder: ChatMessage = {
+        id: createId(),
+        role: "assistant",
+        content: "",
+        status: "pending",
+        createdAt: nowIso(),
+      };
+      const next = [...messages.slice(0, index), placeholder];
 
-        run(next, placeholder.id, createId());
-        return next;
-      });
+      setMessages(next);
+      // A fresh key: the user asked for a genuinely new answer, so this is not a
+      // retry of the previous request.
+      run(next, placeholder.id, createId());
     },
-    [isStreaming, run],
+    [isStreaming, messages, run],
   );
 
   /**
@@ -337,32 +344,32 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         return;
       }
 
-      setMessages((current) => {
-        const index = current.findIndex((message) => message.id === messageId);
+      const index = messages.findIndex((message) => message.id === messageId);
 
-        if (index === -1 || current[index].role !== "user") {
-          return current;
-        }
+      if (index === -1 || messages[index].role !== "user") {
+        return;
+      }
 
-        const edited: ChatMessage = {
-          ...current[index],
-          content: trimmed,
-          status: "complete",
-        };
-        const placeholder: ChatMessage = {
-          id: createId(),
-          role: "assistant",
-          content: "",
-          status: "pending",
-          createdAt: nowIso(),
-        };
-        const next = [...current.slice(0, index), edited, placeholder];
+      const edited: ChatMessage = {
+        ...messages[index],
+        content: trimmed,
+        status: "complete",
+      };
+      const placeholder: ChatMessage = {
+        id: createId(),
+        role: "assistant",
+        content: "",
+        status: "pending",
+        createdAt: nowIso(),
+      };
+      // Later turns are discarded: they answered the previous wording and would
+      // now contradict the edited question.
+      const next = [...messages.slice(0, index), edited, placeholder];
 
-        run(next, placeholder.id, createId());
-        return next;
-      });
+      setMessages(next);
+      run(next, placeholder.id, createId());
     },
-    [isStreaming, run],
+    [isStreaming, messages, run],
   );
 
   /**
