@@ -10,13 +10,16 @@
  * consume the user's computer resources.
  */
 
-export type ProviderId = "mock" | "ollama" | "anthropic";
+export type ProviderId =
+  | "mock"
+  | "ollama"
+  | "anthropic";
 
 export interface ModelDefinition {
   id: string;
   providerId: ProviderId;
 
-  /** Identifier sent to the provider. */
+  /** Identifier sent directly to the configured provider. */
   providerModelId: string;
 
   displayName: string;
@@ -51,12 +54,33 @@ export interface ModelDefinition {
 
 export const MODEL_REGISTRY: readonly ModelDefinition[] = [
   {
+    id: "mabojolu-fast",
+    providerId: "ollama",
+    providerModelId: "qwen3.5:2b-q4_K_M",
+    displayName: "Mabojolu Fast",
+    description:
+      "Faster local intelligence for everyday questions, drafting, and quick assistance.",
+    contextWindowTokens: 16_384,
+    maxOutputTokens: 4_096,
+    capabilities: {
+      streaming: true,
+      vision: false,
+      toolUse: false,
+      reasoning: true,
+    },
+    pricing: {
+      inputPerMillionUsd: 0,
+      outputPerMillionUsd: 0,
+    },
+    enabled: true,
+  },
+  {
     id: "mabojolu-local",
     providerId: "ollama",
     providerModelId: "qwen3.5:4b",
-    displayName: "Mabojolu Local",
+    displayName: "Mabojolu Quality",
     description:
-      "Private local intelligence running through Ollama with no paid API usage.",
+      "Higher-quality local intelligence for analysis, detailed writing, planning, and technical work.",
     contextWindowTokens: 32_768,
     maxOutputTokens: 8_192,
     capabilities: {
@@ -64,14 +88,14 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
 
       /*
        * The current Mabojolu Ollama adapter sends text conversations only.
-       * We will change this to true after image attachments are connected to
-       * the provider request format and tested.
+       * This can become true after image attachments are connected to the
+       * provider request format and tested.
        */
       vision: false,
 
       /*
-       * Tool execution is deliberately disabled until the permission-based
-       * Mabojolu Agent system is implemented.
+       * Tool execution remains disabled until the permission-based Mabojolu
+       * Agent system is implemented.
        */
       toolUse: false,
 
@@ -89,7 +113,7 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "claude-opus-5",
     displayName: "Mabojolu Core",
     description:
-      "Deep cloud intelligence for analysis, planning, and complex work.",
+      "Deep cloud intelligence reserved for complex analysis, planning, and professional work.",
     contextWindowTokens: 1_000_000,
     maxOutputTokens: 128_000,
     capabilities: {
@@ -110,7 +134,7 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
     providerModelId: "claude-sonnet-5",
     displayName: "Mabojolu Swift",
     description:
-      "Balanced cloud intelligence for everyday professional work.",
+      "Balanced cloud intelligence reserved for everyday professional work.",
     contextWindowTokens: 1_000_000,
     maxOutputTokens: 128_000,
     capabilities: {
@@ -151,7 +175,9 @@ export const MODEL_REGISTRY: readonly ModelDefinition[] = [
 export function findModel(
   id: string,
 ): ModelDefinition | undefined {
-  return MODEL_REGISTRY.find((model) => model.id === id);
+  return MODEL_REGISTRY.find(
+    (model) => model.id === id,
+  );
 }
 
 export function modelsForProvider(
@@ -159,7 +185,8 @@ export function modelsForProvider(
 ): readonly ModelDefinition[] {
   return MODEL_REGISTRY.filter(
     (model) =>
-      model.providerId === providerId && model.enabled,
+      model.providerId === providerId &&
+      model.enabled,
   );
 }
 
@@ -208,6 +235,8 @@ export function estimateCostUsd(
  * This is not a provider tokenizer. It intentionally overestimates so the
  * application is less likely to exceed a model's actual context limit.
  */
-export function estimateTokens(text: string): number {
+export function estimateTokens(
+  text: string,
+): number {
   return Math.ceil(text.length / 3.5);
 }

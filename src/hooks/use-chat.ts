@@ -1,84 +1,155 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 
 import { streamChat } from "@/lib/ai/client-stream";
-import { createId, nowIso } from "@/lib/utilities/ids";
-import type { ChatErrorPayload, ChatMessage, FeedbackRating } from "@/types/chat";
+import {
+  createId,
+  nowIso,
+} from "@/lib/utilities/ids";
+import type {
+  ChatErrorPayload,
+  ChatMessage,
+  FeedbackRating,
+} from "@/types/chat";
 
 /**
  * Chat state and transport.
  *
  * All conversation mutation lives here so the components stay presentational.
- * Two invariants drive the design:
  *
- *  1. An interrupted generation must not corrupt the conversation. Partial text
- *     is kept and marked `interrupted`, never silently dropped or left looking
- *     complete.
- *  2. Retry must not duplicate a message. Retrying replaces the failed
- *     assistant turn in place and reuses the same idempotency key, so the server
- *     can recognize the repeat instead of billing a second generation.
+ * An interrupted generation must not corrupt the conversation. Partial text is
+ * kept and marked interrupted.
+ *
+ * Retry must not duplicate a message. Retrying replaces the failed assistant
+ * turn in place and reuses the same idempotency key.
+ *
+ * The selected model is supplied by the parent and included with every new
+ * generation, retry, regeneration, and edited-message request.
  */
 
 export interface UseChatResult {
   messages: ChatMessage[];
   isStreaming: boolean;
-  /** Progress label from the server, for example "Thinking". */
+
+  /** Progress label from the server, such as Thinking. */
   statusLabel: string | null;
+
   send: (content: string) => void;
   stop: () => void;
   retry: () => void;
-  regenerate: (assistantMessageId: string) => void;
-  editUserMessage: (messageId: string, content: string) => void;
-  setFeedback: (messageId: string, rating: FeedbackRating) => void;
+
+  regenerate: (
+    assistantMessageId: string,
+  ) => void;
+
+  editUserMessage: (
+    messageId: string,
+    content: string,
+  ) => void;
+
+  setFeedback: (
+    messageId: string,
+    rating: FeedbackRating,
+  ) => void;
+
   reset: () => void;
-  /** Replace the transcript, when a stored conversation is opened. */
-  loadMessages: (messages: ChatMessage[], conversationId: string) => void;
+
+  /** Replace the transcript when a stored conversation is opened. */
+  loadMessages: (
+    messages: ChatMessage[],
+    conversationId: string,
+  ) => void;
+
   /** True when the last assistant turn failed and can be retried. */
   canRetry: boolean;
 }
 
 export interface UseChatOptions {
   /** Called once the server has created or updated a conversation. */
-  onConversationChanged?: (conversationId: string) => void;
+  onConversationChanged?: (
+    conversationId: string,
+  ) => void;
+
+  /**
+   * Mabojolu model selected by the user.
+   *
+   * Examples:
+   * mabojolu-fast
+   * mabojolu-local
+   */
+  modelId?: string;
 }
 
-export function useChat(options: UseChatOptions = {}): UseChatResult {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [isStreaming, setIsStreaming] = useState(false);
-  const [statusLabel, setStatusLabel] = useState<string | null>(null);
+export function useChat(
+  options: UseChatOptions = {},
+): UseChatResult {
+  const [messages, setMessages] = useState<
+    ChatMessage[]
+  >([]);
+
+  const [isStreaming, setIsStreaming] =
+    useState(false);
+
+  const [statusLabel, setStatusLabel] =
+    useState<string | null>(null);
 
   /**
-   * The conversation being appended to.
+   * The conversation currently being appended to.
    *
-   * A ref, not state: it is read inside async callbacks where a captured state
-   * value would be stale, and changing it must not trigger a re-render.
+   * A ref is used because asynchronous stream callbacks must always read the
+   * latest conversation without depending on captured React state.
    */
-  const conversationIdRef = useRef<string | null>(null);
+  const conversationIdRef =
+    useRef<string | null>(null);
 
   /**
-   * The conversation-changed callback, held in a ref.
-   *
-   * Kept in a ref so `run` does not take it as a dependency, which would rebuild
-   * every callback whenever the parent re-rendered. Assigned in an effect rather
-   * than during render: writing a ref during render is not allowed, because a
-   * render may be thrown away and the write would still have happened.
+   * Keep the conversation-changed callback current without forcing every chat
+   * callback to be recreated whenever the parent renders.
    */
-  const onConversationChangedRef = useRef(options.onConversationChanged);
+  const onConversationChangedRef = useRef(
+    options.onConversationChanged,
+  );
 
   useEffect(() => {
-    onConversationChangedRef.current = options.onConversationChanged;
+    onConversationChangedRef.current =
+      options.onConversationChanged;
   }, [options.onConversationChanged]);
 
-  // Refs rather than state: these are read inside async callbacks where a
-  // captured state value would be stale.
-  const controllerRef = useRef<AbortController | null>(null);
-  const idempotencyKeyRef = useRef<string | null>(null);
-  /** Guards against a late stream writing into a conversation that moved on. */
+  /**
+   * Keep the selected model current for future generations.
+   *
+   * A model change does not interrupt an answer already being generated. It
+   * applies to the next send, retry, regeneration, or edited-message request.
+   */
+  const modelIdRef = useRef(
+    options.modelId,
+  );
+
+  useEffect(() => {
+    modelIdRef.current = options.modelId;
+  }, [options.modelId]);
+
+  const controllerRef =
+    useRef<AbortController | null>(null);
+
+  const idempotencyKeyRef =
+    useRef<string | null>(null);
+
+  /**
+   * Guards against a late stream writing into a conversation that has already
+   * changed.
+   */
   const generationRef = useRef(0);
 
-  // Abort any in-flight generation when the component goes away, so a
-  // navigation does not leave a request running and billing.
+  /**
+   * Abort any active generation when the component unmounts.
+   */
   useEffect(() => {
     return () => {
       controllerRef.current?.abort();
@@ -86,103 +157,174 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
   }, []);
 
   /**
-   * Run one generation against the given history.
+   * Run one generation against the supplied history.
    *
-   * `history` must already contain the user turn and end with the placeholder
-   * assistant message identified by `assistantId`.
+   * The history already contains the user turn and ends with the placeholder
+   * assistant message identified by assistantId.
    */
   const run = useCallback(
-    (history: ChatMessage[], assistantId: string, idempotencyKey: string) => {
-      const generation = generationRef.current + 1;
+    (
+      history: ChatMessage[],
+      assistantId: string,
+      idempotencyKey: string,
+    ) => {
+      const generation =
+        generationRef.current + 1;
+
       generationRef.current = generation;
 
-      const controller = new AbortController();
+      const controller =
+        new AbortController();
+
       controllerRef.current = controller;
-      idempotencyKeyRef.current = idempotencyKey;
+      idempotencyKeyRef.current =
+        idempotencyKey;
 
       setIsStreaming(true);
       setStatusLabel(null);
 
-      // Tracked outside React state so the settle handlers see the final text
-      // without depending on a state update having flushed.
       let accumulated = "";
       let receivedText = false;
 
-      const isCurrent = () => generationRef.current === generation;
+      const isCurrent = () =>
+        generationRef.current === generation;
 
-      const patchAssistant = (patch: Partial<ChatMessage>) => {
+      const patchAssistant = (
+        patch: Partial<ChatMessage>,
+      ) => {
         setMessages((current) =>
           current.map((message) =>
-            message.id === assistantId ? { ...message, ...patch } : message,
+            message.id === assistantId
+              ? {
+                  ...message,
+                  ...patch,
+                }
+              : message,
           ),
         );
       };
 
       void streamChat(
         {
-          // Absent on the first message, so the server creates the conversation
-          // and returns its id in the start event.
           ...(conversationIdRef.current
-            ? { conversationId: conversationIdRef.current }
+            ? {
+                conversationId:
+                  conversationIdRef.current,
+              }
             : {}),
+
           messages: history
-            // Only completed turns are context. The placeholder must not be sent.
-            .filter((message) => message.id !== assistantId)
+            .filter(
+              (message) =>
+                message.id !== assistantId,
+            )
             .map((message) => ({
               id: message.id,
               role: message.role,
               content: message.content,
               createdAt: message.createdAt,
             })),
+
+          ...(modelIdRef.current
+            ? {
+                modelId:
+                  modelIdRef.current,
+              }
+            : {}),
+
           idempotencyKey,
         },
         controller.signal,
         {
-          onStart: ({ model, conversationId, messageId }) => {
-            if (!isCurrent()) return;
-
-            // Adopt the server's identifiers. The server-assigned message id is
-            // what makes feedback and regeneration addressable after a refresh.
-            if (conversationId && conversationIdRef.current !== conversationId) {
-              conversationIdRef.current = conversationId;
-              onConversationChangedRef.current?.(conversationId);
+          onStart: ({
+            model,
+            conversationId,
+            messageId,
+          }) => {
+            if (!isCurrent()) {
+              return;
             }
 
-            patchAssistant({ status: "streaming", model, serverId: messageId });
+            if (
+              conversationId &&
+              conversationIdRef.current !==
+                conversationId
+            ) {
+              conversationIdRef.current =
+                conversationId;
+
+              onConversationChangedRef.current?.(
+                conversationId,
+              );
+            }
+
+            patchAssistant({
+              status: "streaming",
+              model,
+              serverId: messageId,
+            });
           },
+
           onDelta: (text) => {
-            if (!isCurrent()) return;
+            if (!isCurrent()) {
+              return;
+            }
+
             receivedText = true;
             accumulated += text;
-            // Clear the progress label as soon as real text arrives.
+
             setStatusLabel(null);
-            patchAssistant({ content: accumulated, status: "streaming" });
+
+            patchAssistant({
+              content: accumulated,
+              status: "streaming",
+            });
           },
+
           onStatus: (label) => {
-            if (!isCurrent()) return;
+            if (!isCurrent()) {
+              return;
+            }
+
             setStatusLabel(label);
           },
-          onDone: ({ finishReason }) => {
-            if (!isCurrent()) return;
+
+          onDone: ({
+            finishReason,
+          }) => {
+            if (!isCurrent()) {
+              return;
+            }
 
             setIsStreaming(false);
             setStatusLabel(null);
             controllerRef.current = null;
 
-            if (finishReason === "aborted") {
-              // Keep whatever arrived. An empty stop removes the placeholder
-              // rather than leaving a blank bubble behind.
+            if (
+              finishReason === "aborted"
+            ) {
               if (receivedText) {
-                patchAssistant({ content: accumulated, status: "interrupted" });
+                patchAssistant({
+                  content: accumulated,
+                  status: "interrupted",
+                });
               } else {
                 setMessages((current) =>
-                  current.filter((message) => message.id !== assistantId),
+                  current.filter(
+                    (message) =>
+                      message.id !==
+                      assistantId,
+                  ),
                 );
               }
+
               return;
             }
 
-            if (finishReason === "refusal" && !receivedText) {
+            if (
+              finishReason === "refusal" &&
+              !receivedText
+            ) {
               patchAssistant({
                 status: "failed",
                 error: {
@@ -192,20 +334,27 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
                   retryable: false,
                 },
               });
+
               return;
             }
 
-            patchAssistant({ content: accumulated, status: "complete" });
+            patchAssistant({
+              content: accumulated,
+              status: "complete",
+            });
           },
-          onError: (error: ChatErrorPayload) => {
-            if (!isCurrent()) return;
+
+          onError: (
+            error: ChatErrorPayload,
+          ) => {
+            if (!isCurrent()) {
+              return;
+            }
 
             setIsStreaming(false);
             setStatusLabel(null);
             controllerRef.current = null;
 
-            // Text already shown is preserved and the failure is attached to
-            // it, so a mid-stream error does not erase a partial answer.
             patchAssistant({
               content: accumulated,
               status: "failed",
@@ -221,11 +370,16 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
   const send = useCallback(
     (content: string) => {
       const trimmed = content.trim();
-      if (trimmed.length === 0 || isStreaming) {
+
+      if (
+        trimmed.length === 0 ||
+        isStreaming
+      ) {
         return;
       }
 
       const timestamp = nowIso();
+
       const userMessage: ChatMessage = {
         id: createId(),
         role: "user",
@@ -233,6 +387,7 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         status: "complete",
         createdAt: timestamp,
       };
+
       const assistantMessage: ChatMessage = {
         id: createId(),
         role: "assistant",
@@ -241,20 +396,25 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         createdAt: timestamp,
       };
 
-      /*
-       * The next transcript is computed here, not inside the state updater.
-       *
-       * A `setMessages` callback must be pure. React deliberately double-invokes
-       * updaters in development to surface impure ones, so starting a request
-       * inside the updater fired it twice and created two conversations six
-       * milliseconds apart. State is set from a plain value, and the request is
-       * started afterwards, exactly once.
-       */
-      const next = [...messages, userMessage, assistantMessage];
+      const next = [
+        ...messages,
+        userMessage,
+        assistantMessage,
+      ];
+
       setMessages(next);
-      run(next, assistantMessage.id, createId());
+
+      run(
+        next,
+        assistantMessage.id,
+        createId(),
+      );
     },
-    [isStreaming, messages, run],
+    [
+      isStreaming,
+      messages,
+      run,
+    ],
   );
 
   const stop = useCallback(() => {
@@ -262,55 +422,82 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
   }, []);
 
   /**
-   * Re-run the last assistant turn.
+   * Retry the last failed assistant turn.
    *
-   * Reuses the previous idempotency key so the server can tell this is the same
-   * logical request rather than a new one.
+   * The previous idempotency key is reused so the server recognizes the same
+   * logical request instead of creating a duplicate.
    */
   const retry = useCallback(() => {
     if (isStreaming) {
       return;
     }
 
-    const lastIndex = messages.length - 1;
-    const last = messages[lastIndex];
+    const lastIndex =
+      messages.length - 1;
 
-    if (!last || last.role !== "assistant" || last.status !== "failed") {
+    const last =
+      messages[lastIndex];
+
+    if (
+      !last ||
+      last.role !== "assistant" ||
+      last.status !== "failed"
+    ) {
       return;
     }
 
-    const reset: ChatMessage = {
+    const resetMessage: ChatMessage = {
       ...last,
       content: "",
       status: "pending",
       error: undefined,
     };
-    const next = [...messages.slice(0, lastIndex), reset];
+
+    const next = [
+      ...messages.slice(0, lastIndex),
+      resetMessage,
+    ];
 
     setMessages(next);
-    // Reuses the previous key, so the server recognizes this as the same logical
-    // request rather than billing a second generation.
-    run(next, reset.id, idempotencyKeyRef.current ?? createId());
-  }, [isStreaming, messages, run]);
+
+    run(
+      next,
+      resetMessage.id,
+      idempotencyKeyRef.current ??
+        createId(),
+    );
+  }, [
+    isStreaming,
+    messages,
+    run,
+  ]);
 
   /**
    * Regenerate an assistant reply.
    *
-   * Drops that reply and everything after it, then re-asks from the preceding
-   * user turn. A fresh idempotency key is used because this is a genuinely new
-   * request the user asked for.
+   * The selected reply and everything after it are discarded. Mabojolu then
+   * responds again using the currently selected model.
    */
   const regenerate = useCallback(
-    (assistantMessageId: string) => {
+    (
+      assistantMessageId: string,
+    ) => {
       if (isStreaming) {
         return;
       }
 
-      const index = messages.findIndex(
-        (message) => message.id === assistantMessageId,
-      );
+      const index =
+        messages.findIndex(
+          (message) =>
+            message.id ===
+            assistantMessageId,
+        );
 
-      if (index < 1 || messages[index].role !== "assistant") {
+      if (
+        index < 1 ||
+        messages[index].role !==
+          "assistant"
+      ) {
         return;
       }
 
@@ -321,32 +508,57 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         status: "pending",
         createdAt: nowIso(),
       };
-      const next = [...messages.slice(0, index), placeholder];
+
+      const next = [
+        ...messages.slice(0, index),
+        placeholder,
+      ];
 
       setMessages(next);
-      // A fresh key: the user asked for a genuinely new answer, so this is not a
-      // retry of the previous request.
-      run(next, placeholder.id, createId());
+
+      run(
+        next,
+        placeholder.id,
+        createId(),
+      );
     },
-    [isStreaming, messages, run],
+    [
+      isStreaming,
+      messages,
+      run,
+    ],
   );
 
   /**
-   * Edit a user message and re-ask from that point.
+   * Edit a user message and generate a new response from that point.
    *
-   * Later turns are discarded because they answered the old wording and would
-   * otherwise contradict the new question.
+   * Later turns are discarded because they answered the previous wording.
    */
   const editUserMessage = useCallback(
-    (messageId: string, content: string) => {
+    (
+      messageId: string,
+      content: string,
+    ) => {
       const trimmed = content.trim();
-      if (trimmed.length === 0 || isStreaming) {
+
+      if (
+        trimmed.length === 0 ||
+        isStreaming
+      ) {
         return;
       }
 
-      const index = messages.findIndex((message) => message.id === messageId);
+      const index =
+        messages.findIndex(
+          (message) =>
+            message.id ===
+            messageId,
+        );
 
-      if (index === -1 || messages[index].role !== "user") {
+      if (
+        index === -1 ||
+        messages[index].role !== "user"
+      ) {
         return;
       }
 
@@ -355,6 +567,7 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         content: trimmed,
         status: "complete",
       };
+
       const placeholder: ChatMessage = {
         id: createId(),
         role: "assistant",
@@ -362,45 +575,67 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
         status: "pending",
         createdAt: nowIso(),
       };
-      // Later turns are discarded: they answered the previous wording and would
-      // now contradict the edited question.
-      const next = [...messages.slice(0, index), edited, placeholder];
+
+      const next = [
+        ...messages.slice(0, index),
+        edited,
+        placeholder,
+      ];
 
       setMessages(next);
-      run(next, placeholder.id, createId());
+
+      run(
+        next,
+        placeholder.id,
+        createId(),
+      );
     },
-    [isStreaming, messages, run],
+    [
+      isStreaming,
+      messages,
+      run,
+    ],
   );
 
   /**
-   * Record feedback, optimistically and then on the server.
-   *
-   * Optimistic because the control should respond instantly. Persisted because a
-   * thumb that only animates is a decorative control, and the point of feedback is
-   * that someone can act on it.
+   * Record message feedback optimistically, then save it on the server.
    */
   const setFeedback = useCallback(
-    (messageId: string, rating: FeedbackRating) => {
-      const target = messages.find((message) => message.id === messageId);
+    (
+      messageId: string,
+      rating: FeedbackRating,
+    ) => {
+      const target =
+        messages.find(
+          (message) =>
+            message.id === messageId,
+        );
 
       if (!target) {
         return;
       }
 
-      // Selecting the same rating again clears it, so a mis-click is reversible.
-      const nextRating = target.feedback === rating ? null : rating;
+      const nextRating =
+        target.feedback === rating
+          ? null
+          : rating;
 
       setMessages((current) =>
         current.map((message) =>
           message.id === messageId
-            ? { ...message, feedback: nextRating ?? undefined }
+            ? {
+                ...message,
+                feedback:
+                  nextRating ??
+                  undefined,
+              }
             : message,
         ),
       );
 
-      // Only a stored message can carry feedback. A reply still streaming has no
-      // server id yet, and there is nothing to attach it to.
-      const serverId = target.serverId;
+      const serverId =
+        target.serverId;
+
       if (!serverId) {
         return;
       }
@@ -408,32 +643,56 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
       void (async () => {
         try {
           const response = nextRating
-            ? await fetch("/api/feedback", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messageId: serverId, rating: nextRating }),
-              })
+            ? await fetch(
+                "/api/feedback",
+                {
+                  method: "POST",
+                  headers: {
+                    "Content-Type":
+                      "application/json",
+                  },
+                  body: JSON.stringify({
+                    messageId:
+                      serverId,
+                    rating:
+                      nextRating,
+                  }),
+                },
+              )
             : await fetch(
-                `/api/feedback?messageId=${encodeURIComponent(serverId)}`,
-                { method: "DELETE" },
+                `/api/feedback?messageId=${encodeURIComponent(
+                  serverId,
+                )}`,
+                {
+                  method: "DELETE",
+                },
               );
 
           if (!response.ok) {
-            // Roll back, so the UI does not claim to have saved something it did
-            // not.
-            setMessages((current) =>
-              current.map((message) =>
-                message.id === messageId
-                  ? { ...message, feedback: target.feedback }
-                  : message,
-              ),
+            setMessages(
+              (current) =>
+                current.map(
+                  (message) =>
+                    message.id ===
+                    messageId
+                      ? {
+                          ...message,
+                          feedback:
+                            target.feedback,
+                        }
+                      : message,
+                ),
             );
           }
         } catch {
           setMessages((current) =>
             current.map((message) =>
               message.id === messageId
-                ? { ...message, feedback: target.feedback }
+                ? {
+                    ...message,
+                    feedback:
+                      target.feedback,
+                  }
                 : message,
             ),
           );
@@ -444,38 +703,44 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
   );
 
   /**
-   * Replace the transcript with a stored conversation.
-   *
-   * Aborts any active generation first and bumps the guard, so a stream belonging
-   * to the previous conversation cannot write into this one.
+   * Replace the current transcript with a stored conversation.
    */
   const loadMessages = useCallback(
-    (loaded: ChatMessage[], conversationId: string) => {
+    (
+      loaded: ChatMessage[],
+      conversationId: string,
+    ) => {
       controllerRef.current?.abort();
       controllerRef.current = null;
+
       generationRef.current += 1;
       idempotencyKeyRef.current = null;
-      conversationIdRef.current = conversationId;
 
-      // Stored rows already carry their database ids, so `serverId` mirrors `id`
-      // and actions such as feedback work immediately after a refresh.
+      conversationIdRef.current =
+        conversationId;
+
       setMessages(
-        loaded.map((message) => ({ ...message, serverId: message.id })),
+        loaded.map((message) => ({
+          ...message,
+          serverId: message.id,
+        })),
       );
+
       setIsStreaming(false);
       setStatusLabel(null);
     },
     [],
   );
 
+  /**
+   * Start a clean conversation.
+   */
   const reset = useCallback(() => {
     controllerRef.current?.abort();
     controllerRef.current = null;
-    // Invalidate any in-flight stream so it cannot write into the new chat.
+
     generationRef.current += 1;
     idempotencyKeyRef.current = null;
-    // Clearing this is what makes the next message create a new conversation
-    // rather than appending to the previous one.
     conversationIdRef.current = null;
 
     setMessages([]);
@@ -483,7 +748,9 @@ export function useChat(options: UseChatOptions = {}): UseChatResult {
     setStatusLabel(null);
   }, []);
 
-  const last = messages.at(-1);
+  const last =
+    messages.at(-1);
+
   const canRetry =
     !isStreaming &&
     last?.role === "assistant" &&

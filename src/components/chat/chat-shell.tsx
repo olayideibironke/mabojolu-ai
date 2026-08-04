@@ -1,11 +1,24 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 
-import { SettingsDialog } from "@/components/layout/settings-dialog";
+import {
+  SettingsDialog,
+  type MabojoluModelId,
+} from "@/components/layout/settings-dialog";
 import { Sidebar } from "@/components/layout/sidebar";
-import { Button, IconButton } from "@/components/ui/button";
+import {
+  Button,
+  IconButton,
+} from "@/components/ui/button";
 import { MenuIcon } from "@/components/ui/icons";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { useChat } from "@/hooks/use-chat";
@@ -18,22 +31,152 @@ import { Message } from "./message";
 /**
  * Application shell.
  *
- * Coordinates the sidebar, transcript, and composer. Conversation logic lives in
- * `useChat`, history in `useConversations`, so this component stays a coordinator
- * and each piece can be changed independently.
+ * Coordinates the sidebar, transcript, composer, model preference, and
+ * settings dialog.
  *
- * Refresh restoration works by keeping the active conversation id in the URL
- * (`?c=<id>`). That makes the current chat linkable and survivable across a
- * reload, which `sessionStorage` would not give.
+ * Conversation logic lives in useChat and history logic lives in
+ * useConversations.
+ *
+ * The selected local model is stored in the browser so Fast or Quality remains
+ * selected after a refresh.
  */
 
 interface ChatShellProps {
-  /** Whether a session exists. Drives sign-in versus sign-out affordances. */
+  /** Whether a session exists. */
   isSignedIn: boolean;
+
   userEmail?: string;
   isAdmin?: boolean;
-  /** Shown so it is clear where conversations are stored. */
+
+  /** Indicates where conversation records are currently stored. */
   persistenceKind: "local" | "supabase";
+}
+
+const MODEL_STORAGE_KEY =
+  "mabojolu-selected-model";
+
+const MODEL_CHANGE_EVENT =
+  "mabojolu-model-preference-change";
+
+const DEFAULT_MODEL_ID: MabojoluModelId =
+  "mabojolu-local";
+
+/**
+ * Provides a fallback when browser storage is restricted or unavailable.
+ */
+let inMemoryModelPreference: MabojoluModelId =
+  DEFAULT_MODEL_ID;
+
+function isMabojoluModelId(
+  value: string | null,
+): value is MabojoluModelId {
+  return (
+    value === "mabojolu-fast" ||
+    value === "mabojolu-local"
+  );
+}
+
+/**
+ * Client snapshot for React's external-store integration.
+ */
+function getModelPreferenceSnapshot(): MabojoluModelId {
+  try {
+    const storedValue =
+      window.localStorage.getItem(
+        MODEL_STORAGE_KEY,
+      );
+
+    if (isMabojoluModelId(storedValue)) {
+      inMemoryModelPreference =
+        storedValue;
+
+      return storedValue;
+    }
+  } catch {
+    /*
+     * Browser storage may be unavailable in restricted privacy environments.
+     * The in-memory preference still works for the current session.
+     */
+  }
+
+  return inMemoryModelPreference;
+}
+
+/**
+ * Server snapshot must remain stable so server HTML and the first client render
+ * match during hydration.
+ */
+function getServerModelPreferenceSnapshot(): MabojoluModelId {
+  return DEFAULT_MODEL_ID;
+}
+
+/**
+ * Subscribe to preference changes from this tab and other browser tabs.
+ */
+function subscribeToModelPreference(
+  callback: () => void,
+): () => void {
+  const handleStorage = (
+    event: StorageEvent,
+  ) => {
+    if (
+      event.key === MODEL_STORAGE_KEY ||
+      event.key === null
+    ) {
+      callback();
+    }
+  };
+
+  window.addEventListener(
+    "storage",
+    handleStorage,
+  );
+
+  window.addEventListener(
+    MODEL_CHANGE_EVENT,
+    callback,
+  );
+
+  return () => {
+    window.removeEventListener(
+      "storage",
+      handleStorage,
+    );
+
+    window.removeEventListener(
+      MODEL_CHANGE_EVENT,
+      callback,
+    );
+  };
+}
+
+function saveModelPreference(
+  modelId: MabojoluModelId,
+): void {
+  inMemoryModelPreference = modelId;
+
+  try {
+    window.localStorage.setItem(
+      MODEL_STORAGE_KEY,
+      modelId,
+    );
+  } catch {
+    /*
+     * The current browser session can still use the in-memory preference.
+     */
+  }
+
+  window.dispatchEvent(
+    new Event(MODEL_CHANGE_EVENT),
+  );
+}
+
+function modelLabel(
+  modelId: MabojoluModelId,
+): string {
+  return modelId === "mabojolu-fast"
+    ? "Fast"
+    : "Quality";
 }
 
 export function ChatShell({
@@ -42,34 +185,77 @@ export function ChatShell({
   isAdmin = false,
   persistenceKind,
 }: ChatShellProps) {
-  const history = useConversations(isSignedIn);
+  const history =
+    useConversations(isSignedIn);
 
-  const [activeConversationId, setActiveConversationId] = useState<string | null>(
-    null,
+  const [
+    activeConversationId,
+    setActiveConversationId,
+  ] = useState<string | null>(null);
+
+  const [
+    isSidebarOpen,
+    setIsSidebarOpen,
+  ] = useState(false);
+
+  const [
+    isSettingsOpen,
+    setIsSettingsOpen,
+  ] = useState(false);
+
+  const [
+    conversationEpoch,
+    setConversationEpoch,
+  ] = useState(0);
+
+  const selectedModelId =
+    useSyncExternalStore(
+      subscribeToModelPreference,
+      getModelPreferenceSnapshot,
+      getServerModelPreferenceSnapshot,
+    );
+
+  const changeModel = useCallback(
+    (modelId: MabojoluModelId) => {
+      saveModelPreference(modelId);
+    },
+    [],
   );
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
-  const [conversationEpoch, setConversationEpoch] = useState(0);
 
-  /** Reload the sidebar once a reply settles, so titles and ordering are current. */
+  /** Reload the sidebar after conversation changes. */
   const refreshHistory = history.refresh;
 
-  const chat = useChat({
-    onConversationChanged: useCallback(
+  const handleConversationChanged =
+    useCallback(
       (conversationId: string) => {
-        setActiveConversationId(conversationId);
+        setActiveConversationId(
+          conversationId,
+        );
 
-        // Reflect the conversation in the URL so a refresh restores it. `replace`
-        // rather than `push`, so the back button does not walk through every
-        // message.
-        const url = new URL(window.location.href);
-        url.searchParams.set("c", conversationId);
-        window.history.replaceState(null, "", url);
+        const url = new URL(
+          window.location.href,
+        );
+
+        url.searchParams.set(
+          "c",
+          conversationId,
+        );
+
+        window.history.replaceState(
+          null,
+          "",
+          url,
+        );
 
         void refreshHistory();
       },
       [refreshHistory],
-    ),
+    );
+
+  const chat = useChat({
+    modelId: selectedModelId,
+    onConversationChanged:
+      handleConversationChanged,
   });
 
   const {
@@ -86,106 +272,204 @@ export function ChatShell({
     loadMessages,
   } = chat;
 
-  // Follows the streamed text without stealing control from a user who scrolled up.
-  const streamedLength = messages.at(-1)?.content.length ?? 0;
-  const { containerRef, handleScroll } = useAutoScroll<HTMLDivElement>(
+  const streamedLength =
+    messages.at(-1)?.content.length ?? 0;
+
+  const {
+    containerRef,
+    handleScroll,
+  } = useAutoScroll<HTMLDivElement>(
     streamedLength,
     isStreaming,
   );
 
   /**
-   * Restore the conversation named in the URL on first load.
-   *
-   * Runs once, guarded by a ref: re-running would discard whatever the user has
-   * since typed or sent.
+   * Restore the conversation identified in the URL.
    */
   const restoredRef = useRef(false);
 
   useEffect(() => {
-    if (restoredRef.current || !isSignedIn) {
+    if (
+      restoredRef.current ||
+      !isSignedIn
+    ) {
       return;
     }
+
     restoredRef.current = true;
 
-    const requested = new URL(window.location.href).searchParams.get("c");
+    const requested = new URL(
+      window.location.href,
+    ).searchParams.get("c");
+
     if (!requested) {
       return;
     }
 
     void (async () => {
-      const restored = await history.loadConversation(requested);
+      const restored =
+        await history.loadConversation(
+          requested,
+        );
 
       if (restored) {
-        loadMessages(restored, requested);
-        setActiveConversationId(requested);
-      } else {
-        // The id is stale or not ours. Clear it rather than leaving a URL that
-        // silently does nothing.
-        const url = new URL(window.location.href);
-        url.searchParams.delete("c");
-        window.history.replaceState(null, "", url);
-      }
-    })();
-  }, [history, isSignedIn, loadMessages]);
+        loadMessages(
+          restored,
+          requested,
+        );
 
-  // Refresh the sidebar when a generation finishes, so message counts and
-  // ordering settle without the user acting.
-  const wasStreamingRef = useRef(false);
+        setActiveConversationId(
+          requested,
+        );
+
+        return;
+      }
+
+      const url = new URL(
+        window.location.href,
+      );
+
+      url.searchParams.delete("c");
+
+      window.history.replaceState(
+        null,
+        "",
+        url,
+      );
+    })();
+  }, [
+    history,
+    isSignedIn,
+    loadMessages,
+  ]);
+
+  /**
+   * Refresh the sidebar when a generation finishes.
+   */
+  const wasStreamingRef =
+    useRef(false);
+
   useEffect(() => {
-    if (wasStreamingRef.current && !isStreaming) {
+    if (
+      wasStreamingRef.current &&
+      !isStreaming
+    ) {
       void refreshHistory();
     }
-    wasStreamingRef.current = isStreaming;
-  }, [isStreaming, refreshHistory]);
 
-  const startNewChat = useCallback(() => {
-    reset();
-    setActiveConversationId(null);
-    setIsSidebarOpen(false);
-    setConversationEpoch((value) => value + 1);
+    wasStreamingRef.current =
+      isStreaming;
+  }, [
+    isStreaming,
+    refreshHistory,
+  ]);
 
-    const url = new URL(window.location.href);
-    url.searchParams.delete("c");
-    window.history.replaceState(null, "", url);
-  }, [reset]);
+  const startNewChat =
+    useCallback(() => {
+      reset();
 
-  const selectConversation = useCallback(
-    async (conversationId: string) => {
+      setActiveConversationId(null);
       setIsSidebarOpen(false);
 
-      if (conversationId === activeConversationId) {
-        return;
-      }
+      setConversationEpoch(
+        (value) => value + 1,
+      );
 
-      const loaded = await history.loadConversation(conversationId);
+      const url = new URL(
+        window.location.href,
+      );
 
-      if (!loaded) {
-        return;
-      }
+      url.searchParams.delete("c");
 
-      loadMessages(loaded, conversationId);
-      setActiveConversationId(conversationId);
-      setConversationEpoch((value) => value + 1);
+      window.history.replaceState(
+        null,
+        "",
+        url,
+      );
+    }, [reset]);
 
-      const url = new URL(window.location.href);
-      url.searchParams.set("c", conversationId);
-      window.history.replaceState(null, "", url);
-    },
-    [activeConversationId, history, loadMessages],
-  );
+  const selectConversation =
+    useCallback(
+      async (
+        conversationId: string,
+      ) => {
+        setIsSidebarOpen(false);
 
-  const deleteConversation = useCallback(
-    async (conversationId: string) => {
-      const removed = await history.remove(conversationId);
+        if (
+          conversationId ===
+          activeConversationId
+        ) {
+          return;
+        }
 
-      // Only clear the transcript if the conversation on screen is the one that
-      // was deleted.
-      if (removed && conversationId === activeConversationId) {
-        startNewChat();
-      }
-    },
-    [activeConversationId, history, startNewChat],
-  );
+        const loaded =
+          await history.loadConversation(
+            conversationId,
+          );
+
+        if (!loaded) {
+          return;
+        }
+
+        loadMessages(
+          loaded,
+          conversationId,
+        );
+
+        setActiveConversationId(
+          conversationId,
+        );
+
+        setConversationEpoch(
+          (value) => value + 1,
+        );
+
+        const url = new URL(
+          window.location.href,
+        );
+
+        url.searchParams.set(
+          "c",
+          conversationId,
+        );
+
+        window.history.replaceState(
+          null,
+          "",
+          url,
+        );
+      },
+      [
+        activeConversationId,
+        history,
+        loadMessages,
+      ],
+    );
+
+  const deleteConversation =
+    useCallback(
+      async (
+        conversationId: string,
+      ) => {
+        const removed =
+          await history.remove(
+            conversationId,
+          );
+
+        if (
+          removed &&
+          conversationId ===
+            activeConversationId
+        ) {
+          startNewChat();
+        }
+      },
+      [
+        activeConversationId,
+        history,
+        startNewChat,
+      ],
+    );
 
   const handleSend = useCallback(
     (content: string) => {
@@ -195,16 +479,30 @@ export function ChatShell({
     [send],
   );
 
-  const lastAssistantId = useMemo(() => {
-    for (let index = messages.length - 1; index >= 0; index -= 1) {
-      if (messages[index].role === "assistant") {
-        return messages[index].id;
+  const lastAssistantId =
+    useMemo(() => {
+      for (
+        let index =
+          messages.length - 1;
+        index >= 0;
+        index -= 1
+      ) {
+        if (
+          messages[index].role ===
+          "assistant"
+        ) {
+          return messages[index].id;
+        }
       }
-    }
-    return null;
-  }, [messages]);
 
-  const hasMessages = messages.length > 0;
+      return null;
+    }, [messages]);
+
+  const hasMessages =
+    messages.length > 0;
+
+  const activeModelLabel =
+    modelLabel(selectedModelId);
 
   return (
     <div className="h-dvh overflow-hidden bg-surface-base text-text-primary">
@@ -217,19 +515,35 @@ export function ChatShell({
 
       <Sidebar
         isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        conversations={history.conversations}
-        activeConversationId={activeConversationId}
+        onClose={() =>
+          setIsSidebarOpen(false)
+        }
+        conversations={
+          history.conversations
+        }
+        activeConversationId={
+          activeConversationId
+        }
         search={history.search}
-        onSearchChange={history.setSearch}
-        isSearching={history.isSearching}
+        onSearchChange={
+          history.setSearch
+        }
+        isSearching={
+          history.isSearching
+        }
         isLoading={history.isLoading}
         error={history.error}
         isSignedIn={isSignedIn}
-        onSelectConversation={selectConversation}
+        onSelectConversation={
+          selectConversation
+        }
         onNewChat={startNewChat}
-        onDeleteConversation={deleteConversation}
-        onRenameConversation={history.rename}
+        onDeleteConversation={
+          deleteConversation
+        }
+        onRenameConversation={
+          history.rename
+        }
         onOpenSettings={() => {
           setIsSettingsOpen(true);
           setIsSidebarOpen(false);
@@ -242,14 +556,29 @@ export function ChatShell({
           <div className="flex min-w-0 items-center gap-2">
             <IconButton
               label="Open navigation"
-              onClick={() => setIsSidebarOpen(true)}
+              onClick={() =>
+                setIsSidebarOpen(true)
+              }
               className="lg:hidden"
             >
               <MenuIcon />
             </IconButton>
 
-            {/* A label, not a heading: the h1 belongs to the page content. */}
-            <p className="truncate px-1 text-sm font-semibold">Mabojolu</p>
+            <p className="truncate px-1 text-sm font-semibold">
+              Mabojolu
+            </p>
+
+            <button
+              type="button"
+              onClick={() =>
+                setIsSettingsOpen(true)
+              }
+              aria-label={`Current response mode: ${activeModelLabel}. Open settings to change it.`}
+              title="Change response mode"
+              className="inline-flex h-7 items-center rounded-full border border-border-subtle bg-surface-raised px-2.5 text-[11px] font-medium text-text-secondary transition-colors hover:border-border-strong hover:text-text-primary"
+            >
+              {activeModelLabel}
+            </button>
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
@@ -267,8 +596,6 @@ export function ChatShell({
                 {userEmail}
               </span>
             ) : (
-              /* A link, not a button: it navigates, so it must be
-                 middle-clickable and open in a new tab like any other link. */
               <Link
                 href="/sign-in"
                 className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-surface-inverse px-3 text-xs font-medium text-text-inverse transition-opacity hover:opacity-90"
@@ -288,46 +615,67 @@ export function ChatShell({
             {!hasMessages ? (
               <EmptyState
                 onSelect={handleSend}
-                disabled={isStreaming || !isSignedIn}
+                disabled={
+                  isStreaming ||
+                  !isSignedIn
+                }
                 isSignedIn={isSignedIn}
               />
             ) : (
               <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
-                {/*
-                 * `feed` with `aria-busy` tells a screen reader this region updates
-                 * over time and when it is settling, which is more usable than a
-                 * live region announcing every token.
-                 */}
                 <div
                   role="feed"
-                  aria-busy={isStreaming}
+                  aria-busy={
+                    isStreaming
+                  }
                   aria-label="Conversation"
                   className="space-y-7"
                 >
-                  {messages.map((message) => (
-                    <Message
-                      key={message.id}
-                      message={message}
-                      isLastAssistant={message.id === lastAssistantId}
-                      isStreaming={isStreaming}
-                      onRetry={retry}
-                      onRegenerate={regenerate}
-                      onEdit={editUserMessage}
-                      onFeedback={setFeedback}
-                    />
-                  ))}
+                  {messages.map(
+                    (message) => (
+                      <Message
+                        key={message.id}
+                        message={message}
+                        isLastAssistant={
+                          message.id ===
+                          lastAssistantId
+                        }
+                        isStreaming={
+                          isStreaming
+                        }
+                        onRetry={retry}
+                        onRegenerate={
+                          regenerate
+                        }
+                        onEdit={
+                          editUserMessage
+                        }
+                        onFeedback={
+                          setFeedback
+                        }
+                      />
+                    ),
+                  )}
                 </div>
 
-                {/* Progress before any text arrives, so a slow first token does not
-                    look like a hang. */}
-                {isStreaming && messages.at(-1)?.content.length === 0 ? (
+                {isStreaming &&
+                messages.at(-1)
+                  ?.content.length ===
+                  0 ? (
                   <p className="mt-6 flex items-center gap-2 pl-12 text-sm text-text-muted">
-                    <span className="flex gap-1" aria-hidden="true">
+                    <span
+                      className="flex gap-1"
+                      aria-hidden="true"
+                    >
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted" />
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:150ms]" />
                       <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:300ms]" />
                     </span>
-                    <span>{statusLabel ?? "Working"}</span>
+
+                    <span>
+                      {statusLabel ??
+                        "Working"}
+                    </span>
                   </p>
                 ) : null}
               </div>
@@ -338,7 +686,9 @@ export function ChatShell({
             isStreaming={isStreaming}
             onSend={handleSend}
             onStop={stop}
-            focusKey={conversationEpoch}
+            focusKey={
+              conversationEpoch
+            }
             disabled={!isSignedIn}
             disabledReason="Sign in to start a conversation."
           />
@@ -347,10 +697,20 @@ export function ChatShell({
 
       <SettingsDialog
         isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
+        onClose={() =>
+          setIsSettingsOpen(false)
+        }
         isSignedIn={isSignedIn}
         userEmail={userEmail}
-        persistenceKind={persistenceKind}
+        persistenceKind={
+          persistenceKind
+        }
+        selectedModelId={
+          selectedModelId
+        }
+        onModelChange={
+          changeModel
+        }
       />
     </div>
   );
