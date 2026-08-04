@@ -16,7 +16,11 @@ const UNKNOWN_ERROR: ChatErrorPayload = {
 };
 
 export interface StreamCallbacks {
-  onStart?: (info: { messageId: string; model: string }) => void;
+  onStart?: (info: {
+    messageId: string;
+    model: string;
+    conversationId?: string;
+  }) => void;
   onDelta: (text: string) => void;
   onStatus?: (label: string) => void;
   onDone: (info: {
@@ -100,6 +104,9 @@ export async function streamChat(
             callbacks.onStart?.({
               messageId: event.messageId,
               model: event.model,
+              ...(event.conversationId
+                ? { conversationId: event.conversationId }
+                : {}),
             });
             break;
           case "delta":

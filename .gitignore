@@ -37,6 +37,11 @@ yarn-error.log*
 # contributors know which variables exist and where to obtain each value.
 !.env.example
 
+# local development database
+# Written by the local persistence adapter. Contains conversation content, so it
+# must never be committed.
+/.mabojolu-data
+
 # vercel
 .vercel
 

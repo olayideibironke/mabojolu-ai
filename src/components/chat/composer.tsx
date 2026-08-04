@@ -37,6 +37,10 @@ interface ComposerProps {
   onStop: () => void;
   /** Focused when this changes, so switching chats lands the caret here. */
   focusKey?: string | number;
+  /** Blocks input, for example when not signed in. */
+  disabled?: boolean;
+  /** Why input is blocked. Shown in place of the usual hint. */
+  disabledReason?: string;
 }
 
 /** Matches the CSS max-height, so the JS and CSS caps cannot drift apart. */
@@ -50,6 +54,8 @@ export function Composer({
   onSend,
   onStop,
   focusKey,
+  disabled = false,
+  disabledReason,
 }: ComposerProps) {
   const [draft, setDraft] = useState("");
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -84,7 +90,7 @@ export function Composer({
 
   const trimmed = draft.trim();
   const isOverLimit = draft.length > MAX_MESSAGE_CHARS;
-  const canSend = trimmed.length > 0 && !isStreaming && !isOverLimit;
+  const canSend = trimmed.length > 0 && !isStreaming && !isOverLimit && !disabled;
 
   const submit = useCallback(() => {
     if (!canSend) {
@@ -132,10 +138,11 @@ export function Composer({
             onChange={(event) => setDraft(event.target.value)}
             onKeyDown={handleKeyDown}
             rows={1}
-            placeholder="Message Mabojolu"
+            disabled={disabled}
+            placeholder={disabled ? (disabledReason ?? "") : "Message Mabojolu"}
             aria-describedby="composer-hint"
             aria-invalid={isOverLimit}
-            className="max-h-[200px] min-h-12 w-full resize-none bg-transparent px-3 py-3 text-[15px] leading-6 text-text-primary outline-none placeholder:text-text-muted"
+            className="max-h-[200px] min-h-12 w-full resize-none bg-transparent px-3 py-3 text-[15px] leading-6 text-text-primary outline-none placeholder:text-text-muted disabled:cursor-not-allowed"
           />
 
           <div className="flex items-center justify-between gap-2 px-1 pb-1">
@@ -197,9 +204,11 @@ export function Composer({
           id="composer-hint"
           className="mt-2 text-center text-[11px] leading-4 text-text-muted"
         >
-          {isOverLimit
-            ? "That message is too long to send. Please shorten it."
-            : "Mabojolu can make mistakes. Review important information. Press Enter to send, Shift plus Enter for a new line."}
+          {disabled
+            ? (disabledReason ?? "Messaging is unavailable right now.")
+            : isOverLimit
+              ? "That message is too long to send. Please shorten it."
+              : "Mabojolu can make mistakes. Review important information. Press Enter to send, Shift plus Enter for a new line."}
         </p>
       </div>
     </div>

@@ -25,6 +25,8 @@ function encodeEvent(event: ChatStreamEvent): Uint8Array {
 export interface StreamOptions {
   messageId: string;
   model: string;
+  /** Sent in the start event so the client learns a newly created id. */
+  conversationId?: string;
   chunks: AsyncIterable<GenerationChunk>;
   /** Aborted when the client disconnects or the user presses stop. */
   signal: AbortSignal;
@@ -113,6 +115,9 @@ export function createChatStream(options: StreamOptions): Response {
           type: "start",
           messageId: options.messageId,
           model: options.model,
+          ...(options.conversationId
+            ? { conversationId: options.conversationId }
+            : {}),
         });
 
         for await (const chunk of options.chunks) {

@@ -35,9 +35,14 @@ const STARTERS = [
 interface EmptyStateProps {
   onSelect: (prompt: string) => void;
   disabled?: boolean;
+  isSignedIn?: boolean;
 }
 
-export function EmptyState({ onSelect, disabled = false }: EmptyStateProps) {
+export function EmptyState({
+  onSelect,
+  disabled = false,
+  isSignedIn = true,
+}: EmptyStateProps) {
   return (
     <div className="mx-auto flex min-h-full w-full max-w-5xl flex-col justify-center px-4 py-10 sm:px-8">
       <div className="mx-auto w-full max-w-3xl">
@@ -62,6 +67,25 @@ export function EmptyState({ onSelect, disabled = false }: EmptyStateProps) {
           </p>
         </div>
 
+        {/* Shown instead of the starter cards when signed out, so a card that
+            cannot work is never offered. */}
+        {!isSignedIn ? (
+          <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 text-center shadow-sm">
+            <p className="text-sm font-medium text-text-primary">
+              Sign in to start a conversation
+            </p>
+            <p className="mx-auto mt-2 max-w-sm text-xs leading-5 text-text-secondary">
+              Your conversations are saved to your account so you can return to
+              them.
+            </p>
+            <a
+              href="/sign-in"
+              className="mt-4 inline-flex h-10 items-center justify-center rounded-xl bg-surface-inverse px-4 text-sm font-medium text-text-inverse transition-opacity hover:opacity-90"
+            >
+              Sign in
+            </a>
+          </div>
+        ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           {STARTERS.map((starter) => (
             <button
@@ -80,6 +104,7 @@ export function EmptyState({ onSelect, disabled = false }: EmptyStateProps) {
             </button>
           ))}
         </div>
+        )}
 
         <p className="mt-8 text-center text-xs leading-5 text-text-muted">
           Mabojolu does not remember previous conversations, and it cannot browse

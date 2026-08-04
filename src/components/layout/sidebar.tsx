@@ -1,34 +1,36 @@
 "use client";
 
 import {
+  useCallback,
   useEffect,
-  useMemo,
   useRef,
   useState,
   useSyncExternalStore,
 } from "react";
 
 import { BrandLockup } from "@/components/ui/brand-mark";
-import { desktopLayoutStore } from "@/lib/utilities/media-query";
 import { Button, IconButton } from "@/components/ui/button";
 import {
   CloseIcon,
+  EditIcon,
   NewChatIcon,
   SearchIcon,
   SettingsIcon,
   TrashIcon,
 } from "@/components/ui/icons";
+import { desktopLayoutStore } from "@/lib/utilities/media-query";
+import { MAX_TITLE_CHARS } from "@/lib/validation/chat";
 import type { ConversationSummary } from "@/types/chat";
 
 /**
  * Conversation sidebar.
  *
- * One component serves both breakpoints: a persistent column from `lg` up, and
- * an overlay drawer below it. Two implementations would drift apart.
+ * One component serves both breakpoints: a persistent column from `lg` up, and an
+ * overlay drawer below it. Two implementations would drift apart.
  *
- * Search filters locally over the loaded summaries. Once history lives in the
- * database this becomes a server query; the prop shape is already compatible so
- * the swap does not change this component's contract.
+ * Search is delegated upward rather than filtering locally, because the server can
+ * also search message bodies, which is how a user finds a chat by something they
+ * remember saying in it.
  */
 
 interface SidebarProps {
@@ -36,9 +38,17 @@ interface SidebarProps {
   onClose: () => void;
   conversations: ConversationSummary[];
   activeConversationId: string | null;
+  search: string;
+  onSearchChange: (value: string) => void;
+  isSearching: boolean;
+  isLoading: boolean;
+  error: string | null;
+  isSignedIn: boolean;
+  isAdmin: boolean;
   onSelectConversation: (id: string) => void;
   onNewChat: () => void;
   onDeleteConversation: (id: string) => void;
+  onRenameConversation: (id: string, title: string) => Promise<boolean>;
   onOpenSettings: () => void;
 }
 
@@ -47,15 +57,25 @@ export function Sidebar({
   onClose,
   conversations,
   activeConversationId,
+  search,
+  onSearchChange,
+  isSearching,
+  isLoading,
+  error,
+  isSignedIn,
+  isAdmin,
   onSelectConversation,
   onNewChat,
   onDeleteConversation,
+  onRenameConversation,
   onOpenSettings,
 }: SidebarProps) {
-  const [query, setQuery] = useState("");
   /** Two-step delete, so a stray click cannot destroy a conversation. */
   const [requestedDeleteId, setRequestedDeleteId] = useState<string | null>(null);
+  const [renamingId, setRenamingId] = useState<string | null>(null);
+  const [renameDraft, setRenameDraft] = useState("");
   const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const renameInputRef = useRef<HTMLInputElement>(null);
 
   const isDesktopLayout = useSyncExternalStore(
     desktopLayoutStore.subscribe,
@@ -64,18 +84,17 @@ export function Sidebar({
   );
 
   /**
-   * True when the sidebar is translated off-canvas: closed, and below the `lg`
-   * breakpoint where it becomes a permanent column.
+   * True when the sidebar is translated off-canvas.
    *
-   * This matters because an off-canvas panel is still in the accessibility tree
-   * and its controls stay tabbable, so it is marked `inert` to keep a keyboard
-   * user from tabbing into an invisible drawer.
+   * An off-canvas panel stays in the accessibility tree and its controls remain
+   * tabbable, so it is marked `inert` to stop a keyboard user tabbing into an
+   * invisible drawer.
    */
   const isOffCanvas = !isOpen && !isDesktopLayout;
 
   /**
-   * Derived rather than stored, so a conversation deleted from elsewhere cannot
-   * leave a confirmation prompt attached to a row that no longer exists.
+   * Derived rather than stored, so a conversation removed elsewhere cannot leave a
+   * confirmation prompt attached to a row that no longer exists.
    */
   const pendingDeleteId =
     requestedDeleteId &&
@@ -83,8 +102,8 @@ export function Sidebar({
       ? requestedDeleteId
       : null;
 
-  // Escape closes the drawer. Only bound while open so it does not interfere
-  // with other Escape handlers, such as cancelling a message edit.
+  // Escape closes the drawer. Bound only while open, so it does not interfere with
+  // other Escape handlers such as cancelling a rename.
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -100,30 +119,56 @@ export function Sidebar({
     return () => document.removeEventListener("keydown", onKeyDown);
   }, [isOpen, onClose]);
 
-  // Move focus into the drawer when it opens on small screens, so keyboard and
-  // screen reader users are not left behind on the page underneath.
+  // Move focus into the drawer when it opens, so keyboard and screen reader users
+  // are not left behind on the page underneath.
   useEffect(() => {
     if (isOpen) {
       closeButtonRef.current?.focus();
     }
   }, [isOpen]);
 
-  const filtered = useMemo(() => {
-    const needle = query.trim().toLowerCase();
+  // Focus and select the title when a rename starts, so typing replaces it.
+  useEffect(() => {
+    if (renamingId) {
+      renameInputRef.current?.focus();
+      renameInputRef.current?.select();
+    }
+  }, [renamingId]);
 
-    if (needle.length === 0) {
-      return conversations;
+  const beginRename = useCallback((conversation: ConversationSummary) => {
+    setRenamingId(conversation.id);
+    setRenameDraft(conversation.title);
+  }, []);
+
+  const cancelRename = useCallback(() => {
+    setRenamingId(null);
+    setRenameDraft("");
+  }, []);
+
+  const commitRename = useCallback(async () => {
+    if (!renamingId) {
+      return;
     }
 
-    return conversations.filter((conversation) =>
-      conversation.title.toLowerCase().includes(needle),
+    const trimmed = renameDraft.trim();
+    const original = conversations.find(
+      (conversation) => conversation.id === renamingId,
     );
-  }, [conversations, query]);
+
+    // An empty or unchanged title is a no-op rather than a pointless request.
+    if (trimmed.length === 0 || trimmed === original?.title) {
+      cancelRename();
+      return;
+    }
+
+    await onRenameConversation(renamingId, trimmed);
+    cancelRename();
+  }, [cancelRename, conversations, onRenameConversation, renameDraft, renamingId]);
 
   return (
     <>
-      {/* Scrim. A button rather than a div so dismissing by click is also
-          exposed to assistive technology. */}
+      {/* Scrim. A button rather than a div so dismissing by click is exposed to
+          assistive technology too. */}
       {isOpen ? (
         <button
           type="button"
@@ -167,7 +212,7 @@ export function Sidebar({
         </div>
 
         {/* Search only earns its space once there is something to search. */}
-        {conversations.length > 0 ? (
+        {isSignedIn && (conversations.length > 0 || search.length > 0) ? (
           <div className="px-3 pt-3">
             <div className="relative">
               <SearchIcon className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-text-muted" />
@@ -177,35 +222,60 @@ export function Sidebar({
               <input
                 id="conversation-search"
                 type="search"
-                value={query}
-                onChange={(event) => setQuery(event.target.value)}
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
                 placeholder="Search chats"
                 className="h-9 w-full rounded-xl border border-border-subtle bg-surface-raised pl-9 pr-3 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-border-strong"
               />
+              {isSearching ? (
+                <span
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-text-muted"
+                  aria-hidden="true"
+                >
+                  ...
+                </span>
+              ) : null}
             </div>
           </div>
         ) : null}
 
-        <nav aria-label="Recent conversations" className="mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-3">
-          {conversations.length === 0 ? (
+        <nav
+          aria-label="Recent conversations"
+          aria-busy={isLoading}
+          className="mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-3"
+        >
+          {!isSignedIn ? (
+            <div className="rounded-xl border border-dashed border-border-default px-3 py-5 text-center">
+              <p className="text-xs leading-5 text-text-muted">
+                Sign in to save and revisit your conversations.
+              </p>
+            </div>
+          ) : error ? (
+            <p role="alert" className="px-2 py-4 text-xs leading-5 text-danger">
+              {error}
+            </p>
+          ) : isLoading ? (
+            <p className="px-2 py-4 text-xs text-text-muted">Loading chats...</p>
+          ) : conversations.length === 0 && search.trim().length > 0 ? (
+            <p className="px-2 py-4 text-center text-xs text-text-muted">
+              No chats match &ldquo;{search.trim()}&rdquo;.
+            </p>
+          ) : conversations.length === 0 ? (
             <div className="rounded-xl border border-dashed border-border-default px-3 py-5 text-center">
               <p className="text-xs leading-5 text-text-muted">
                 Your conversations will appear here.
               </p>
             </div>
-          ) : filtered.length === 0 ? (
-            <p className="px-2 py-4 text-center text-xs text-text-muted">
-              No chats match &ldquo;{query.trim()}&rdquo;.
-            </p>
           ) : (
             <ul className="space-y-0.5">
-              {filtered.map((conversation) => {
+              {conversations.map((conversation) => {
                 const isActive = conversation.id === activeConversationId;
                 const isPendingDelete = pendingDeleteId === conversation.id;
+                const isRenaming = renamingId === conversation.id;
 
-                return (
-                  <li key={conversation.id} className="group relative">
-                    {isPendingDelete ? (
+                if (isPendingDelete) {
+                  return (
+                    <li key={conversation.id}>
                       <div className="rounded-xl border border-border-default bg-surface-raised p-2.5">
                         <p className="text-xs leading-5 text-text-primary">
                           Delete this chat? This cannot be undone.
@@ -230,34 +300,81 @@ export function Sidebar({
                           </Button>
                         </div>
                       </div>
-                    ) : (
-                      <>
-                        <button
-                          type="button"
-                          onClick={() => onSelectConversation(conversation.id)}
-                          // Marks the current chat for assistive technology,
-                          // not just visually.
-                          aria-current={isActive ? "true" : undefined}
-                          className={`w-full truncate rounded-xl py-2.5 pl-3 pr-10 text-left text-sm transition-colors ${
-                            isActive
-                              ? "bg-surface-raised text-text-primary shadow-sm"
-                              : "text-text-secondary hover:bg-surface-raised/70 hover:text-text-primary"
-                          }`}
-                        >
-                          {conversation.title}
-                        </button>
+                    </li>
+                  );
+                }
 
-                        <span className="absolute right-1 top-1/2 -translate-y-1/2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-                          <IconButton
-                            size="sm"
-                            label={`Delete chat: ${conversation.title}`}
-                            onClick={() => setRequestedDeleteId(conversation.id)}
-                          >
-                            <TrashIcon className="h-4 w-4" />
-                          </IconButton>
-                        </span>
-                      </>
-                    )}
+                if (isRenaming) {
+                  return (
+                    <li key={conversation.id}>
+                      <div className="rounded-xl border border-border-default bg-surface-raised p-2">
+                        <label
+                          className="sr-only"
+                          htmlFor={`rename-${conversation.id}`}
+                        >
+                          Conversation title
+                        </label>
+                        <input
+                          id={`rename-${conversation.id}`}
+                          ref={renameInputRef}
+                          value={renameDraft}
+                          maxLength={MAX_TITLE_CHARS}
+                          onChange={(event) => setRenameDraft(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Enter") {
+                              event.preventDefault();
+                              void commitRename();
+                            }
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              cancelRename();
+                            }
+                          }}
+                          // Committing on blur means clicking away saves rather
+                          // than silently discarding the edit.
+                          onBlur={() => void commitRename()}
+                          className="w-full rounded-lg bg-transparent px-1 py-1 text-sm text-text-primary outline-none"
+                        />
+                      </div>
+                    </li>
+                  );
+                }
+
+                return (
+                  <li key={conversation.id} className="group relative">
+                    <button
+                      type="button"
+                      onClick={() => onSelectConversation(conversation.id)}
+                      // Marks the current chat for assistive technology, not just
+                      // visually.
+                      aria-current={isActive ? "true" : undefined}
+                      className={`w-full truncate rounded-xl py-2.5 pl-3 pr-16 text-left text-sm transition-colors ${
+                        isActive
+                          ? "bg-surface-raised text-text-primary shadow-sm"
+                          : "text-text-secondary hover:bg-surface-raised/70 hover:text-text-primary"
+                      }`}
+                    >
+                      {conversation.title}
+                    </button>
+
+                    {/* Revealed on hover and on keyboard focus, so the controls are
+                        reachable without a pointer. */}
+                    <span className="absolute right-1 top-1/2 flex -translate-y-1/2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
+                      <IconButton
+                        size="sm"
+                        label={`Rename chat: ${conversation.title}`}
+                        onClick={() => beginRename(conversation)}
+                      >
+                        <EditIcon className="h-4 w-4" />
+                      </IconButton>
+                      <IconButton
+                        size="sm"
+                        label={`Delete chat: ${conversation.title}`}
+                        onClick={() => setRequestedDeleteId(conversation.id)}
+                      >
+                        <TrashIcon className="h-4 w-4" />
+                      </IconButton>
+                    </span>
                   </li>
                 );
               })}
@@ -266,6 +383,15 @@ export function Sidebar({
         </nav>
 
         <div className="border-t border-border-subtle p-3">
+          {isAdmin ? (
+            <a
+              href="/admin"
+              className="mb-1 flex h-10 w-full items-center gap-2 rounded-xl px-4 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+            >
+              <span className="flex-1 text-left">Admin</span>
+            </a>
+          ) : null}
+
           <Button
             variant="ghost"
             onClick={onOpenSettings}

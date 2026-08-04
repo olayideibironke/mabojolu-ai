@@ -32,14 +32,43 @@ export interface UseChatResult {
   editUserMessage: (messageId: string, content: string) => void;
   setFeedback: (messageId: string, rating: FeedbackRating) => void;
   reset: () => void;
+  /** Replace the transcript, when a stored conversation is opened. */
+  loadMessages: (messages: ChatMessage[], conversationId: string) => void;
   /** True when the last assistant turn failed and can be retried. */
   canRetry: boolean;
 }
 
-export function useChat(): UseChatResult {
+export interface UseChatOptions {
+  /** Called once the server has created or updated a conversation. */
+  onConversationChanged?: (conversationId: string) => void;
+}
+
+export function useChat(options: UseChatOptions = {}): UseChatResult {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [statusLabel, setStatusLabel] = useState<string | null>(null);
+
+  /**
+   * The conversation being appended to.
+   *
+   * A ref, not state: it is read inside async callbacks where a captured state
+   * value would be stale, and changing it must not trigger a re-render.
+   */
+  const conversationIdRef = useRef<string | null>(null);
+
+  /**
+   * The conversation-changed callback, held in a ref.
+   *
+   * Kept in a ref so `run` does not take it as a dependency, which would rebuild
+   * every callback whenever the parent re-rendered. Assigned in an effect rather
+   * than during render: writing a ref during render is not allowed, because a
+   * render may be thrown away and the write would still have happened.
+   */
+  const onConversationChangedRef = useRef(options.onConversationChanged);
+
+  useEffect(() => {
+    onConversationChangedRef.current = options.onConversationChanged;
+  }, [options.onConversationChanged]);
 
   // Refs rather than state: these are read inside async callbacks where a
   // captured state value would be stale.
@@ -91,6 +120,11 @@ export function useChat(): UseChatResult {
 
       void streamChat(
         {
+          // Absent on the first message, so the server creates the conversation
+          // and returns its id in the start event.
+          ...(conversationIdRef.current
+            ? { conversationId: conversationIdRef.current }
+            : {}),
           messages: history
             // Only completed turns are context. The placeholder must not be sent.
             .filter((message) => message.id !== assistantId)
@@ -104,9 +138,17 @@ export function useChat(): UseChatResult {
         },
         controller.signal,
         {
-          onStart: ({ model }) => {
+          onStart: ({ model, conversationId, messageId }) => {
             if (!isCurrent()) return;
-            patchAssistant({ status: "streaming", model });
+
+            // Adopt the server's identifiers. The server-assigned message id is
+            // what makes feedback and regeneration addressable after a refresh.
+            if (conversationId && conversationIdRef.current !== conversationId) {
+              conversationIdRef.current = conversationId;
+              onConversationChangedRef.current?.(conversationId);
+            }
+
+            patchAssistant({ status: "streaming", model, serverId: messageId });
           },
           onDelta: (text) => {
             if (!isCurrent()) return;
@@ -323,20 +365,101 @@ export function useChat(): UseChatResult {
     [isStreaming, run],
   );
 
-  const setFeedback = useCallback((messageId: string, rating: FeedbackRating) => {
-    setMessages((current) =>
-      current.map((message) =>
-        message.id === messageId
-          ? {
-              ...message,
-              // Selecting the same rating again clears it, so feedback is
-              // reversible rather than a one-way commitment.
-              feedback: message.feedback === rating ? undefined : rating,
-            }
-          : message,
-      ),
-    );
-  }, []);
+  /**
+   * Record feedback, optimistically and then on the server.
+   *
+   * Optimistic because the control should respond instantly. Persisted because a
+   * thumb that only animates is a decorative control, and the point of feedback is
+   * that someone can act on it.
+   */
+  const setFeedback = useCallback(
+    (messageId: string, rating: FeedbackRating) => {
+      const target = messages.find((message) => message.id === messageId);
+
+      if (!target) {
+        return;
+      }
+
+      // Selecting the same rating again clears it, so a mis-click is reversible.
+      const nextRating = target.feedback === rating ? null : rating;
+
+      setMessages((current) =>
+        current.map((message) =>
+          message.id === messageId
+            ? { ...message, feedback: nextRating ?? undefined }
+            : message,
+        ),
+      );
+
+      // Only a stored message can carry feedback. A reply still streaming has no
+      // server id yet, and there is nothing to attach it to.
+      const serverId = target.serverId;
+      if (!serverId) {
+        return;
+      }
+
+      void (async () => {
+        try {
+          const response = nextRating
+            ? await fetch("/api/feedback", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ messageId: serverId, rating: nextRating }),
+              })
+            : await fetch(
+                `/api/feedback?messageId=${encodeURIComponent(serverId)}`,
+                { method: "DELETE" },
+              );
+
+          if (!response.ok) {
+            // Roll back, so the UI does not claim to have saved something it did
+            // not.
+            setMessages((current) =>
+              current.map((message) =>
+                message.id === messageId
+                  ? { ...message, feedback: target.feedback }
+                  : message,
+              ),
+            );
+          }
+        } catch {
+          setMessages((current) =>
+            current.map((message) =>
+              message.id === messageId
+                ? { ...message, feedback: target.feedback }
+                : message,
+            ),
+          );
+        }
+      })();
+    },
+    [messages],
+  );
+
+  /**
+   * Replace the transcript with a stored conversation.
+   *
+   * Aborts any active generation first and bumps the guard, so a stream belonging
+   * to the previous conversation cannot write into this one.
+   */
+  const loadMessages = useCallback(
+    (loaded: ChatMessage[], conversationId: string) => {
+      controllerRef.current?.abort();
+      controllerRef.current = null;
+      generationRef.current += 1;
+      idempotencyKeyRef.current = null;
+      conversationIdRef.current = conversationId;
+
+      // Stored rows already carry their database ids, so `serverId` mirrors `id`
+      // and actions such as feedback work immediately after a refresh.
+      setMessages(
+        loaded.map((message) => ({ ...message, serverId: message.id })),
+      );
+      setIsStreaming(false);
+      setStatusLabel(null);
+    },
+    [],
+  );
 
   const reset = useCallback(() => {
     controllerRef.current?.abort();
@@ -344,6 +467,9 @@ export function useChat(): UseChatResult {
     // Invalidate any in-flight stream so it cannot write into the new chat.
     generationRef.current += 1;
     idempotencyKeyRef.current = null;
+    // Clearing this is what makes the next message create a new conversation
+    // rather than appending to the previous one.
+    conversationIdRef.current = null;
 
     setMessages([]);
     setIsStreaming(false);
@@ -368,6 +494,7 @@ export function useChat(): UseChatResult {
     editUserMessage,
     setFeedback,
     reset,
+    loadMessages,
     canRetry,
   };
 }

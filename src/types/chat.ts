@@ -24,6 +24,15 @@ export type FeedbackRating = "up" | "down";
 
 export interface ChatMessage {
   id: string;
+  /**
+   * The database identifier, once the server has assigned one.
+   *
+   * Distinct from `id` because a message is rendered optimistically with a
+   * client-generated id before the server has stored it. Actions that address a
+   * stored row, such as feedback, need this one; React keys and local updates use
+   * `id`, which never changes and so cannot remount a mid-stream component.
+   */
+  serverId?: string;
   role: MessageRole;
   content: string;
   status: MessageStatus;
@@ -99,7 +108,19 @@ export interface UsageRecord {
  * type is a compile error at every consumer until handled.
  */
 export type ChatStreamEvent =
-  | { type: "start"; messageId: string; model: string }
+  | {
+      type: "start";
+      /** Server-assigned id of the assistant message being written. */
+      messageId: string;
+      model: string;
+      /**
+       * The conversation this reply belongs to.
+       *
+       * Present so the client learns the id of a conversation the server just
+       * created, without a second round trip.
+       */
+      conversationId?: string;
+    }
   | { type: "delta"; text: string }
   | { type: "status"; label: string }
   | {
