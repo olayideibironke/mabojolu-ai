@@ -529,6 +529,89 @@ describe("attachments", () => {
     expect(attachment).not.toHaveProperty("userId");
   });
 
+  it("records the real storage path when the status advances", async () => {
+    /*
+     * Regression test for a bug found by driving the running app.
+     *
+     * The upload route creates the row with a placeholder path, because the final
+     * path contains the attachment id, and only then stores the object. The real
+     * path was computed but never written back, so every row kept the placeholder
+     * and the owner's own download could never match a stored file.
+     */
+    const conversation = await database.createConversation({
+      userId: USER_A,
+      title: "Files",
+    });
+
+    const attachment = await database.createAttachment({
+      userId: USER_A,
+      conversationId: conversation.id,
+      filename: "report.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 2048,
+      storagePath: `pending/${USER_A}/placeholder`,
+    });
+
+    const finalPath = `${USER_A}/${conversation.id}/${attachment.id}-report.pdf`;
+
+    expect(
+      await database.updateAttachmentStatus(attachment.id, USER_A, "uploaded", {
+        storagePath: finalPath,
+      }),
+    ).toBe(true);
+
+    const [stored] = await database.listAttachments(conversation.id, USER_A);
+
+    expect(stored.storagePath).toBe(finalPath);
+    expect(stored.status).toBe("uploaded");
+    // Still not `ready`: the bytes exist but nothing has processed them.
+    expect(stored.status).not.toBe("ready");
+  });
+
+  it("records a failure reason without a storage path", async () => {
+    const conversation = await database.createConversation({
+      userId: USER_A,
+      title: "Files",
+    });
+    const attachment = await database.createAttachment({
+      userId: USER_A,
+      conversationId: conversation.id,
+      filename: "broken.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      storagePath: `pending/${USER_A}/broken`,
+    });
+
+    await database.updateAttachmentStatus(attachment.id, USER_A, "failed", {
+      failureReason: "Upload to storage failed.",
+    });
+
+    const [stored] = await database.listAttachments(conversation.id, USER_A);
+    expect(stored.status).toBe("failed");
+    expect(stored.failureReason).toBe("Upload to storage failed.");
+  });
+
+  it("refuses to advance another user's attachment", async () => {
+    const conversation = await database.createConversation({
+      userId: USER_A,
+      title: "Files",
+    });
+    const attachment = await database.createAttachment({
+      userId: USER_A,
+      conversationId: conversation.id,
+      filename: "report.pdf",
+      mimeType: "application/pdf",
+      sizeBytes: 100,
+      storagePath: `pending/${USER_A}/x`,
+    });
+
+    // A client that could mark another user's file `ready` could make the model
+    // treat unvalidated content as readable.
+    expect(
+      await database.updateAttachmentStatus(attachment.id, USER_B, "ready"),
+    ).toBe(false);
+  });
+
   it("does not list another user's attachments", async () => {
     const conversation = await database.createConversation({
       userId: USER_A,

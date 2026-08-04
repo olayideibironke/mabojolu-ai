@@ -165,16 +165,22 @@ export async function POST(request: NextRequest): Promise<Response> {
       );
     }
 
-    // The row is created first, so its id can be part of the storage path and no
-    // stored object exists without a row describing it.
+    /*
+     * The row is created first, so its id can form part of the storage path and no
+     * stored object exists without a row describing it.
+     *
+     * The placeholder path is namespaced and unique rather than a bare literal:
+     * the column is unique, so two concurrent uploads sharing one placeholder
+     * would collide, and a distinctive value makes a row that never completed
+     * obvious rather than looking like a real path.
+     */
     const record = await database.createAttachment({
       userId: session.userId,
       conversationId,
       filename: validation.safeFilename,
       mimeType: validation.format.mimeType,
       sizeBytes: bytes.byteLength,
-      // Rewritten immediately below, once the id is known.
-      storagePath: "pending",
+      storagePath: `pending/${session.userId}/${crypto.randomUUID()}`,
     });
 
     const storagePath = buildStoragePath({
@@ -189,12 +195,9 @@ export async function POST(request: NextRequest): Promise<Response> {
     } catch (cause) {
       // Mark the row failed rather than leaving it stuck at `pending`, so the UI
       // can explain rather than showing a file that never arrives.
-      await database.updateAttachmentStatus(
-        record.id,
-        session.userId,
-        "failed",
-        "Upload to storage failed.",
-      );
+      await database.updateAttachmentStatus(record.id, session.userId, "failed", {
+        failureReason: "Upload to storage failed.",
+      });
 
       logChatError(normalizeError(cause), { stage: "attachment_put" });
 
@@ -212,8 +215,13 @@ export async function POST(request: NextRequest): Promise<Response> {
      * model cannot read this file yet. Only a successful processing step advances
      * it to `ready`, which is what keeps the assistant from claiming to have read
      * something it has not.
+     *
+     * The real storage path is recorded here, after the object exists. Writing it
+     * earlier would leave a row pointing at bytes that had not been stored yet.
      */
-    await database.updateAttachmentStatus(record.id, session.userId, "uploaded");
+    await database.updateAttachmentStatus(record.id, session.userId, "uploaded", {
+      storagePath,
+    });
 
     return Response.json({
       attachment: {

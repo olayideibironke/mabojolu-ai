@@ -625,7 +625,7 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     attachmentId: string,
     userId: string,
     status: AttachmentRecord["status"],
-    failureReason?: string,
+    options: { failureReason?: string; storagePath?: string } = {},
   ): Promise<boolean> {
     return this.run(async (db) => {
       const row = db.attachments.find(
@@ -638,7 +638,14 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       }
 
       row.status = status;
-      row.failureReason = failureReason ?? null;
+      row.failureReason = options.failureReason ?? null;
+
+      // Recorded only once the bytes are actually in storage, so the row cannot
+      // point at an object that does not exist.
+      if (options.storagePath !== undefined) {
+        row.storagePath = options.storagePath;
+      }
+
       await this.persist(db);
       return true;
     });

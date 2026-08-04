@@ -612,7 +612,7 @@ export class SupabaseDatabaseAdapter implements DatabaseAdapter {
     attachmentId: string,
     userId: string,
     status: AttachmentRecord["status"],
-    failureReason?: string,
+    options: { failureReason?: string; storagePath?: string } = {},
   ): Promise<boolean> {
     /*
      * Service role by design. There is no client update policy on attachments,
@@ -624,7 +624,14 @@ export class SupabaseDatabaseAdapter implements DatabaseAdapter {
     const { error, count } = await client
       .from("attachments")
       .update(
-        { status, failure_reason: failureReason ?? null },
+        {
+          status,
+          failure_reason: options.failureReason ?? null,
+          // Written only once the object exists in storage.
+          ...(options.storagePath === undefined
+            ? {}
+            : { storage_path: options.storagePath }),
+        },
         { count: "exact" },
       )
       .eq("id", attachmentId)

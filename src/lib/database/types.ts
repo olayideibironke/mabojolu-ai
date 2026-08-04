@@ -223,11 +223,20 @@ export interface DatabaseAdapter {
 
   // --- Attachments ---
   createAttachment(input: AttachmentInput): Promise<AttachmentRecord>;
+  /**
+   * Advance an attachment's lifecycle.
+   *
+   * `storagePath` is settable here because the final path contains the
+   * attachment id, which only exists once the row has been created. The row is
+   * written with a placeholder, the object is stored, and the real path is
+   * recorded with the status change, so a row never claims a path whose bytes are
+   * not yet in storage.
+   */
   updateAttachmentStatus(
     attachmentId: string,
     userId: string,
     status: AttachmentRecord["status"],
-    failureReason?: string,
+    options?: { failureReason?: string; storagePath?: string },
   ): Promise<boolean>;
   listAttachments(
     conversationId: string,
