@@ -127,20 +127,20 @@ export async function checkUsageLimits(
   if (!isAdmin) {
     if (session.isAnonymous) {
       /**
-       * Count the guest's complete history rather than a rolling window.
+       * Count successful assistant responses across the guest's complete history rather than using a rolling window.
        *
-       * A guest receives five exploratory prompts total. Waiting or refreshing
+       * A guest receives five successful exploratory responses total. Waiting or refreshing
        * must not create another allowance. Upgrading the anonymous account keeps
        * the same user ID and therefore preserves the conversation history.
        */
-      const guestMessages =
+      const guestCompletedResponses =
         await database.countRecentMessages(
           userId,
           new Date(0).toISOString(),
         );
 
       if (
-        guestMessages >=
+        guestCompletedResponses >=
         GUEST_TOTAL_MESSAGE_LIMIT
       ) {
         await database.recordSafetyEvent(
@@ -157,7 +157,7 @@ export async function checkUsageLimits(
               "info",
 
             detail:
-              `Guest sent ${guestMessages} messages, limit ${GUEST_TOTAL_MESSAGE_LIMIT}.`,
+              `Guest received ${guestCompletedResponses} successful responses, limit ${GUEST_TOTAL_MESSAGE_LIMIT}.`,
           },
         );
 
@@ -168,7 +168,7 @@ export async function checkUsageLimits(
             "forbidden",
             {
               message:
-                "Create a free Mabojolu account to continue and keep your conversations.",
+                "You've used your 5 free questions. Create a free Mabojolu account to continue this conversation, save your chats, and access them on any device.",
             },
           ),
         };
@@ -187,14 +187,14 @@ export async function checkUsageLimits(
               HOUR_MS,
         ).toISOString();
 
-      const freeWindowMessages =
+      const freeWindowCompletedResponses =
         await database.countRecentMessages(
           userId,
           freeWindowStart,
         );
 
       if (
-        freeWindowMessages >=
+        freeWindowCompletedResponses >=
         FREE_WINDOW_MESSAGE_LIMIT
       ) {
         await database.recordSafetyEvent(
@@ -211,7 +211,7 @@ export async function checkUsageLimits(
               "info",
 
             detail:
-              `Registered free user sent ${freeWindowMessages} messages in ${FREE_WINDOW_HOURS} hours, limit ${FREE_WINDOW_MESSAGE_LIMIT}.`,
+              `Registered free user received ${freeWindowCompletedResponses} successful responses in ${FREE_WINDOW_HOURS} hours, limit ${FREE_WINDOW_MESSAGE_LIMIT}.`,
           },
         );
 
@@ -245,14 +245,14 @@ export async function checkUsageLimits(
               HOUR_MS,
         ).toISOString();
 
-      const dailyMessages =
+      const dailyCompletedResponses =
         await database.countRecentMessages(
           userId,
           dailyWindowStart,
         );
 
       if (
-        dailyMessages >=
+        dailyCompletedResponses >=
         env.MABOJOLU_DAILY_MESSAGE_LIMIT
       ) {
         await database.recordSafetyEvent(
@@ -269,7 +269,7 @@ export async function checkUsageLimits(
               "info",
 
             detail:
-              `Sent ${dailyMessages} messages in 24 hours, limit ${env.MABOJOLU_DAILY_MESSAGE_LIMIT}.`,
+              `Received ${dailyCompletedResponses} successful responses in 24 hours, limit ${env.MABOJOLU_DAILY_MESSAGE_LIMIT}.`,
           },
         );
 

@@ -470,7 +470,7 @@ export interface DatabaseAdapter {
     input: SafetyEventInput,
   ): Promise<void>;
 
-  /** Number of messages sent by one user within a quota window. */
+  /** Number of successful assistant responses completed within a quota window. */
   countRecentMessages(
     userId: string,
     sinceIso: string,

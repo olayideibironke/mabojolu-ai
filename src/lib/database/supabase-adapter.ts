@@ -935,7 +935,7 @@ export class SupabaseDatabaseAdapter {
     userId: string,
     sinceIso: string,
   ): Promise<number> {
-    // Service role, so the quota counts every message even if a future policy
+    // Service role, so the quota counts every successful assistant response even if a future policy
     // narrows what a user can read about themselves.
     const client =
       this.serviceClient();
@@ -948,7 +948,8 @@ export class SupabaseDatabaseAdapter {
           head: true,
         })
         .eq("user_id", userId)
-        .eq("role", "user")
+        .eq("role", "assistant")
+        .eq("status", "complete")
         .gte(
           "created_at",
           sinceIso,

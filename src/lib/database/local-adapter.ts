@@ -807,7 +807,8 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
         db.messages.filter(
           (message) =>
             message.userId === userId &&
-            message.role === "user" &&
+            message.role === "assistant" &&
+            message.status === "complete" &&
             message.createdAt >= sinceIso,
         ).length,
     );
