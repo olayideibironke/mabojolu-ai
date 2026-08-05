@@ -14,7 +14,11 @@ import { z } from "zod";
  */
 const serverEnvSchema = z.object({
   NODE_ENV: z
-    .enum(["development", "test", "production"])
+    .enum([
+      "development",
+      "test",
+      "production",
+    ])
     .default("development"),
 
   /**
@@ -30,10 +34,15 @@ const serverEnvSchema = z.object({
    * Cloud AI requiring an Anthropic API key.
    */
   AI_PROVIDER: z
-    .enum(["mock", "ollama", "anthropic"])
+    .enum([
+      "mock",
+      "ollama",
+      "anthropic",
+    ])
     .default("mock"),
 
-  ANTHROPIC_API_KEY: z.string().min(1).optional(),
+  ANTHROPIC_API_KEY:
+    z.string().min(1).optional(),
 
   /**
    * Local Ollama HTTP endpoint.
@@ -44,65 +53,78 @@ const serverEnvSchema = z.object({
   OLLAMA_BASE_URL: z
     .string()
     .url()
-    .default("http://127.0.0.1:11434"),
+    .default(
+      "http://127.0.0.1:11434",
+    ),
 
   /**
    * How long Ollama should keep the selected model loaded in memory after a
    * response. Ollama accepts values such as 5m, 30m, or 0.
    */
-  OLLAMA_KEEP_ALIVE: z.string().min(1).default("5m"),
+  OLLAMA_KEEP_ALIVE: z
+    .string()
+    .min(1)
+    .default("5m"),
 
   /** Overrides the registry default model. Must be a known model id. */
-  MABOJOLU_DEFAULT_MODEL: z.string().min(1).optional(),
+  MABOJOLU_DEFAULT_MODEL:
+    z.string().min(1).optional(),
 
   /** Upper bound on generated tokens per response. */
-  MABOJOLU_MAX_OUTPUT_TOKENS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(8192),
+  MABOJOLU_MAX_OUTPUT_TOKENS:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(8192),
 
   /** Provider request timeout in milliseconds. */
-  MABOJOLU_REQUEST_TIMEOUT_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(120_000),
+  MABOJOLU_REQUEST_TIMEOUT_MS:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(120_000),
 
   /** Maximum characters accepted in one user message. */
-  MABOJOLU_MAX_MESSAGE_CHARS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(32_000),
+  MABOJOLU_MAX_MESSAGE_CHARS:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(32_000),
 
   /** Maximum messages accepted in one conversation request. */
-  MABOJOLU_MAX_CONVERSATION_MESSAGES: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(400),
+  MABOJOLU_MAX_CONVERSATION_MESSAGES:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(400),
 
   /** Token budget for reconstructed conversation context. */
-  MABOJOLU_CONTEXT_TOKEN_BUDGET: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(120_000),
+  MABOJOLU_CONTEXT_TOKEN_BUDGET:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(120_000),
 
   /** Requests allowed per rate-limit window, per identity. */
-  MABOJOLU_RATE_LIMIT_MAX: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(30),
+  MABOJOLU_RATE_LIMIT_MAX:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(30),
 
   /** Rate-limit window length in milliseconds. */
-  MABOJOLU_RATE_LIMIT_WINDOW_MS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(60_000),
+  MABOJOLU_RATE_LIMIT_WINDOW_MS:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(60_000),
 
   /**
    * Where conversations are stored.
@@ -114,7 +136,10 @@ const serverEnvSchema = z.object({
    * PostgreSQL with row-level security.
    */
   PERSISTENCE: z
-    .enum(["local", "supabase"])
+    .enum([
+      "local",
+      "supabase",
+    ])
     .default("local"),
 
   /**
@@ -126,72 +151,131 @@ const serverEnvSchema = z.object({
    * supabase:
    * Real Supabase authentication.
    */
-  AUTH_MODE: z.enum(["dev", "supabase"]).default("dev"),
-
-  // Safe to expose to the browser. The anon key is protected through RLS.
-  NEXT_PUBLIC_SUPABASE_URL: z.string().url().optional(),
-  NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
+  AUTH_MODE: z
+    .enum([
+      "dev",
+      "supabase",
+    ])
+    .default("dev"),
 
   /**
-   * Bypasses row-level security.
+   * Supabase project endpoint.
    *
-   * This key must remain server-side and should be used only where an operation
-   * genuinely cannot be performed as the authenticated user.
+   * Safe to expose to the browser because it identifies the project but does
+   * not grant privileged access by itself.
    */
-  SUPABASE_SERVICE_ROLE_KEY: z.string().min(1).optional(),
+  NEXT_PUBLIC_SUPABASE_URL:
+    z.string().url().optional(),
+
+  /**
+   * Current browser-safe Supabase API key.
+   *
+   * New Supabase projects use keys beginning with `sb_publishable_`. Access is
+   * still restricted by the signed-in user's JWT and row-level security.
+   */
+  NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY:
+    z.string().min(1).optional(),
+
+  /**
+   * Legacy browser-safe Supabase key.
+   *
+   * Retained temporarily so an older project can be migrated without breaking
+   * its existing environment configuration.
+   */
+  NEXT_PUBLIC_SUPABASE_ANON_KEY:
+    z.string().min(1).optional(),
+
+  /**
+   * Current privileged server-only Supabase API key.
+   *
+   * New Supabase projects use keys beginning with `sb_secret_`. This bypasses
+   * row-level security and must never be exposed through a public variable,
+   * browser bundle, screenshot, repository, or client component.
+   */
+  SUPABASE_SECRET_KEY:
+    z.string().min(1).optional(),
+
+  /**
+   * Legacy privileged Supabase key.
+   *
+   * Retained temporarily for compatibility with projects that still use the
+   * legacy `service_role` JWT.
+   */
+  SUPABASE_SERVICE_ROLE_KEY:
+    z.string().min(1).optional(),
 
   /** Messages one user may send per day. */
-  MABOJOLU_DAILY_MESSAGE_LIMIT: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(200),
+  MABOJOLU_DAILY_MESSAGE_LIMIT:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(200),
 
   /** Generations one user may have running at once. */
-  MABOJOLU_MAX_CONCURRENT_GENERATIONS: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(2),
+  MABOJOLU_MAX_CONCURRENT_GENERATIONS:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(2),
 
   /** Attachments one user may hold. */
-  MABOJOLU_MAX_ATTACHMENTS_PER_USER: z.coerce
-    .number()
-    .int()
-    .nonnegative()
-    .default(20),
+  MABOJOLU_MAX_ATTACHMENTS_PER_USER:
+    z.coerce
+      .number()
+      .int()
+      .nonnegative()
+      .default(20),
 
   /** Largest accepted attachment, in bytes. Defaults to 10 MB. */
-  MABOJOLU_MAX_ATTACHMENT_BYTES: z.coerce
-    .number()
-    .int()
-    .positive()
-    .default(10_485_760),
+  MABOJOLU_MAX_ATTACHMENT_BYTES:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(10_485_760),
 
   /**
    * Whether attachment uploads are enabled.
    *
    * Disabled by default until production storage controls are verified.
    */
-  MABOJOLU_ATTACHMENTS_ENABLED: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((value) => value === "true"),
+  MABOJOLU_ATTACHMENTS_ENABLED:
+    z.enum([
+      "true",
+      "false",
+    ])
+      .default("false")
+      .transform(
+        (value) =>
+          value === "true",
+      ),
 
   /** Daily cloud-provider spending ceiling. Zero disables the check. */
-  MABOJOLU_DAILY_COST_LIMIT_USD: z.coerce
-    .number()
-    .nonnegative()
-    .default(0),
+  MABOJOLU_DAILY_COST_LIMIT_USD:
+    z.coerce
+      .number()
+      .nonnegative()
+      .default(0),
 
   /** Serves a maintenance notice instead of starting chat generations. */
-  MABOJOLU_MAINTENANCE_MODE: z
-    .enum(["true", "false"])
-    .default("false")
-    .transform((value) => value === "true"),
+  MABOJOLU_MAINTENANCE_MODE:
+    z.enum([
+      "true",
+      "false",
+    ])
+      .default("false")
+      .transform(
+        (value) =>
+          value === "true",
+      ),
 });
 
-export type ServerEnv = z.infer<typeof serverEnvSchema>;
+export type ServerEnv =
+  z.infer<
+    typeof serverEnvSchema
+  >;
 
 export type EnvValidationResult =
   | {
@@ -203,30 +287,54 @@ export type EnvValidationResult =
       issues: string[];
     };
 
-let cached: EnvValidationResult | null = null;
+let cached:
+  | EnvValidationResult
+  | null = null;
 
 function validate(): EnvValidationResult {
-  const parsed = serverEnvSchema.safeParse(process.env);
+  const parsed =
+    serverEnvSchema.safeParse(
+      process.env,
+    );
 
   if (!parsed.success) {
     return {
       ok: false,
-      issues: parsed.error.issues.map(
-        (issue) =>
-          `${issue.path.join(".") || "(root)"}: ${issue.message}`,
-      ),
+
+      issues:
+        parsed.error.issues.map(
+          (issue) =>
+            `${
+              issue.path.join(".") ||
+              "(root)"
+            }: ${issue.message}`,
+        ),
     };
   }
 
   const env = parsed.data;
+
   const issues: string[] = [];
+
+  /*
+   * Prefer the current Supabase keys. Legacy keys remain valid fallbacks while
+   * existing projects are migrated.
+   */
+  const publicSupabaseKey =
+    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+  const privilegedSupabaseKey =
+    env.SUPABASE_SECRET_KEY ??
+    env.SUPABASE_SERVICE_ROLE_KEY;
 
   /*
    * Anthropic requires a credential. Ollama and mock mode do not require any
    * API key.
    */
   if (
-    env.AI_PROVIDER === "anthropic" &&
+    env.AI_PROVIDER ===
+      "anthropic" &&
     !env.ANTHROPIC_API_KEY
   ) {
     issues.push(
@@ -235,29 +343,40 @@ function validate(): EnvValidationResult {
     );
   }
 
-  if (env.PERSISTENCE === "supabase") {
-    if (!env.NEXT_PUBLIC_SUPABASE_URL) {
+  if (
+    env.PERSISTENCE ===
+    "supabase"
+  ) {
+    if (
+      !env.NEXT_PUBLIC_SUPABASE_URL
+    ) {
       issues.push(
         'NEXT_PUBLIC_SUPABASE_URL: required when PERSISTENCE is "supabase".',
       );
     }
 
-    if (!env.NEXT_PUBLIC_SUPABASE_ANON_KEY) {
+    if (!publicSupabaseKey) {
       issues.push(
-        'NEXT_PUBLIC_SUPABASE_ANON_KEY: required when PERSISTENCE is "supabase".',
+        "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: required when " +
+          'PERSISTENCE is "supabase". A legacy ' +
+          "NEXT_PUBLIC_SUPABASE_ANON_KEY is also accepted temporarily.",
       );
     }
 
-    if (!env.SUPABASE_SERVICE_ROLE_KEY) {
+    if (
+      !privilegedSupabaseKey
+    ) {
       issues.push(
-        'SUPABASE_SERVICE_ROLE_KEY: required when PERSISTENCE is "supabase". ' +
-          "Keep this value server-only.",
+        "SUPABASE_SECRET_KEY: required when PERSISTENCE is " +
+          '"supabase". A legacy SUPABASE_SERVICE_ROLE_KEY is also ' +
+          "accepted temporarily. Keep either value server-only.",
       );
     }
   }
 
   if (
-    env.AUTH_MODE === "supabase" &&
+    env.AUTH_MODE ===
+      "supabase" &&
     !env.NEXT_PUBLIC_SUPABASE_URL
   ) {
     issues.push(
@@ -266,11 +385,14 @@ function validate(): EnvValidationResult {
   }
 
   if (
-    env.AUTH_MODE === "supabase" &&
-    !env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+    env.AUTH_MODE ===
+      "supabase" &&
+    !publicSupabaseKey
   ) {
     issues.push(
-      'NEXT_PUBLIC_SUPABASE_ANON_KEY: required when AUTH_MODE is "supabase".',
+      "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: required when " +
+        'AUTH_MODE is "supabase". A legacy ' +
+        "NEXT_PUBLIC_SUPABASE_ANON_KEY is also accepted temporarily.",
     );
   }
 
@@ -278,14 +400,23 @@ function validate(): EnvValidationResult {
    * Refuse to serve production traffic with development-only authentication or
    * local JSON persistence.
    */
-  if (env.NODE_ENV === "production") {
-    if (env.AUTH_MODE === "dev") {
+  if (
+    env.NODE_ENV ===
+    "production"
+  ) {
+    if (
+      env.AUTH_MODE === "dev"
+    ) {
       issues.push(
-        'AUTH_MODE: "dev" cannot be used in production. Set AUTH_MODE="supabase".',
+        'AUTH_MODE: "dev" cannot be used in production. ' +
+          'Set AUTH_MODE="supabase".',
       );
     }
 
-    if (env.PERSISTENCE === "local") {
+    if (
+      env.PERSISTENCE ===
+      "local"
+    ) {
       issues.push(
         'PERSISTENCE: "local" cannot be used in production. ' +
           'Set PERSISTENCE="supabase".',
@@ -324,12 +455,16 @@ export function inspectServerEnv(): EnvValidationResult {
  * Use only where a configuration failure cannot be handled locally.
  */
 export function serverEnv(): ServerEnv {
-  const result = inspectServerEnv();
+  const result =
+    inspectServerEnv();
 
   if (!result.ok) {
     throw new Error(
       `Invalid server environment:\n${result.issues
-        .map((issue) => `  - ${issue}`)
+        .map(
+          (issue) =>
+            `  - ${issue}`,
+        )
         .join("\n")}`,
     );
   }

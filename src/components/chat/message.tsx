@@ -25,7 +25,6 @@ import type {
 
 import { Markdown } from "./markdown";
 import { MessageActions } from "./message-actions";
-import { ResponseModelLabel } from "./response-model-label";
 
 /**
  * One turn in the conversation.
@@ -57,6 +56,15 @@ interface MessageProps {
     rating: FeedbackRating,
   ) => void;
 }
+
+const REASONING_DOTS = [
+  "0ms",
+  "120ms",
+  "240ms",
+  "360ms",
+  "480ms",
+  "600ms",
+] as const;
 
 export function Message({
   message,
@@ -370,6 +378,43 @@ function UserMessage({
   );
 }
 
+function ReasoningStatus() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      aria-label="Mabojolu is reasoning"
+      className="flex min-h-6 items-center gap-1 text-[15px] leading-6 text-text-muted"
+    >
+      <span>
+        Make I Reason
+      </span>
+
+      <span
+        className="inline-flex items-end gap-[2px]"
+        aria-hidden="true"
+      >
+        {REASONING_DOTS.map(
+          (delay, index) => (
+            <span
+              key={delay}
+              style={{
+                animationDelay:
+                  delay,
+              }}
+              className="inline-block h-[3px] w-[3px] animate-bounce rounded-full bg-current [animation-duration:900ms]"
+            >
+              <span className="sr-only">
+                {index + 1}
+              </span>
+            </span>
+          ),
+        )}
+      </span>
+    </div>
+  );
+}
+
 function AssistantMessage({
   message,
   isLastAssistant,
@@ -413,20 +458,10 @@ function AssistantMessage({
           />
         ) : null}
 
-        {message.status ===
-        "streaming" ? (
-          <span
-            className="mabojolu-caret"
-            aria-hidden="true"
-          />
+        {isThisMessageStreaming &&
+        !hasContent ? (
+          <ReasoningStatus />
         ) : null}
-
-        <ResponseModelLabel
-          model={message.model}
-          isStreaming={
-            isThisMessageStreaming
-          }
-        />
 
         {message.status ===
         "interrupted" ? (

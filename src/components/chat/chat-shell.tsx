@@ -231,7 +231,6 @@ export function ChatShell({
   const {
     messages,
     isStreaming,
-    statusLabel,
     send,
     stop,
     retry,
@@ -762,29 +761,6 @@ export function ChatShell({
                     ),
                   )}
                 </div>
-
-                {isStreaming &&
-                messages.at(-1)
-                  ?.content.length ===
-                  0 ? (
-                  <p className="mt-6 flex items-center gap-2 pl-12 text-sm text-text-muted">
-                    <span
-                      className="flex gap-1"
-                      aria-hidden="true"
-                    >
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted" />
-
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:150ms]" />
-
-                      <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-text-muted [animation-delay:300ms]" />
-                    </span>
-
-                    <span>
-                      {statusLabel ??
-                        "Working"}
-                    </span>
-                  </p>
-                ) : null}
               </div>
             )}
           </div>
