@@ -30,14 +30,69 @@ import { OllamaProvider } from "./providers/ollama";
 
 const providerCache = new Map<ProviderId, AiProvider>();
 
-function getProvider(providerId: ProviderId): AiProvider {
-  const cachedProvider = providerCache.get(providerId);
+/**
+ * Product-facing response modes are stable across environments.
+ *
+ * The browser works only with Mabojolu mode IDs. This server-side map resolves
+ * those modes to the actual model registered for the configured provider.
+ *
+ * Local development:
+ *   Fast, Regular, and Quality retain their Ollama models.
+ *
+ * Production:
+ *   Fast and Regular use Claude Sonnet 5 through Mabojolu Swift.
+ *   Quality uses Claude Opus 5 through Mabojolu Core.
+ *
+ * Automated tests:
+ *   Every visible mode resolves to the deterministic mock provider.
+ */
+const MODEL_ALIASES: Readonly<
+  Record<
+    ProviderId,
+    Readonly<Record<string, string>>
+  >
+> = {
+  ollama: {
+    "mabojolu-fast": "mabojolu-fast",
+    "mabojolu-regular": "mabojolu-regular",
+    "mabojolu-local": "mabojolu-local",
+  },
+
+  anthropic: {
+    "mabojolu-fast": "mabojolu-swift",
+    "mabojolu-regular": "mabojolu-swift",
+    "mabojolu-local": "mabojolu-core",
+  },
+
+  mock: {
+    "mabojolu-fast": "mabojolu-mock",
+    "mabojolu-regular": "mabojolu-mock",
+    "mabojolu-local": "mabojolu-mock",
+  },
+};
+
+function resolveProviderModelAlias(
+  providerId: ProviderId,
+  requestedModelId: string,
+): string {
+  return (
+    MODEL_ALIASES[providerId][requestedModelId] ??
+    requestedModelId
+  );
+}
+
+function getProvider(
+  providerId: ProviderId,
+): AiProvider {
+  const cachedProvider =
+    providerCache.get(providerId);
 
   if (cachedProvider) {
     return cachedProvider;
   }
 
-  const envResult = inspectServerEnv();
+  const envResult =
+    inspectServerEnv();
 
   if (!envResult.ok) {
     console.error(
@@ -45,10 +100,13 @@ function getProvider(providerId: ProviderId): AiProvider {
       envResult.issues.join("; "),
     );
 
-    throw chatError("provider_not_configured", {
-      message:
-        "Mabojolu is not configured correctly. Check the server environment variables.",
-    });
+    throw chatError(
+      "provider_not_configured",
+      {
+        message:
+          "Mabojolu is not configured correctly. Check the server environment variables.",
+      },
+    );
   }
 
   const env = envResult.env;
@@ -57,41 +115,65 @@ function getProvider(providerId: ProviderId): AiProvider {
 
   switch (providerId) {
     case "anthropic":
-      provider = new AnthropicProvider({
-        apiKey: env.ANTHROPIC_API_KEY,
-        timeoutMs: env.MABOJOLU_REQUEST_TIMEOUT_MS,
-      });
+      provider =
+        new AnthropicProvider({
+          apiKey:
+            env.ANTHROPIC_API_KEY,
+
+          timeoutMs:
+            env.MABOJOLU_REQUEST_TIMEOUT_MS,
+        });
+
       break;
 
     case "ollama":
-      provider = new OllamaProvider({
-        baseUrl: env.OLLAMA_BASE_URL,
-        timeoutMs: env.MABOJOLU_REQUEST_TIMEOUT_MS,
-        keepAlive: env.OLLAMA_KEEP_ALIVE,
-      });
+      provider =
+        new OllamaProvider({
+          baseUrl:
+            env.OLLAMA_BASE_URL,
+
+          timeoutMs:
+            env.MABOJOLU_REQUEST_TIMEOUT_MS,
+
+          keepAlive:
+            env.OLLAMA_KEEP_ALIVE,
+        });
+
       break;
 
     case "mock":
-      provider = new MockProvider({
-        chunkDelayMs:
-          env.NODE_ENV === "test" ? 0 : 18,
-      });
+      provider =
+        new MockProvider({
+          chunkDelayMs:
+            env.NODE_ENV === "test"
+              ? 0
+              : 18,
+        });
+
       break;
 
     default: {
-      const unsupportedProvider: never = providerId;
+      const unsupportedProvider: never =
+        providerId;
 
-      throw chatError("provider_not_configured", {
-        message:
-          "The selected Mabojolu AI provider is not supported.",
-        cause: new Error(
-          `Unsupported provider: ${unsupportedProvider}`,
-        ),
-      });
+      throw chatError(
+        "provider_not_configured",
+        {
+          message:
+            "The selected Mabojolu AI provider is not supported.",
+
+          cause: new Error(
+            `Unsupported provider: ${unsupportedProvider}`,
+          ),
+        },
+      );
     }
   }
 
-  providerCache.set(providerId, provider);
+  providerCache.set(
+    providerId,
+    provider,
+  );
 
   return provider;
 }
@@ -99,45 +181,69 @@ function getProvider(providerId: ProviderId): AiProvider {
 /**
  * Resolve the model for the current environment.
  *
- * An explicitly requested model must belong to the configured provider.
- * Mabojolu never silently substitutes a cloud model for a local model or the
- * other way around.
+ * The browser sends a stable Mabojolu response-mode ID. The gateway maps that
+ * mode to the correct local, cloud, or test model for the configured provider.
+ *
+ * Direct registry IDs remain supported for trusted server configuration such as
+ * MABOJOLU_DEFAULT_MODEL.
  */
 export function resolveModel(
   requestedModelId?: string,
 ): ModelDefinition {
-  const envResult = inspectServerEnv();
+  const envResult =
+    inspectServerEnv();
 
-  const providerId: ProviderId = envResult.ok
-    ? envResult.env.AI_PROVIDER
-    : "mock";
+  const providerId: ProviderId =
+    envResult.ok
+      ? envResult.env.AI_PROVIDER
+      : "mock";
 
   const candidateId =
     requestedModelId ??
     (envResult.ok
-      ? envResult.env.MABOJOLU_DEFAULT_MODEL
+      ? envResult.env
+          .MABOJOLU_DEFAULT_MODEL
       : undefined);
 
   if (candidateId) {
-    const model = findModel(candidateId);
+    const resolvedId =
+      resolveProviderModelAlias(
+        providerId,
+        candidateId,
+      );
+
+    const model =
+      findModel(resolvedId);
 
     if (!model || !model.enabled) {
-      throw chatError("invalid_request", {
-        message: "That model is not available.",
-      });
+      throw chatError(
+        "invalid_request",
+        {
+          message:
+            "That model is not available.",
+        },
+      );
     }
 
-    if (model.providerId !== providerId) {
-      throw chatError("invalid_request", {
-        message:
-          "That model is not available in this environment.",
-      });
+    if (
+      model.providerId !==
+      providerId
+    ) {
+      throw chatError(
+        "invalid_request",
+        {
+          message:
+            "That model is not available in this environment.",
+        },
+      );
     }
 
     return model;
   }
 
-  return defaultModelFor(providerId);
+  return defaultModelFor(
+    providerId,
+  );
 }
 
 export interface GatewayRequest {
@@ -165,7 +271,8 @@ export interface GatewayStream {
 export function startGeneration(
   request: GatewayRequest,
 ): GatewayStream {
-  const envResult = inspectServerEnv();
+  const envResult =
+    inspectServerEnv();
 
   if (!envResult.ok) {
     console.error(
@@ -173,52 +280,90 @@ export function startGeneration(
       envResult.issues.join("; "),
     );
 
-    throw chatError("provider_not_configured", {
-      message:
-        "Mabojolu is not configured correctly. Check the server environment variables.",
-    });
+    throw chatError(
+      "provider_not_configured",
+      {
+        message:
+          "Mabojolu is not configured correctly. Check the server environment variables.",
+      },
+    );
   }
 
   const env = envResult.env;
-  const model = resolveModel(request.modelId);
-  const provider = getProvider(model.providerId);
+
+  const model =
+    resolveModel(
+      request.modelId,
+    );
+
+  const provider =
+    getProvider(
+      model.providerId,
+    );
 
   if (!provider.isConfigured()) {
-    throw chatError("provider_not_configured");
+    throw chatError(
+      "provider_not_configured",
+    );
   }
 
-  const prompt = getSystemPrompt(
-    request.promptVersion,
-  );
+  const prompt =
+    getSystemPrompt(
+      request.promptVersion,
+    );
 
-  const maxOutputTokens = Math.min(
-    env.MABOJOLU_MAX_OUTPUT_TOKENS,
-    model.maxOutputTokens,
-  );
+  const maxOutputTokens =
+    Math.min(
+      env.MABOJOLU_MAX_OUTPUT_TOKENS,
+      model.maxOutputTokens,
+    );
 
-  const context = buildContext({
-    messages: request.messages,
-    systemPrompt: prompt.content,
-    model,
-    maxOutputTokens,
-    contextTokenBudget:
-      env.MABOJOLU_CONTEXT_TOKEN_BUDGET,
-  });
+  const context =
+    buildContext({
+      messages:
+        request.messages,
+
+      systemPrompt:
+        prompt.content,
+
+      model,
+
+      maxOutputTokens,
+
+      contextTokenBudget:
+        env.MABOJOLU_CONTEXT_TOKEN_BUDGET,
+    });
 
   return {
     model,
-    promptVersion: prompt.version,
+
+    promptVersion:
+      prompt.version,
+
     estimatedInputTokens:
       context.estimatedInputTokens,
-    droppedMessages: context.droppedMessages,
-    chunks: provider.stream({
-      model,
-      systemPrompt: prompt.content,
-      messages: context.messages,
-      maxOutputTokens,
-      signal: request.signal,
-      idempotencyKey: request.idempotencyKey,
-    }),
+
+    droppedMessages:
+      context.droppedMessages,
+
+    chunks:
+      provider.stream({
+        model,
+
+        systemPrompt:
+          prompt.content,
+
+        messages:
+          context.messages,
+
+        maxOutputTokens,
+
+        signal:
+          request.signal,
+
+        idempotencyKey:
+          request.idempotencyKey,
+      }),
   };
 }
 
