@@ -35,8 +35,8 @@ import { MessageActions } from "./message-actions";
  * renderer.
  *
  * User image attachments are displayed directly above the accompanying prompt.
- * Verified public sources are displayed beneath assistant responses as secure
- * external links.
+ * Verified public sources remain hidden inside a compact expandable panel until
+ * the user selects the Sources control beneath the assistant response.
  */
 
 interface MessageProps {
@@ -418,13 +418,42 @@ function ReasoningStatus() {
   );
 }
 
+function SourcesIcon({
+  className = "h-4 w-4",
+}: {
+  className?: string;
+}) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+      className={className}
+    >
+      <path d="M4.5 5.5A2.5 2.5 0 0 1 7 3h5.5A2.5 2.5 0 0 1 15 5.5v10A2.5 2.5 0 0 1 12.5 18H7a2.5 2.5 0 0 1-2.5-2.5z" />
+      <path d="M8.5 21h7A4.5 4.5 0 0 0 20 16.5V9" />
+      <path d="M8 8h3.5" />
+      <path d="M8 12h3.5" />
+    </svg>
+  );
+}
+
 /**
  * Supporting public pages used by Mabojolu during live web research.
+ *
+ * The panel is bounded so a long source list does not take over the entire chat
+ * page. Every source remains available inside the scrollable panel.
  */
 function SourceList({
   sources,
+  panelId,
 }: {
   sources: ChatSource[];
+  panelId: string;
 }) {
   if (sources.length === 0) {
     return null;
@@ -432,66 +461,73 @@ function SourceList({
 
   return (
     <section
+      id={panelId}
       aria-label="Sources"
-      className="mt-5"
+      className="mt-3 overflow-hidden rounded-2xl border border-border-subtle bg-surface-base shadow-sm"
     >
-      <div className="mb-2 flex items-center gap-2">
-        <h3 className="text-sm font-semibold text-text-primary">
-          Sources
-        </h3>
+      <div className="flex items-center justify-between gap-3 border-b border-border-subtle bg-surface-raised px-4 py-3">
+        <div className="flex items-center gap-2">
+          <SourcesIcon />
 
-        <span className="rounded-full border border-border-subtle bg-surface-raised px-2 py-0.5 text-[11px] font-medium text-text-muted">
+          <h3 className="text-sm font-semibold text-text-primary">
+            Sources
+          </h3>
+        </div>
+
+        <span className="rounded-full border border-border-subtle bg-surface-base px-2.5 py-0.5 text-[11px] font-semibold text-text-muted">
           {sources.length}
         </span>
       </div>
 
-      <div className="grid gap-2 sm:grid-cols-2">
-        {sources.map(
-          (source, index) => (
-            <a
-              key={source.id}
-              href={source.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label={`Open source ${index + 1}: ${source.title}`}
-              className="group/source min-w-0 rounded-xl border border-border-subtle bg-surface-raised px-3 py-3 text-left transition hover:border-border-default hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-            >
-              <div className="flex min-w-0 items-start gap-2.5">
-                <span
-                  aria-hidden="true"
-                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-base text-[11px] font-semibold text-text-muted"
-                >
-                  {index + 1}
-                </span>
+      <div className="max-h-[420px] overflow-y-auto overscroll-contain p-3">
+        <div className="grid gap-2 sm:grid-cols-2">
+          {sources.map(
+            (source, index) => (
+              <a
+                key={source.id}
+                href={source.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label={`Open source ${index + 1}: ${source.title}`}
+                className="group/source min-w-0 rounded-xl border border-border-subtle bg-surface-raised px-3 py-3 text-left transition hover:border-border-default hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span
+                    aria-hidden="true"
+                    className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-base text-[11px] font-semibold text-text-muted"
+                  >
+                    {index + 1}
+                  </span>
 
-                <div className="min-w-0 flex-1">
-                  <p className="break-words text-sm font-medium leading-5 text-text-primary group-hover/source:underline">
-                    {source.title}
-                  </p>
-
-                  <p className="mt-0.5 truncate text-xs text-text-muted">
-                    {getSourceHostname(
-                      source.url,
-                    )}
-                  </p>
-
-                  {source.citedText ? (
-                    <p className="mt-2 break-words text-xs leading-5 text-text-secondary">
-                      {source.citedText}
+                  <div className="min-w-0 flex-1">
+                    <p className="break-words text-sm font-medium leading-5 text-text-primary group-hover/source:underline">
+                      {source.title}
                     </p>
-                  ) : null}
-                </div>
 
-                <span
-                  aria-hidden="true"
-                  className="shrink-0 text-sm text-text-muted transition-transform group-hover/source:-translate-y-0.5 group-hover/source:translate-x-0.5"
-                >
-                  ↗
-                </span>
-              </div>
-            </a>
-          ),
-        )}
+                    <p className="mt-0.5 truncate text-xs text-text-muted">
+                      {getSourceHostname(
+                        source.url,
+                      )}
+                    </p>
+
+                    {source.citedText ? (
+                      <p className="mt-2 line-clamp-4 break-words text-xs leading-5 text-text-secondary">
+                        {source.citedText}
+                      </p>
+                    ) : null}
+                  </div>
+
+                  <span
+                    aria-hidden="true"
+                    className="shrink-0 text-sm text-text-muted transition-transform group-hover/source:-translate-y-0.5 group-hover/source:translate-x-0.5"
+                  >
+                    ↗
+                  </span>
+                </div>
+              </a>
+            ),
+          )}
+        </div>
       </div>
     </section>
   );
@@ -532,6 +568,11 @@ function AssistantMessage({
     rating: FeedbackRating,
   ) => void;
 }) {
+  const [
+    areSourcesOpen,
+    setAreSourcesOpen,
+  ] = useState(false);
+
   const isActive =
     message.status === "streaming" ||
     message.status === "pending";
@@ -541,6 +582,9 @@ function AssistantMessage({
 
   const sources =
     message.sources ?? [];
+
+  const sourcePanelId =
+    `sources-${message.id}`;
 
   const isThisMessageStreaming =
     isStreaming && isActive;
@@ -559,12 +603,6 @@ function AssistantMessage({
         {isThisMessageStreaming &&
         !hasContent ? (
           <ReasoningStatus />
-        ) : null}
-
-        {sources.length > 0 ? (
-          <SourceList
-            sources={sources}
-          />
         ) : null}
 
         {message.status ===
@@ -604,27 +642,81 @@ function AssistantMessage({
         {!isActive &&
         hasContent &&
         message.status !== "failed" ? (
-          <div className="mt-2 -ml-1.5">
-            <MessageActions
-              content={message.content}
-              feedback={message.feedback}
-              disabled={
-                isStreaming ||
-                !isLastAssistant
-              }
-              onRegenerate={() =>
-                onRegenerate(
-                  message.id,
-                )
-              }
-              onFeedback={(rating) =>
-                onFeedback(
-                  message.id,
-                  rating,
-                )
-              }
-            />
-          </div>
+          <>
+            <div className="mt-2 -ml-1.5 flex flex-wrap items-center gap-1">
+              <MessageActions
+                content={message.content}
+                feedback={message.feedback}
+                disabled={
+                  isStreaming ||
+                  !isLastAssistant
+                }
+                onRegenerate={() =>
+                  onRegenerate(
+                    message.id,
+                  )
+                }
+                onFeedback={(rating) =>
+                  onFeedback(
+                    message.id,
+                    rating,
+                  )
+                }
+              />
+
+              {sources.length > 0 ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAreSourcesOpen(
+                      (current) =>
+                        !current,
+                    );
+                  }}
+                  aria-expanded={
+                    areSourcesOpen
+                  }
+                  aria-controls={
+                    sourcePanelId
+                  }
+                  className={`inline-flex h-8 items-center gap-1.5 rounded-lg px-2.5 text-xs font-medium transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent ${
+                    areSourcesOpen
+                      ? "bg-surface-raised text-text-primary"
+                      : "text-text-muted hover:bg-surface-raised hover:text-text-primary"
+                  }`}
+                >
+                  <SourcesIcon className="h-4 w-4" />
+
+                  <span>
+                    Sources
+                  </span>
+
+                  <span className="flex h-5 min-w-5 items-center justify-center rounded-full border border-border-subtle bg-surface-base px-1 text-[10px] font-semibold text-text-muted">
+                    {sources.length}
+                  </span>
+
+                  <span
+                    aria-hidden="true"
+                    className={`ml-0.5 text-[10px] transition-transform ${
+                      areSourcesOpen
+                        ? "rotate-180"
+                        : ""
+                    }`}
+                  >
+                    ▾
+                  </span>
+                </button>
+              ) : null}
+            </div>
+
+            {areSourcesOpen &&
+            sources.length > 0 ? (
+              <SourceList
+                sources={sources}
+                panelId={sourcePanelId}
+              />
+            ) : null}
+          </>
         ) : null}
       </div>
     </article>
