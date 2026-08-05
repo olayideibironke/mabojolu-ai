@@ -26,17 +26,6 @@ import { desktopLayoutStore } from "@/lib/utilities/media-query";
 import { MAX_TITLE_CHARS } from "@/lib/validation/chat";
 import type { ConversationSummary } from "@/types/chat";
 
-/**
- * Conversation sidebar.
- *
- * One component serves both breakpoints: a persistent column from `lg` up, and
- * an overlay drawer below it. Two implementations would drift apart.
- *
- * Search is delegated upward rather than filtering locally, because the server
- * can also search message bodies. That allows a user to find a chat by
- * something they remember saying inside it.
- */
-
 interface SidebarProps {
   isOpen: boolean;
   onClose: () => void;
@@ -48,6 +37,7 @@ interface SidebarProps {
   isLoading: boolean;
   error: string | null;
   isSignedIn: boolean;
+  isGuest?: boolean;
   isAdmin: boolean;
   onSelectConversation: (id: string) => void;
   onNewChat: () => void;
@@ -70,6 +60,7 @@ export function Sidebar({
   isLoading,
   error,
   isSignedIn,
+  isGuest = false,
   isAdmin,
   onSelectConversation,
   onNewChat,
@@ -77,7 +68,6 @@ export function Sidebar({
   onRenameConversation,
   onOpenSettings,
 }: SidebarProps) {
-  /** Two-step deletion prevents an accidental click from destroying a chat. */
   const [
     requestedDeleteId,
     setRequestedDeleteId,
@@ -106,21 +96,18 @@ export function Sidebar({
       desktopLayoutStore.getServerSnapshot,
     );
 
-  /**
-   * True when the sidebar is translated off-canvas.
-   *
-   * An off-canvas panel remains in the accessibility tree unless it is marked
-   * inert, which would otherwise allow keyboard focus to enter an invisible
-   * drawer.
-   */
   const isOffCanvas =
     !isOpen &&
     !isDesktopLayout;
 
   /**
-   * Derived rather than stored so a conversation removed elsewhere cannot leave
-   * a confirmation prompt attached to a row that no longer exists.
+   * Anonymous visitors may use Mabojolu immediately, but saved-history controls
+   * remain hidden until the visitor creates or signs into a permanent account.
    */
+  const hasPermanentAccount =
+    isSignedIn &&
+    !isGuest;
+
   const pendingDeleteId =
     requestedDeleteId &&
     conversations.some(
@@ -252,7 +239,7 @@ export function Sidebar({
       ) : null}
 
       <aside
-        aria-label="Conversations"
+        aria-label="Mabojolu navigation"
         inert={isOffCanvas}
         className={`fixed inset-y-0 left-0 z-50 flex w-[284px] flex-col border-r border-border-subtle bg-surface-sunken transition-transform duration-200 lg:translate-x-0 ${
           isOpen
@@ -287,7 +274,7 @@ export function Sidebar({
           </Button>
         </div>
 
-        {isSignedIn &&
+        {hasPermanentAccount &&
         (
           conversations.length > 0 ||
           search.length > 0
@@ -330,16 +317,14 @@ export function Sidebar({
 
         <nav
           aria-label="Recent conversations"
-          aria-busy={isLoading}
+          aria-busy={
+            hasPermanentAccount
+              ? isLoading
+              : false
+          }
           className="mt-3 min-h-0 flex-1 overflow-y-auto px-3 pb-3"
         >
-          {!isSignedIn ? (
-            <div className="rounded-xl border border-dashed border-border-default px-3 py-5 text-center">
-              <p className="text-xs leading-5 text-text-muted">
-                Sign in to save and revisit your conversations.
-              </p>
-            </div>
-          ) : error ? (
+          {!hasPermanentAccount ? null : error ? (
             <p
               role="alert"
               className="px-2 py-4 text-xs leading-5 text-danger"
@@ -360,13 +345,7 @@ export function Sidebar({
               &rdquo;.
             </p>
           ) : conversations.length ===
-            0 ? (
-            <div className="rounded-xl border border-dashed border-border-default px-3 py-5 text-center">
-              <p className="text-xs leading-5 text-text-muted">
-                Your conversations will appear here.
-              </p>
-            </div>
-          ) : (
+            0 ? null : (
             <ul className="space-y-0.5">
               {conversations.map(
                 (conversation) => {
@@ -556,22 +535,27 @@ export function Sidebar({
           )}
         </nav>
 
-        <div className="border-t border-border-subtle p-3">
+        <div className="border-t border-border-subtle px-3 pb-3 pt-2">
           {isAdmin ? (
             <Link
               href="/admin"
-              className="mb-1 flex h-10 w-full items-center gap-2 rounded-xl px-4 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+              className="flex h-10 w-full items-center rounded-xl px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
             >
-              <span className="flex-1 text-left">
-                Admin
-              </span>
+              Admin
             </Link>
           ) : null}
+
+          <Link
+            href="/pricing"
+            className="flex h-10 w-full items-center rounded-xl px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+          >
+            See plans and pricing
+          </Link>
 
           <Button
             variant="ghost"
             onClick={onOpenSettings}
-            className="w-full justify-start"
+            className="w-full justify-start px-3"
           >
             <SettingsIcon />
 
@@ -579,6 +563,22 @@ export function Sidebar({
               Settings
             </span>
           </Button>
+
+          <Link
+            href="/help"
+            className="flex h-10 w-full items-center rounded-xl px-3 text-sm font-medium text-text-secondary transition-colors hover:bg-surface-raised hover:text-text-primary"
+          >
+            Help
+          </Link>
+
+          {!hasPermanentAccount ? (
+            <Link
+              href="/sign-in"
+              className="mt-3 inline-flex h-11 w-full items-center justify-center rounded-xl border border-border-default bg-surface-base px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-raised"
+            >
+              Log in
+            </Link>
+          ) : null}
         </div>
       </aside>
     </>

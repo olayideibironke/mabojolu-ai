@@ -15,10 +15,7 @@ import {
   type MabojoluModelId,
 } from "@/components/layout/settings-dialog";
 import { Sidebar } from "@/components/layout/sidebar";
-import {
-  Button,
-  IconButton,
-} from "@/components/ui/button";
+import { IconButton } from "@/components/ui/button";
 import { MenuIcon } from "@/components/ui/icons";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
 import { useChat } from "@/hooks/use-chat";
@@ -67,7 +64,11 @@ function getModelPreferenceSnapshot(): MabojoluModelId {
         MODEL_STORAGE_KEY,
       );
 
-    if (isMabojoluModelId(storedValue)) {
+    if (
+      isMabojoluModelId(
+        storedValue,
+      )
+    ) {
       inMemoryModelPreference =
         storedValue;
 
@@ -94,7 +95,8 @@ function subscribeToModelPreference(
     event: StorageEvent,
   ) => {
     if (
-      event.key === MODEL_STORAGE_KEY ||
+      event.key ===
+        MODEL_STORAGE_KEY ||
       event.key === null
     ) {
       callback();
@@ -127,7 +129,8 @@ function subscribeToModelPreference(
 function saveModelPreference(
   modelId: MabojoluModelId,
 ): void {
-  inMemoryModelPreference = modelId;
+  inMemoryModelPreference =
+    modelId;
 
   try {
     window.localStorage.setItem(
@@ -141,7 +144,9 @@ function saveModelPreference(
   }
 
   window.dispatchEvent(
-    new Event(MODEL_CHANGE_EVENT),
+    new Event(
+      MODEL_CHANGE_EVENT,
+    ),
   );
 }
 
@@ -153,17 +158,23 @@ export function ChatShell({
   persistenceKind,
 }: ChatShellProps) {
   const history =
-    useConversations(isSignedIn);
+    useConversations(
+      isSignedIn,
+    );
 
   const [
     activeConversationId,
     setActiveConversationId,
-  ] = useState<string | null>(null);
+  ] = useState<
+    string | null
+  >(null);
 
   const [
     activeMessageId,
     setActiveMessageId,
-  ] = useState<string | null>(null);
+  ] = useState<
+    string | null
+  >(null);
 
   const [
     isSidebarOpen,
@@ -187,26 +198,34 @@ export function ChatShell({
       getServerModelPreferenceSnapshot,
     );
 
-  const changeModel = useCallback(
-    (modelId: MabojoluModelId) => {
-      saveModelPreference(modelId);
-    },
-    [],
-  );
+  const changeModel =
+    useCallback(
+      (
+        modelId: MabojoluModelId,
+      ) => {
+        saveModelPreference(
+          modelId,
+        );
+      },
+      [],
+    );
 
   const refreshHistory =
     history.refresh;
 
   const handleConversationChanged =
     useCallback(
-      (conversationId: string) => {
+      (
+        conversationId: string,
+      ) => {
         setActiveConversationId(
           conversationId,
         );
 
-        const url = new URL(
-          window.location.href,
-        );
+        const url =
+          new URL(
+            window.location.href,
+          );
 
         url.searchParams.set(
           "c",
@@ -224,11 +243,14 @@ export function ChatShell({
       [refreshHistory],
     );
 
-  const chat = useChat({
-    modelId: selectedModelId,
-    onConversationChanged:
-      handleConversationChanged,
-  });
+  const chat =
+    useChat({
+      modelId:
+        selectedModelId,
+
+      onConversationChanged:
+        handleConversationChanged,
+    });
 
   const {
     messages,
@@ -244,15 +266,17 @@ export function ChatShell({
   } = chat;
 
   const streamedLength =
-    messages.at(-1)?.content.length ?? 0;
+    messages.at(-1)
+      ?.content.length ?? 0;
 
   const {
     containerRef,
     handleScroll,
-  } = useAutoScroll<HTMLDivElement>(
-    streamedLength,
-    isStreaming,
-  );
+  } =
+    useAutoScroll<HTMLDivElement>(
+      streamedLength,
+      isStreaming,
+    );
 
   useEffect(() => {
     const root =
@@ -273,18 +297,23 @@ export function ChatShell({
       );
 
     if (
-      messageNodes.length === 0
+      messageNodes.length ===
+      0
     ) {
       return;
     }
 
     const observer =
       new IntersectionObserver(
-        (entries) => {
+        (
+          entries,
+        ) => {
           const visibleEntries =
             entries
               .filter(
-                (entry) =>
+                (
+                  entry,
+                ) =>
                   entry.isIntersecting,
               )
               .sort(
@@ -304,11 +333,13 @@ export function ChatShell({
 
                   return (
                     Math.abs(
-                      first.boundingClientRect
+                      first
+                        .boundingClientRect
                         .top,
                     ) -
                     Math.abs(
-                      second.boundingClientRect
+                      second
+                        .boundingClientRect
                         .top,
                     )
                   );
@@ -331,16 +362,21 @@ export function ChatShell({
           }
 
           setActiveMessageId(
-            (current) =>
-              current === messageId
+            (
+              current,
+            ) =>
+              current ===
+              messageId
                 ? current
                 : messageId,
           );
         },
         {
           root,
+
           rootMargin:
             "-12% 0px -45% 0px",
+
           threshold: [
             0.05,
             0.25,
@@ -351,8 +387,12 @@ export function ChatShell({
       );
 
     messageNodes.forEach(
-      (node) => {
-        observer.observe(node);
+      (
+        node,
+      ) => {
+        observer.observe(
+          node,
+        );
       },
     );
 
@@ -364,7 +404,8 @@ export function ChatShell({
     messages,
   ]);
 
-  const restoredRef = useRef(false);
+  const restoredRef =
+    useRef(false);
 
   useEffect(() => {
     if (
@@ -374,11 +415,15 @@ export function ChatShell({
       return;
     }
 
-    restoredRef.current = true;
+    restoredRef.current =
+      true;
 
-    const requested = new URL(
-      window.location.href,
-    ).searchParams.get("c");
+    const requested =
+      new URL(
+        window.location.href,
+      ).searchParams.get(
+        "c",
+      );
 
     if (!requested) {
       return;
@@ -403,11 +448,14 @@ export function ChatShell({
         return;
       }
 
-      const url = new URL(
-        window.location.href,
-      );
+      const url =
+        new URL(
+          window.location.href,
+        );
 
-      url.searchParams.delete("c");
+      url.searchParams.delete(
+        "c",
+      );
 
       window.history.replaceState(
         null,
@@ -443,19 +491,33 @@ export function ChatShell({
     useCallback(() => {
       reset();
 
-      setActiveConversationId(null);
-      setActiveMessageId(null);
-      setIsSidebarOpen(false);
+      setActiveConversationId(
+        null,
+      );
+
+      setActiveMessageId(
+        null,
+      );
+
+      setIsSidebarOpen(
+        false,
+      );
 
       setConversationEpoch(
-        (value) => value + 1,
+        (
+          value,
+        ) =>
+          value + 1,
       );
 
-      const url = new URL(
-        window.location.href,
-      );
+      const url =
+        new URL(
+          window.location.href,
+        );
 
-      url.searchParams.delete("c");
+      url.searchParams.delete(
+        "c",
+      );
 
       window.history.replaceState(
         null,
@@ -469,7 +531,9 @@ export function ChatShell({
       async (
         conversationId: string,
       ) => {
-        setIsSidebarOpen(false);
+        setIsSidebarOpen(
+          false,
+        );
 
         if (
           conversationId ===
@@ -496,15 +560,21 @@ export function ChatShell({
           conversationId,
         );
 
-        setActiveMessageId(null);
+        setActiveMessageId(
+          null,
+        );
 
         setConversationEpoch(
-          (value) => value + 1,
+          (
+            value,
+          ) =>
+            value + 1,
         );
 
-        const url = new URL(
-          window.location.href,
-        );
+        const url =
+          new URL(
+            window.location.href,
+          );
 
         url.searchParams.set(
           "c",
@@ -549,25 +619,31 @@ export function ChatShell({
       ],
     );
 
-  const handleSend = useCallback(
-    (
-      content: string,
-      attachments:
-        ChatImageAttachment[] = [],
-    ) => {
-      send(
-        content,
-        attachments,
-      );
+  const handleSend =
+    useCallback(
+      (
+        content: string,
+        attachments:
+          ChatImageAttachment[] =
+            [],
+      ) => {
+        send(
+          content,
+          attachments,
+        );
 
-      setIsSidebarOpen(false);
-    },
-    [send],
-  );
+        setIsSidebarOpen(
+          false,
+        );
+      },
+      [send],
+    );
 
   const jumpToMessage =
     useCallback(
-      (messageId: string) => {
+      (
+        messageId: string,
+      ) => {
         const target =
           document.getElementById(
             `message-${messageId}`,
@@ -577,12 +653,19 @@ export function ChatShell({
           return;
         }
 
-        setActiveMessageId(messageId);
+        setActiveMessageId(
+          messageId,
+        );
 
         target.scrollIntoView({
-          behavior: "smooth",
-          block: "center",
-          inline: "nearest",
+          behavior:
+            "smooth",
+
+          block:
+            "center",
+
+          inline:
+            "nearest",
         });
       },
       [],
@@ -597,10 +680,13 @@ export function ChatShell({
         index -= 1
       ) {
         if (
-          messages[index].role ===
+          messages[index]
+            .role ===
           "assistant"
         ) {
-          return messages[index].id;
+          return messages[
+            index
+          ].id;
         }
       }
 
@@ -609,6 +695,10 @@ export function ChatShell({
 
   const hasMessages =
     messages.length > 0;
+
+  const hasPermanentAccount =
+    isSignedIn &&
+    !isGuest;
 
   return (
     <div className="h-dvh overflow-hidden bg-surface-base text-text-primary">
@@ -620,9 +710,13 @@ export function ChatShell({
       </a>
 
       <Sidebar
-        isOpen={isSidebarOpen}
+        isOpen={
+          isSidebarOpen
+        }
         onClose={() =>
-          setIsSidebarOpen(false)
+          setIsSidebarOpen(
+            false,
+          )
         }
         conversations={
           history.conversations
@@ -630,20 +724,33 @@ export function ChatShell({
         activeConversationId={
           activeConversationId
         }
-        search={history.search}
+        search={
+          history.search
+        }
         onSearchChange={
           history.setSearch
         }
         isSearching={
           history.isSearching
         }
-        isLoading={history.isLoading}
-        error={history.error}
-        isSignedIn={isSignedIn}
+        isLoading={
+          history.isLoading
+        }
+        error={
+          history.error
+        }
+        isSignedIn={
+          isSignedIn
+        }
+        isGuest={
+          isGuest
+        }
         onSelectConversation={
           selectConversation
         }
-        onNewChat={startNewChat}
+        onNewChat={
+          startNewChat
+        }
         onDeleteConversation={
           deleteConversation
         }
@@ -651,10 +758,17 @@ export function ChatShell({
           history.rename
         }
         onOpenSettings={() => {
-          setIsSettingsOpen(true);
-          setIsSidebarOpen(false);
+          setIsSettingsOpen(
+            true,
+          );
+
+          setIsSidebarOpen(
+            false,
+          );
         }}
-        isAdmin={isAdmin}
+        isAdmin={
+          isAdmin
+        }
       />
 
       <div className="flex h-dvh flex-col lg:pl-[284px]">
@@ -663,7 +777,9 @@ export function ChatShell({
             <IconButton
               label="Open navigation"
               onClick={() =>
-                setIsSidebarOpen(true)
+                setIsSidebarOpen(
+                  true,
+                )
               }
               className="lg:hidden"
             >
@@ -676,57 +792,52 @@ export function ChatShell({
           </div>
 
           <div className="flex shrink-0 items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={startNewChat}
-              className="hidden sm:inline-flex"
-            >
-              New chat
-            </Button>
-
-            {isGuest ? (
-              <>
-                <span className="hidden text-xs font-medium text-text-muted sm:inline">
-                  Guest
-                </span>
-
-                <Link
-                  href="/sign-in"
-                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-surface-inverse px-3 text-xs font-medium text-text-inverse transition-opacity hover:opacity-90"
-                >
-                  Save chats
-                </Link>
-              </>
-            ) : isSignedIn ? (
-              <span className="hidden max-w-[16ch] truncate text-xs text-text-muted sm:inline">
+            {hasPermanentAccount ? (
+              <span className="hidden max-w-[20ch] truncate text-xs text-text-muted sm:inline">
                 {userEmail}
               </span>
             ) : (
-              <Link
-                href="/sign-in"
-                className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-surface-inverse px-3 text-xs font-medium text-text-inverse transition-opacity hover:opacity-90"
-              >
-                Sign in
-              </Link>
+              <>
+                <Link
+                  href="/sign-in"
+                  className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl bg-surface-inverse px-4 text-sm font-semibold text-text-inverse transition-opacity hover:opacity-90"
+                >
+                  Log in
+                </Link>
+
+                <Link
+                  href="/sign-in?mode=sign-up"
+                  className="inline-flex h-9 shrink-0 items-center justify-center rounded-xl border border-border-default bg-surface-base px-4 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-raised"
+                >
+                  Sign up for free
+                </Link>
+              </>
             )}
           </div>
         </header>
 
         <main className="flex min-h-0 flex-1 flex-col">
           <div
-            ref={containerRef}
-            onScroll={handleScroll}
+            ref={
+              containerRef
+            }
+            onScroll={
+              handleScroll
+            }
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain"
           >
             {!hasMessages ? (
               <EmptyState
-                onSelect={handleSend}
+                onSelect={
+                  handleSend
+                }
                 disabled={
                   isStreaming ||
                   !isSignedIn
                 }
-                isSignedIn={isSignedIn}
+                isSignedIn={
+                  isSignedIn
+                }
               />
             ) : (
               <div className="mx-auto w-full max-w-[1120px] px-4 py-8 sm:px-6">
@@ -739,9 +850,13 @@ export function ChatShell({
                   className="mx-auto max-w-[1040px] space-y-7"
                 >
                   {messages.map(
-                    (message) => (
+                    (
+                      message,
+                    ) => (
                       <div
-                        key={message.id}
+                        key={
+                          message.id
+                        }
                         id={`message-${message.id}`}
                         data-message-id={
                           message.id
@@ -781,14 +896,22 @@ export function ChatShell({
           </div>
 
           <Composer
-            isStreaming={isStreaming}
-            onSend={handleSend}
-            onStop={stop}
+            isStreaming={
+              isStreaming
+            }
+            onSend={
+              handleSend
+            }
+            onStop={
+              stop
+            }
             focusKey={
               conversationEpoch
             }
-            disabled={!isSignedIn}
-            disabledReason="Sign in to start a conversation."
+            disabled={
+              !isSignedIn
+            }
+            disabledReason="Preparing Mabojolu..."
             selectedModelId={
               selectedModelId
             }
@@ -800,7 +923,9 @@ export function ChatShell({
       </div>
 
       <ConversationMap
-        messages={messages}
+        messages={
+          messages
+        }
         activeMessageId={
           activeMessageId
         }
@@ -810,12 +935,20 @@ export function ChatShell({
       />
 
       <SettingsDialog
-        isOpen={isSettingsOpen}
-        onClose={() =>
-          setIsSettingsOpen(false)
+        isOpen={
+          isSettingsOpen
         }
-        isSignedIn={isSignedIn}
-        userEmail={userEmail}
+        onClose={() =>
+          setIsSettingsOpen(
+            false,
+          )
+        }
+        isSignedIn={
+          hasPermanentAccount
+        }
+        userEmail={
+          userEmail
+        }
         persistenceKind={
           persistenceKind
         }

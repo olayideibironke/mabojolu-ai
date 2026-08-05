@@ -1,5 +1,6 @@
 "use client";
 
+import { useSearchParams } from "next/navigation";
 import {
   type FormEvent,
   useEffect,
@@ -25,11 +26,27 @@ type Notice =
     }
   | null;
 
+function modeFromQuery(
+  value: string | null,
+): AuthMode {
+  return value === "sign-up"
+    ? "sign-up"
+    : "sign-in";
+}
+
 export function EmailPasswordAuth() {
-  const [
-    mode,
-    setMode,
-  ] = useState<AuthMode>("sign-in");
+  const searchParams =
+    useSearchParams();
+
+  const requestedMode =
+    searchParams.get("mode");
+
+  const [mode, setMode] =
+    useState<AuthMode>(() =>
+      modeFromQuery(
+        requestedMode,
+      ),
+    );
 
   const [
     displayName,
@@ -75,11 +92,36 @@ export function EmailPasswordAuth() {
     mode === "sign-up";
 
   const isForgotPassword =
-    mode === "forgot-password";
+    mode ===
+    "forgot-password";
 
   const isAnonymousSignUp =
     isSignUp &&
     isAnonymous;
+
+  /*
+   * Keep the visible tab aligned with links such as:
+   * /sign-in?mode=sign-up
+   */
+  useEffect(() => {
+    if (
+      isSubmitting ||
+      mode ===
+        "forgot-password"
+    ) {
+      return;
+    }
+
+    setMode(
+      modeFromQuery(
+        requestedMode,
+      ),
+    );
+  }, [
+    isSubmitting,
+    mode,
+    requestedMode,
+  ]);
 
   useEffect(() => {
     let isActive = true;
@@ -89,31 +131,27 @@ export function EmailPasswordAuth() {
 
     void client.auth
       .getSession()
-      .then(
-        ({
-          data,
-        }) => {
-          if (!isActive) {
-            return;
-          }
+      .then(({ data }) => {
+        if (!isActive) {
+          return;
+        }
 
-          setIsAnonymous(
-            data.session?.user
-              .is_anonymous === true,
-          );
-
-          setIsAuthStateReady(
+        setIsAnonymous(
+          data.session?.user
+            .is_anonymous ===
             true,
-          );
-        },
-      )
+        );
+
+        setIsAuthStateReady(
+          true,
+        );
+      })
       .catch(() => {
         if (!isActive) {
           return;
         }
 
         setIsAnonymous(false);
-
         setIsAuthStateReady(
           true,
         );
@@ -135,7 +173,8 @@ export function EmailPasswordAuth() {
 
           setIsAnonymous(
             session?.user
-              .is_anonymous === true,
+              .is_anonymous ===
+              true,
           );
 
           setIsAuthStateReady(
@@ -197,6 +236,34 @@ export function EmailPasswordAuth() {
       isSubmitting,
     ]);
 
+  function updateUrlMode(
+    nextMode: AuthMode,
+  ) {
+    const url = new URL(
+      window.location.href,
+    );
+
+    if (
+      nextMode ===
+      "sign-up"
+    ) {
+      url.searchParams.set(
+        "mode",
+        "sign-up",
+      );
+    } else {
+      url.searchParams.delete(
+        "mode",
+      );
+    }
+
+    window.history.replaceState(
+      null,
+      "",
+      url,
+    );
+  }
+
   function changeMode(
     nextMode: AuthMode,
   ) {
@@ -208,6 +275,15 @@ export function EmailPasswordAuth() {
     setNotice(null);
     setPassword("");
     setConfirmPassword("");
+
+    if (
+      nextMode !==
+      "forgot-password"
+    ) {
+      updateUrlMode(
+        nextMode,
+      );
+    }
   }
 
   async function handleSubmit(
@@ -251,9 +327,7 @@ export function EmailPasswordAuth() {
         const client =
           getSupabaseBrowserClient();
 
-        const {
-          error,
-        } =
+        const { error } =
           await client.auth
             .resetPasswordForEmail(
               normalizedEmail,
@@ -338,16 +412,14 @@ export function EmailPasswordAuth() {
       const client =
         getSupabaseBrowserClient();
 
-      /**
-       * Upgrade the current anonymous identity rather than creating a separate
-       * account. This preserves the same user ID and all guest conversations.
+      /*
+       * Upgrade the current anonymous identity instead of creating a separate
+       * account. The same user ID and guest conversations are preserved.
        */
       if (
         isAnonymousSignUp
       ) {
-        const {
-          error,
-        } =
+        const { error } =
           await client.auth
             .updateUser(
               {
@@ -437,9 +509,7 @@ export function EmailPasswordAuth() {
         return;
       }
 
-      const {
-        error,
-      } =
+      const { error } =
         await client.auth
           .signInWithPassword({
             email:
@@ -493,13 +563,12 @@ export function EmailPasswordAuth() {
               )
             }
             className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              mode ===
-              "sign-in"
+              mode === "sign-in"
                 ? "bg-surface-raised text-text-primary shadow-sm"
                 : "text-text-muted hover:text-text-primary"
             }`}
           >
-            Sign in
+            Log in
           </button>
 
           <button
@@ -515,13 +584,12 @@ export function EmailPasswordAuth() {
               )
             }
             className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              mode ===
-              "sign-up"
+              mode === "sign-up"
                 ? "bg-surface-raised text-text-primary shadow-sm"
                 : "text-text-muted hover:text-text-primary"
             }`}
           >
-            Create account
+            Sign up
           </button>
         </div>
       ) : null}
@@ -531,7 +599,7 @@ export function EmailPasswordAuth() {
           {isForgotPassword
             ? "Reset your password"
             : isAnonymousSignUp
-              ? "Save your Mabojolu conversations"
+              ? "Create your Mabojolu account"
               : isSignUp
                 ? "Create your Mabojolu account"
                 : "Welcome back"}
@@ -541,10 +609,10 @@ export function EmailPasswordAuth() {
           {isForgotPassword
             ? "Enter your account email and we will send you a secure reset link."
             : isAnonymousSignUp
-              ? "Add your email to keep this guest account. After verification, you will create a password."
+              ? "Create your free account and keep the conversations you started as a guest."
               : isSignUp
                 ? "Create an account to save and revisit your conversations."
-                : "Sign in to continue your conversations."}
+                : "Log in to continue your conversations."}
         </p>
       </div>
 
@@ -726,8 +794,7 @@ export function EmailPasswordAuth() {
                 : "status"
             }
             className={`rounded-xl border px-3.5 py-3 text-sm leading-5 ${
-              notice.kind ===
-              "error"
+              notice.kind === "error"
                 ? "border-danger/20 bg-danger-subtle text-text-primary"
                 : "border-border-default bg-surface-base text-text-secondary"
             }`}
@@ -762,7 +829,7 @@ export function EmailPasswordAuth() {
             }
             className="font-semibold text-text-primary underline-offset-4 hover:underline disabled:opacity-50"
           >
-            Return to sign in
+            Return to log in
           </button>
         ) : (
           <>
@@ -785,8 +852,8 @@ export function EmailPasswordAuth() {
               className="font-semibold text-text-primary underline-offset-4 hover:underline disabled:opacity-50"
             >
               {isSignUp
-                ? "Sign in"
-                : "Create an account"}
+                ? "Log in"
+                : "Sign up for free"}
             </button>
           </>
         )}
