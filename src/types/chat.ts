@@ -28,6 +28,40 @@ export type FeedbackRating =
   | "down";
 
 /**
+ * Public source used to support a Mabojolu response.
+ *
+ * Provider-specific citation identifiers and encrypted metadata remain on the
+ * server. Only safe display information crosses into the browser.
+ */
+export interface ChatSource {
+  /**
+   * Stable identifier created by Mabojolu for this response.
+   *
+   * The same web page may be cited more than once, but it should appear only
+   * once in the visible source list.
+   */
+  id: string;
+
+  /**
+   * Human-readable page or document title.
+   */
+  title: string;
+
+  /**
+   * Complete HTTPS source address.
+   */
+  url: string;
+
+  /**
+   * Short supporting excerpt supplied by the provider when available.
+   *
+   * This is optional because some providers return a source title and URL
+   * without a safe excerpt.
+   */
+  citedText?: string;
+}
+
+/**
  * Image attached to a user message.
  *
  * `dataUrl` contains the browser-readable preview and the base64 image payload
@@ -90,6 +124,13 @@ export interface ChatMessage {
   error?: ChatErrorPayload;
 
   feedback?: FeedbackRating;
+
+  /**
+   * Verified public sources supporting an assistant response.
+   *
+   * User messages should not contain sources.
+   */
+  sources?: ChatSource[];
 }
 
 export interface Conversation {
@@ -103,7 +144,7 @@ export interface Conversation {
 /**
  * Conversation summary used in the sidebar.
  *
- * Message bodies and attachment data are intentionally excluded.
+ * Message bodies, sources, and attachment data are intentionally excluded.
  */
 export interface ConversationSummary {
   id: string;
@@ -184,12 +225,24 @@ export type ChatStreamEvent =
       label: string;
     }
   | {
+      /**
+       * One verified web source discovered during generation.
+       *
+       * The client deduplicates these by source ID before attaching them to the
+       * assistant message.
+       */
+      type: "source";
+      source: ChatSource;
+    }
+  | {
       type: "done";
+
       finishReason:
         | "end_turn"
         | "max_tokens"
         | "aborted"
         | "refusal";
+
       usage?: UsageRecord;
     }
   | {

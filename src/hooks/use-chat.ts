@@ -16,6 +16,7 @@ import type {
   ChatErrorPayload,
   ChatImageAttachment,
   ChatMessage,
+  ChatSource,
   FeedbackRating,
 } from "@/types/chat";
 
@@ -76,7 +77,9 @@ interface RequestMessage {
  * Prepare one browser message for the chat API.
  *
  * Image data is included only when attachments exist, keeping ordinary text
- * requests small.
+ * requests small. Source metadata is not sent back as conversation input
+ * because Anthropic receives the visible assistant text as conversation
+ * context and can perform a new search when current verification is required.
  */
 function prepareRequestMessage(
   message: ChatMessage,
@@ -182,6 +185,19 @@ export function useChat(
       let accumulated = "";
       let receivedText = false;
 
+      /*
+       * Preserve source discovery order while preventing duplicate cards when
+       * one page supports several claims in the same answer.
+       */
+      const sourcesById =
+        new Map<string, ChatSource>();
+
+      const currentSources =
+        (): ChatSource[] =>
+          Array.from(
+            sourcesById.values(),
+          );
+
       const isCurrent = () =>
         generationRef.current ===
         generation;
@@ -276,6 +292,13 @@ export function useChat(
             patchAssistant({
               content: accumulated,
               status: "streaming",
+
+              ...(sourcesById.size > 0
+                ? {
+                    sources:
+                      currentSources(),
+                  }
+                : {}),
             });
           },
 
@@ -287,6 +310,31 @@ export function useChat(
             setStatusLabel(label);
           },
 
+          onSource: (source) => {
+            if (!isCurrent()) {
+              return;
+            }
+
+            if (
+              sourcesById.has(
+                source.id,
+              )
+            ) {
+              return;
+            }
+
+            sourcesById.set(
+              source.id,
+              source,
+            );
+
+            patchAssistant({
+              sources:
+                currentSources(),
+              status: "streaming",
+            });
+          },
+
           onDone: ({
             finishReason,
           }) => {
@@ -296,18 +344,34 @@ export function useChat(
 
             setIsStreaming(false);
             setStatusLabel(null);
+
             controllerRef.current =
               null;
+
+            const sources =
+              currentSources();
 
             if (
               finishReason ===
               "aborted"
             ) {
-              if (receivedText) {
+              if (
+                receivedText ||
+                sources.length > 0
+              ) {
                 patchAssistant({
                   content: accumulated,
                   status:
                     "interrupted",
+
+                  ...(sources.length > 0
+                    ? {
+                        sources,
+                      }
+                    : {
+                        sources:
+                          undefined,
+                      }),
                 });
               } else {
                 setMessages(
@@ -330,11 +394,23 @@ export function useChat(
             ) {
               patchAssistant({
                 status: "failed",
+
+                ...(sources.length > 0
+                  ? {
+                      sources,
+                    }
+                  : {
+                      sources:
+                        undefined,
+                    }),
+
                 error: {
                   code:
                     "provider_refused",
+
                   message:
                     "Mabojolu was unable to answer that request. Try rephrasing it.",
+
                   retryable: false,
                 },
               });
@@ -345,6 +421,15 @@ export function useChat(
             patchAssistant({
               content: accumulated,
               status: "complete",
+
+              ...(sources.length > 0
+                ? {
+                    sources,
+                  }
+                : {
+                    sources:
+                      undefined,
+                  }),
             });
           },
 
@@ -357,13 +442,26 @@ export function useChat(
 
             setIsStreaming(false);
             setStatusLabel(null);
+
             controllerRef.current =
               null;
+
+            const sources =
+              currentSources();
 
             patchAssistant({
               content: accumulated,
               status: "failed",
               error,
+
+              ...(sources.length > 0
+                ? {
+                    sources,
+                  }
+                : {
+                    sources:
+                      undefined,
+                  }),
             });
           },
         },
@@ -394,10 +492,12 @@ export function useChat(
       const userMessage: ChatMessage = {
         id: createId(),
         role: "user",
+
         content:
           trimmed.length > 0
             ? trimmed
             : "Please describe the attached image.",
+
         status: "complete",
         createdAt: timestamp,
 
@@ -470,6 +570,7 @@ export function useChat(
       content: "",
       status: "pending",
       error: undefined,
+      sources: undefined,
     };
 
     const next = [
@@ -642,6 +743,7 @@ export function useChat(
           message.id === messageId
             ? {
                 ...message,
+
                 feedback:
                   nextRating ??
                   undefined,
@@ -659,31 +761,37 @@ export function useChat(
 
       void (async () => {
         try {
-          const response = nextRating
-            ? await fetch(
-                "/api/feedback",
-                {
-                  method: "POST",
-                  headers: {
-                    "Content-Type":
-                      "application/json",
+          const response =
+            nextRating
+              ? await fetch(
+                  "/api/feedback",
+                  {
+                    method: "POST",
+
+                    headers: {
+                      "Content-Type":
+                        "application/json",
+                    },
+
+                    body:
+                      JSON.stringify({
+                        messageId:
+                          serverId,
+
+                        rating:
+                          nextRating,
+                      }),
                   },
-                  body: JSON.stringify({
-                    messageId:
-                      serverId,
-                    rating:
-                      nextRating,
-                  }),
-                },
-              )
-            : await fetch(
-                `/api/feedback?messageId=${encodeURIComponent(
-                  serverId,
-                )}`,
-                {
-                  method: "DELETE",
-                },
-              );
+                )
+              : await fetch(
+                  `/api/feedback?messageId=${encodeURIComponent(
+                    serverId,
+                  )}`,
+                  {
+                    method:
+                      "DELETE",
+                  },
+                );
 
           if (!response.ok) {
             setMessages(
@@ -694,6 +802,7 @@ export function useChat(
                     messageId
                       ? {
                           ...message,
+
                           feedback:
                             target.feedback,
                         }
@@ -702,16 +811,20 @@ export function useChat(
             );
           }
         } catch {
-          setMessages((current) =>
-            current.map((message) =>
-              message.id === messageId
-                ? {
-                    ...message,
-                    feedback:
-                      target.feedback,
-                  }
-                : message,
-            ),
+          setMessages(
+            (current) =>
+              current.map(
+                (message) =>
+                  message.id ===
+                  messageId
+                    ? {
+                        ...message,
+
+                        feedback:
+                          target.feedback,
+                      }
+                    : message,
+              ),
           );
         }
       })();
@@ -725,10 +838,12 @@ export function useChat(
       conversationId: string,
     ) => {
       controllerRef.current?.abort();
+
       controllerRef.current =
         null;
 
       generationRef.current += 1;
+
       idempotencyKeyRef.current =
         null;
 
@@ -736,22 +851,36 @@ export function useChat(
         conversationId;
 
       setMessages(
-        loaded.map((message) => ({
-          ...message,
+        loaded.map(
+          (message) => ({
+            ...message,
 
-          ...(message.attachments
-            ? {
-                attachments:
-                  message.attachments.map(
-                    (attachment) => ({
-                      ...attachment,
-                    }),
-                  ),
-              }
-            : {}),
+            ...(message.attachments
+              ? {
+                  attachments:
+                    message.attachments.map(
+                      (attachment) => ({
+                        ...attachment,
+                      }),
+                    ),
+                }
+              : {}),
 
-          serverId: message.id,
-        })),
+            ...(message.sources
+              ? {
+                  sources:
+                    message.sources.map(
+                      (source) => ({
+                        ...source,
+                      }),
+                    ),
+                }
+              : {}),
+
+            serverId:
+              message.id,
+          }),
+        ),
       );
 
       setIsStreaming(false);
@@ -762,10 +891,12 @@ export function useChat(
 
   const reset = useCallback(() => {
     controllerRef.current?.abort();
+
     controllerRef.current =
       null;
 
     generationRef.current += 1;
+
     idempotencyKeyRef.current =
       null;
 

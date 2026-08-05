@@ -20,6 +20,7 @@ import {
 import type {
   ChatImageAttachment,
   ChatMessage,
+  ChatSource,
   FeedbackRating,
 } from "@/types/chat";
 
@@ -34,6 +35,8 @@ import { MessageActions } from "./message-actions";
  * renderer.
  *
  * User image attachments are displayed directly above the accompanying prompt.
+ * Verified public sources are displayed beneath assistant responses as secure
+ * external links.
  */
 
 interface MessageProps {
@@ -415,6 +418,98 @@ function ReasoningStatus() {
   );
 }
 
+/**
+ * Supporting public pages used by Mabojolu during live web research.
+ */
+function SourceList({
+  sources,
+}: {
+  sources: ChatSource[];
+}) {
+  if (sources.length === 0) {
+    return null;
+  }
+
+  return (
+    <section
+      aria-label="Sources"
+      className="mt-5"
+    >
+      <div className="mb-2 flex items-center gap-2">
+        <h3 className="text-sm font-semibold text-text-primary">
+          Sources
+        </h3>
+
+        <span className="rounded-full border border-border-subtle bg-surface-raised px-2 py-0.5 text-[11px] font-medium text-text-muted">
+          {sources.length}
+        </span>
+      </div>
+
+      <div className="grid gap-2 sm:grid-cols-2">
+        {sources.map(
+          (source, index) => (
+            <a
+              key={source.id}
+              href={source.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`Open source ${index + 1}: ${source.title}`}
+              className="group/source min-w-0 rounded-xl border border-border-subtle bg-surface-raised px-3 py-3 text-left transition hover:border-border-default hover:bg-surface-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+            >
+              <div className="flex min-w-0 items-start gap-2.5">
+                <span
+                  aria-hidden="true"
+                  className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full border border-border-subtle bg-surface-base text-[11px] font-semibold text-text-muted"
+                >
+                  {index + 1}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <p className="break-words text-sm font-medium leading-5 text-text-primary group-hover/source:underline">
+                    {source.title}
+                  </p>
+
+                  <p className="mt-0.5 truncate text-xs text-text-muted">
+                    {getSourceHostname(
+                      source.url,
+                    )}
+                  </p>
+
+                  {source.citedText ? (
+                    <p className="mt-2 break-words text-xs leading-5 text-text-secondary">
+                      {source.citedText}
+                    </p>
+                  ) : null}
+                </div>
+
+                <span
+                  aria-hidden="true"
+                  className="shrink-0 text-sm text-text-muted transition-transform group-hover/source:-translate-y-0.5 group-hover/source:translate-x-0.5"
+                >
+                  ↗
+                </span>
+              </div>
+            </a>
+          ),
+        )}
+      </div>
+    </section>
+  );
+}
+
+function getSourceHostname(
+  url: string,
+): string {
+  try {
+    return new URL(url).hostname.replace(
+      /^www\./,
+      "",
+    );
+  } catch {
+    return "Web source";
+  }
+}
+
 function AssistantMessage({
   message,
   isLastAssistant,
@@ -444,6 +539,9 @@ function AssistantMessage({
   const hasContent =
     message.content.trim().length > 0;
 
+  const sources =
+    message.sources ?? [];
+
   const isThisMessageStreaming =
     isStreaming && isActive;
 
@@ -461,6 +559,12 @@ function AssistantMessage({
         {isThisMessageStreaming &&
         !hasContent ? (
           <ReasoningStatus />
+        ) : null}
+
+        {sources.length > 0 ? (
+          <SourceList
+            sources={sources}
+          />
         ) : null}
 
         {message.status ===

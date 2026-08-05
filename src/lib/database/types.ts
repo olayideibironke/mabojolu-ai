@@ -18,6 +18,7 @@
 
 import type {
   ChatMessage,
+  ChatSource,
   Conversation,
   ConversationSummary,
   FeedbackRating,
@@ -59,6 +60,13 @@ export interface AppendMessageInput {
   promptVersion?: string;
   usage?: UsageRecord;
   errorCode?: string;
+
+  /**
+   * Verified public sources supporting an assistant response.
+   *
+   * User messages should normally omit this field.
+   */
+  sources?: ChatSource[];
 }
 
 export interface UsageEventInput {
@@ -416,6 +424,11 @@ export interface DatabaseAdapter {
       status?: MessageStatus;
       usage?: UsageRecord;
       errorCode?: string;
+
+      /**
+       * Replaces the complete verified-source list for this message.
+       */
+      sources?: ChatSource[];
     },
   ): Promise<boolean>;
 

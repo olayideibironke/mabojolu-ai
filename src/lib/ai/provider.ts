@@ -1,4 +1,7 @@
-import type { UsageRecord } from "@/types/chat";
+import type {
+  ChatSource,
+  UsageRecord,
+} from "@/types/chat";
 
 import type { ModelDefinition } from "./models";
 
@@ -35,7 +38,10 @@ export interface NormalizedImage {
  * Images are optional because ordinary text conversations should remain small.
  */
 export interface NormalizedMessage {
-  role: "user" | "assistant";
+  role:
+    | "user"
+    | "assistant";
+
   content: string;
 
   /**
@@ -85,6 +91,16 @@ export type GenerationChunk =
        */
       type: "progress";
       label: string;
+    }
+  | {
+      /**
+       * One verified public source used during generation.
+       *
+       * Provider-specific identifiers and internal metadata are removed before
+       * a source reaches this contract.
+       */
+      type: "source";
+      source: ChatSource;
     }
   | {
       type: "finish";
