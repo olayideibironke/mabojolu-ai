@@ -2,15 +2,12 @@
 
 import {
   type FormEvent,
-  useCallback,
   useEffect,
   useMemo,
   useState,
 } from "react";
 
 import { getSupabaseBrowserClient } from "@/lib/auth/supabase-browser";
-
-import { TurnstileWidget } from "./turnstile-widget";
 
 type AuthMode =
   | "sign-in"
@@ -70,18 +67,6 @@ export function EmailPasswordAuth() {
   ] = useState(false);
 
   const [
-    captchaToken,
-    setCaptchaToken,
-  ] = useState<string | null>(
-    null,
-  );
-
-  const [
-    captchaEpoch,
-    setCaptchaEpoch,
-  ] = useState(0);
-
-  const [
     notice,
     setNotice,
   ] = useState<Notice>(null);
@@ -95,39 +80,6 @@ export function EmailPasswordAuth() {
   const isAnonymousSignUp =
     isSignUp &&
     isAnonymous;
-
-  /**
-   * Anonymous account upgrades use updateUser() on an already authenticated
-   * guest identity.
-   *
-   * New sign-ups, password sign-ins, and password-reset requests use the
-   * Turnstile token required by Supabase CAPTCHA protection.
-   */
-  const needsCaptcha =
-    isAuthStateReady &&
-    !isAnonymousSignUp;
-
-  const handleCaptchaTokenChange =
-    useCallback(
-      (
-        token: string | null,
-      ) => {
-        setCaptchaToken(
-          token,
-        );
-      },
-      [],
-    );
-
-  const resetCaptcha =
-    useCallback(() => {
-      setCaptchaToken(null);
-
-      setCaptchaEpoch(
-        (value) =>
-          value + 1,
-      );
-    }, []);
 
   useEffect(() => {
     let isActive = true;
@@ -256,7 +208,6 @@ export function EmailPasswordAuth() {
     setNotice(null);
     setPassword("");
     setConfirmPassword("");
-    resetCaptcha();
   }
 
   async function handleSubmit(
@@ -284,23 +235,8 @@ export function EmailPasswordAuth() {
     if (!normalizedEmail) {
       setNotice({
         kind: "error",
-
         message:
           "Enter your email address.",
-      });
-
-      return;
-    }
-
-    if (
-      needsCaptcha &&
-      !captchaToken
-    ) {
-      setNotice({
-        kind: "error",
-
-        message:
-          "Complete the security check to continue.",
       });
 
       return;
@@ -324,17 +260,12 @@ export function EmailPasswordAuth() {
               {
                 redirectTo:
                   `${window.location.origin}/auth/callback?next=/reset-password`,
-
-                captchaToken:
-                  captchaToken ??
-                  undefined,
               },
             );
 
         if (error) {
           setNotice({
             kind: "error",
-
             message:
               "Mabojolu could not send the reset email. Please try again.",
           });
@@ -344,20 +275,17 @@ export function EmailPasswordAuth() {
 
         setNotice({
           kind: "success",
-
           message:
             "Check your email for a secure password-reset link.",
         });
       } catch {
         setNotice({
           kind: "error",
-
           message:
             "Mabojolu could not send the reset email. Please try again.",
         });
       } finally {
         setIsSubmitting(false);
-        resetCaptcha();
       }
 
       return;
@@ -369,7 +297,6 @@ export function EmailPasswordAuth() {
     ) {
       setNotice({
         kind: "error",
-
         message:
           "Enter your name.",
       });
@@ -383,7 +310,6 @@ export function EmailPasswordAuth() {
     ) {
       setNotice({
         kind: "error",
-
         message:
           "Your password must contain at least 8 characters.",
       });
@@ -399,7 +325,6 @@ export function EmailPasswordAuth() {
     ) {
       setNotice({
         kind: "error",
-
         message:
           "The passwords do not match.",
       });
@@ -415,8 +340,7 @@ export function EmailPasswordAuth() {
 
       /**
        * Upgrade the current anonymous identity rather than creating a separate
-       * account. This keeps the same user ID and therefore preserves the
-       * visitor's Mabojolu conversations.
+       * account. This preserves the same user ID and all guest conversations.
        */
       if (
         isAnonymousSignUp
@@ -444,7 +368,6 @@ export function EmailPasswordAuth() {
         if (error) {
           setNotice({
             kind: "error",
-
             message:
               error.message,
           });
@@ -454,7 +377,6 @@ export function EmailPasswordAuth() {
 
         setNotice({
           kind: "success",
-
           message:
             "Check your email and verify your address. You will then create a password without losing your Mabojolu conversations.",
         });
@@ -482,17 +404,12 @@ export function EmailPasswordAuth() {
 
                 emailRedirectTo:
                   `${window.location.origin}/auth/callback?next=/`,
-
-                captchaToken:
-                  captchaToken ??
-                  undefined,
               },
             });
 
         if (error) {
           setNotice({
             kind: "error",
-
             message:
               error.message,
           });
@@ -513,7 +430,6 @@ export function EmailPasswordAuth() {
 
         setNotice({
           kind: "success",
-
           message:
             "Account created. Check your email and confirm your address before signing in.",
         });
@@ -530,18 +446,11 @@ export function EmailPasswordAuth() {
               normalizedEmail,
 
             password,
-
-            options: {
-              captchaToken:
-                captchaToken ??
-                undefined,
-            },
           });
 
       if (error) {
         setNotice({
           kind: "error",
-
           message:
             "The email or password is incorrect.",
         });
@@ -555,13 +464,11 @@ export function EmailPasswordAuth() {
     } catch {
       setNotice({
         kind: "error",
-
         message:
           "Mabojolu could not complete authentication. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
-      resetCaptcha();
     }
   }
 
@@ -810,18 +717,6 @@ export function EmailPasswordAuth() {
           </div>
         ) : null}
 
-        {needsCaptcha ? (
-          <TurnstileWidget
-            key={
-              captchaEpoch
-            }
-            onTokenChange={
-              handleCaptchaTokenChange
-            }
-            className="flex min-h-[65px] items-center justify-center"
-          />
-        ) : null}
-
         {notice ? (
           <div
             role={
@@ -845,11 +740,7 @@ export function EmailPasswordAuth() {
           type="submit"
           disabled={
             isSubmitting ||
-            !isAuthStateReady ||
-            (
-              needsCaptcha &&
-              !captchaToken
-            )
+            !isAuthStateReady
           }
           className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-surface-inverse px-4 text-sm font-semibold text-text-inverse transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
