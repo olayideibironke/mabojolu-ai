@@ -148,6 +148,161 @@ export interface AttachmentRecord {
   createdAt: string;
 }
 
+/**
+ * Mabojolu billing plans.
+ *
+ * Plan names remain product-level identifiers. Stripe price identifiers are
+ * stored separately so payment-provider details never leak into application
+ * authorization rules.
+ */
+export type BillingPlanId =
+  | "none"
+  | "starter"
+  | "plus"
+  | "pro";
+
+/**
+ * Current payment state for one user.
+ *
+ * Only `active` and `trialing` grant subscription-backed usage. A user may still
+ * have prepaid credit when another status is present.
+ */
+export type BillingSubscriptionStatus =
+  | "none"
+  | "trialing"
+  | "active"
+  | "past_due"
+  | "canceled"
+  | "unpaid";
+
+/**
+ * One billing account associated with one Mabojolu user.
+ *
+ * Monetary usage is stored as integer microdollars:
+ *
+ *   1 USD = 1,000,000 microdollars
+ *
+ * This avoids floating-point rounding problems when individual generations
+ * cost less than one cent.
+ */
+export interface BillingAccount {
+  userId: string;
+  planId: BillingPlanId;
+  subscriptionStatus: BillingSubscriptionStatus;
+
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
+
+  currentPeriodStart: string | null;
+  currentPeriodEnd: string | null;
+
+  /**
+   * Monthly provider-cost allowance included with the active subscription.
+   */
+  includedUsageMicros: number;
+
+  /**
+   * Provider cost already consumed during the current billing period.
+   */
+  usedUsageMicros: number;
+
+  /**
+   * Additional prepaid provider-cost balance that does not expire monthly.
+   */
+  prepaidBalanceMicros: number;
+
+  createdAt: string;
+  updatedAt: string;
+}
+
+/**
+ * Funding source selected when a generation reserve is created.
+ *
+ * Subscription allowance is consumed before prepaid balance.
+ */
+export type BillingFundingSource =
+  | "subscription"
+  | "prepaid";
+
+/**
+ * Temporary cost reservation created before an AI provider request starts.
+ *
+ * Mabojolu reserves a conservative maximum before calling Anthropic. When the
+ * response settles, the reservation is replaced by actual provider cost and the
+ * unused difference is returned to the same funding source.
+ */
+export interface BillingUsageReservation {
+  id: string;
+  userId: string;
+  conversationId: string | null;
+  modelId: string;
+  fundingSource: BillingFundingSource;
+  reservedMicros: number;
+  actualMicros: number | null;
+
+  status:
+    | "reserved"
+    | "settled"
+    | "released";
+
+  createdAt: string;
+  settledAt: string | null;
+}
+
+export interface ReserveBillingUsageInput {
+  id: string;
+  userId: string;
+  conversationId: string | null;
+  modelId: string;
+
+  /**
+   * Conservative maximum provider cost to hold before generation begins.
+   */
+  amountMicros: number;
+}
+
+export interface SettleBillingUsageInput {
+  reservationId: string;
+  userId: string;
+
+  /**
+   * Actual provider cost after streaming finishes.
+   *
+   * This may be lower than the reservation. The difference is refunded.
+   */
+  actualMicros: number;
+}
+
+export interface UpdateBillingSubscriptionInput {
+  userId: string;
+  planId: BillingPlanId;
+  subscriptionStatus: BillingSubscriptionStatus;
+
+  stripeCustomerId?: string | null;
+  stripeSubscriptionId?: string | null;
+
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+
+  includedUsageMicros: number;
+
+  /**
+   * Set true when Stripe starts a new paid period and monthly usage should
+   * return to zero.
+   */
+  resetPeriodUsage?: boolean;
+}
+
+export interface AddPrepaidCreditInput {
+  userId: string;
+  amountMicros: number;
+
+  /**
+   * Payment-provider identifier used to make webhook processing idempotent.
+   */
+  externalReference: string;
+}
+
 export interface AdminMetrics {
   userCount: number;
   conversationCount: number;
@@ -307,6 +462,66 @@ export interface DatabaseAdapter {
     userId: string,
     sinceIso: string,
   ): Promise<number>;
+
+  // --- Billing -------------------------------------------------------------
+
+  /**
+   * Return the user's billing account.
+   *
+   * Null means the user has never started a paid plan or purchased credits.
+   */
+  getBillingAccount(
+    userId: string,
+  ): Promise<BillingAccount | null>;
+
+  /**
+   * Create a billing account when one does not yet exist.
+   */
+  ensureBillingAccount(
+    userId: string,
+  ): Promise<BillingAccount>;
+
+  /**
+   * Reserve provider-cost funding before an AI request begins.
+   *
+   * Returns null when neither active subscription allowance nor prepaid credit
+   * can cover the requested amount. Implementations must perform this
+   * atomically so simultaneous requests cannot spend the same balance twice.
+   */
+  reserveBillingUsage(
+    input: ReserveBillingUsageInput,
+  ): Promise<BillingUsageReservation | null>;
+
+  /**
+   * Replace a reservation with the generation's actual provider cost and refund
+   * any unused amount.
+   */
+  settleBillingUsage(
+    input: SettleBillingUsageInput,
+  ): Promise<boolean>;
+
+  /**
+   * Release the complete reservation when generation never starts or no
+   * provider cost is incurred.
+   */
+  releaseBillingUsage(
+    reservationId: string,
+    userId: string,
+  ): Promise<boolean>;
+
+  /**
+   * Apply Stripe subscription state to the Mabojolu billing account.
+   */
+  updateBillingSubscription(
+    input: UpdateBillingSubscriptionInput,
+  ): Promise<BillingAccount>;
+
+  /**
+   * Add prepaid credit once for one verified payment-provider event.
+   */
+  addPrepaidCredit(
+    input: AddPrepaidCreditInput,
+  ): Promise<BillingAccount>;
 
   // --- Attachments ---------------------------------------------------------
 

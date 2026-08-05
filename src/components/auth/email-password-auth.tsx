@@ -1,12 +1,16 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   type FormEvent,
+  useCallback,
+  useEffect,
   useMemo,
   useState,
 } from "react";
+
+import { getSupabaseBrowserClient } from "@/lib/auth/supabase-browser";
+
+import { TurnstileWidget } from "./turnstile-widget";
 
 type AuthMode =
   | "sign-in"
@@ -23,34 +27,6 @@ type Notice =
       message: string;
     }
   | null;
-
-let browserClient: SupabaseClient | null = null;
-
-function getSupabaseBrowserClient(): SupabaseClient {
-  if (browserClient) {
-    return browserClient;
-  }
-
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      "Mabojolu authentication is not configured.",
-    );
-  }
-
-  browserClient = createBrowserClient(
-    url,
-    key,
-  );
-
-  return browserClient;
-}
 
 export function EmailPasswordAuth() {
   const [
@@ -84,6 +60,28 @@ export function EmailPasswordAuth() {
   ] = useState(false);
 
   const [
+    isAuthStateReady,
+    setIsAuthStateReady,
+  ] = useState(false);
+
+  const [
+    isAnonymous,
+    setIsAnonymous,
+  ] = useState(false);
+
+  const [
+    captchaToken,
+    setCaptchaToken,
+  ] = useState<string | null>(
+    null,
+  );
+
+  const [
+    captchaEpoch,
+    setCaptchaEpoch,
+  ] = useState(0);
+
+  const [
     notice,
     setNotice,
   ] = useState<Notice>(null);
@@ -94,29 +92,158 @@ export function EmailPasswordAuth() {
   const isForgotPassword =
     mode === "forgot-password";
 
-  const submitLabel = useMemo(() => {
-    if (isSubmitting) {
-      if (isForgotPassword) {
-        return "Sending reset email...";
+  const isAnonymousSignUp =
+    isSignUp &&
+    isAnonymous;
+
+  /**
+   * Anonymous account upgrades use updateUser() on an already authenticated
+   * guest identity.
+   *
+   * New sign-ups, password sign-ins, and password-reset requests use the
+   * Turnstile token required by Supabase CAPTCHA protection.
+   */
+  const needsCaptcha =
+    isAuthStateReady &&
+    !isAnonymousSignUp;
+
+  const handleCaptchaTokenChange =
+    useCallback(
+      (
+        token: string | null,
+      ) => {
+        setCaptchaToken(
+          token,
+        );
+      },
+      [],
+    );
+
+  const resetCaptcha =
+    useCallback(() => {
+      setCaptchaToken(null);
+
+      setCaptchaEpoch(
+        (value) =>
+          value + 1,
+      );
+    }, []);
+
+  useEffect(() => {
+    let isActive = true;
+
+    const client =
+      getSupabaseBrowserClient();
+
+    void client.auth
+      .getSession()
+      .then(
+        ({
+          data,
+        }) => {
+          if (!isActive) {
+            return;
+          }
+
+          setIsAnonymous(
+            data.session?.user
+              .is_anonymous === true,
+          );
+
+          setIsAuthStateReady(
+            true,
+          );
+        },
+      )
+      .catch(() => {
+        if (!isActive) {
+          return;
+        }
+
+        setIsAnonymous(false);
+
+        setIsAuthStateReady(
+          true,
+        );
+      });
+
+    const {
+      data: {
+        subscription,
+      },
+    } =
+      client.auth.onAuthStateChange(
+        (
+          _event,
+          session,
+        ) => {
+          if (!isActive) {
+            return;
+          }
+
+          setIsAnonymous(
+            session?.user
+              .is_anonymous === true,
+          );
+
+          setIsAuthStateReady(
+            true,
+          );
+        },
+      );
+
+    return () => {
+      isActive = false;
+      subscription.unsubscribe();
+    };
+  }, []);
+
+  const submitLabel =
+    useMemo(() => {
+      if (!isAuthStateReady) {
+        return "Preparing...";
+      }
+
+      if (isSubmitting) {
+        if (
+          isForgotPassword
+        ) {
+          return "Sending reset email...";
+        }
+
+        if (
+          isAnonymousSignUp
+        ) {
+          return "Sending verification email...";
+        }
+
+        return isSignUp
+          ? "Creating account..."
+          : "Signing in...";
+      }
+
+      if (
+        isForgotPassword
+      ) {
+        return "Send reset email";
+      }
+
+      if (
+        isAnonymousSignUp
+      ) {
+        return "Continue with email";
       }
 
       return isSignUp
-        ? "Creating account..."
-        : "Signing in...";
-    }
-
-    if (isForgotPassword) {
-      return "Send reset email";
-    }
-
-    return isSignUp
-      ? "Create account"
-      : "Sign in";
-  }, [
-    isForgotPassword,
-    isSignUp,
-    isSubmitting,
-  ]);
+        ? "Create account"
+        : "Sign in";
+    }, [
+      isAnonymousSignUp,
+      isAuthStateReady,
+      isForgotPassword,
+      isSignUp,
+      isSubmitting,
+    ]);
 
   function changeMode(
     nextMode: AuthMode,
@@ -129,6 +256,7 @@ export function EmailPasswordAuth() {
     setNotice(null);
     setPassword("");
     setConfirmPassword("");
+    resetCaptcha();
   }
 
   async function handleSubmit(
@@ -136,10 +264,19 @@ export function EmailPasswordAuth() {
   ) {
     event.preventDefault();
 
+    if (
+      isSubmitting ||
+      !isAuthStateReady
+    ) {
+      return;
+    }
+
     setNotice(null);
 
     const normalizedEmail =
-      email.trim().toLowerCase();
+      email
+        .trim()
+        .toLowerCase();
 
     const normalizedName =
       displayName.trim();
@@ -147,6 +284,7 @@ export function EmailPasswordAuth() {
     if (!normalizedEmail) {
       setNotice({
         kind: "error",
+
         message:
           "Enter your email address.",
       });
@@ -154,7 +292,23 @@ export function EmailPasswordAuth() {
       return;
     }
 
-    if (isForgotPassword) {
+    if (
+      needsCaptcha &&
+      !captchaToken
+    ) {
+      setNotice({
+        kind: "error",
+
+        message:
+          "Complete the security check to continue.",
+      });
+
+      return;
+    }
+
+    if (
+      isForgotPassword
+    ) {
       setIsSubmitting(true);
 
       try {
@@ -164,17 +318,23 @@ export function EmailPasswordAuth() {
         const {
           error,
         } =
-          await client.auth.resetPasswordForEmail(
-            normalizedEmail,
-            {
-              redirectTo:
-                `${window.location.origin}/auth/callback?next=/reset-password`,
-            },
-          );
+          await client.auth
+            .resetPasswordForEmail(
+              normalizedEmail,
+              {
+                redirectTo:
+                  `${window.location.origin}/auth/callback?next=/reset-password`,
+
+                captchaToken:
+                  captchaToken ??
+                  undefined,
+              },
+            );
 
         if (error) {
           setNotice({
             kind: "error",
+
             message:
               "Mabojolu could not send the reset email. Please try again.",
           });
@@ -184,28 +344,21 @@ export function EmailPasswordAuth() {
 
         setNotice({
           kind: "success",
+
           message:
             "Check your email for a secure password-reset link.",
         });
       } catch {
         setNotice({
           kind: "error",
+
           message:
             "Mabojolu could not send the reset email. Please try again.",
         });
       } finally {
         setIsSubmitting(false);
+        resetCaptcha();
       }
-
-      return;
-    }
-
-    if (password.length < 8) {
-      setNotice({
-        kind: "error",
-        message:
-          "Your password must contain at least 8 characters.",
-      });
 
       return;
     }
@@ -216,6 +369,7 @@ export function EmailPasswordAuth() {
     ) {
       setNotice({
         kind: "error",
+
         message:
           "Enter your name.",
       });
@@ -224,11 +378,28 @@ export function EmailPasswordAuth() {
     }
 
     if (
-      isSignUp &&
-      password !== confirmPassword
+      !isAnonymousSignUp &&
+      password.length < 8
     ) {
       setNotice({
         kind: "error",
+
+        message:
+          "Your password must contain at least 8 characters.",
+      });
+
+      return;
+    }
+
+    if (
+      isSignUp &&
+      !isAnonymousSignUp &&
+      password !==
+        confirmPassword
+    ) {
+      setNotice({
+        kind: "error",
+
         message:
           "The passwords do not match.",
       });
@@ -242,31 +413,86 @@ export function EmailPasswordAuth() {
       const client =
         getSupabaseBrowserClient();
 
+      /**
+       * Upgrade the current anonymous identity rather than creating a separate
+       * account. This keeps the same user ID and therefore preserves the
+       * visitor's Mabojolu conversations.
+       */
+      if (
+        isAnonymousSignUp
+      ) {
+        const {
+          error,
+        } =
+          await client.auth
+            .updateUser(
+              {
+                email:
+                  normalizedEmail,
+
+                data: {
+                  display_name:
+                    normalizedName,
+                },
+              },
+              {
+                emailRedirectTo:
+                  `${window.location.origin}/auth/callback?next=/reset-password`,
+              },
+            );
+
+        if (error) {
+          setNotice({
+            kind: "error",
+
+            message:
+              error.message,
+          });
+
+          return;
+        }
+
+        setNotice({
+          kind: "success",
+
+          message:
+            "Check your email and verify your address. You will then create a password without losing your Mabojolu conversations.",
+        });
+
+        return;
+      }
+
       if (isSignUp) {
         const {
           data,
           error,
         } =
-          await client.auth.signUp({
-            email:
-              normalizedEmail,
+          await client.auth
+            .signUp({
+              email:
+                normalizedEmail,
 
-            password,
+              password,
 
-            options: {
-              data: {
-                display_name:
-                  normalizedName,
+              options: {
+                data: {
+                  display_name:
+                    normalizedName,
+                },
+
+                emailRedirectTo:
+                  `${window.location.origin}/auth/callback?next=/`,
+
+                captchaToken:
+                  captchaToken ??
+                  undefined,
               },
-
-              emailRedirectTo:
-                `${window.location.origin}/auth/callback?next=/`,
-            },
-          });
+            });
 
         if (error) {
           setNotice({
             kind: "error",
+
             message:
               error.message,
           });
@@ -275,7 +501,10 @@ export function EmailPasswordAuth() {
         }
 
         if (data.session) {
-          window.location.assign("/");
+          window.location.assign(
+            "/",
+          );
+
           return;
         }
 
@@ -284,6 +513,7 @@ export function EmailPasswordAuth() {
 
         setNotice({
           kind: "success",
+
           message:
             "Account created. Check your email and confirm your address before signing in.",
         });
@@ -294,16 +524,24 @@ export function EmailPasswordAuth() {
       const {
         error,
       } =
-        await client.auth.signInWithPassword({
-          email:
-            normalizedEmail,
+        await client.auth
+          .signInWithPassword({
+            email:
+              normalizedEmail,
 
-          password,
-        });
+            password,
+
+            options: {
+              captchaToken:
+                captchaToken ??
+                undefined,
+            },
+          });
 
       if (error) {
         setNotice({
           kind: "error",
+
           message:
             "The email or password is incorrect.",
         });
@@ -311,15 +549,19 @@ export function EmailPasswordAuth() {
         return;
       }
 
-      window.location.assign("/");
+      window.location.assign(
+        "/",
+      );
     } catch {
       setNotice({
         kind: "error",
+
         message:
           "Mabojolu could not complete authentication. Please try again.",
       });
     } finally {
       setIsSubmitting(false);
+      resetCaptcha();
     }
   }
 
@@ -335,13 +577,17 @@ export function EmailPasswordAuth() {
             type="button"
             role="tab"
             aria-selected={
-              mode === "sign-in"
+              mode ===
+              "sign-in"
             }
             onClick={() =>
-              changeMode("sign-in")
+              changeMode(
+                "sign-in",
+              )
             }
             className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              mode === "sign-in"
+              mode ===
+              "sign-in"
                 ? "bg-surface-raised text-text-primary shadow-sm"
                 : "text-text-muted hover:text-text-primary"
             }`}
@@ -353,13 +599,17 @@ export function EmailPasswordAuth() {
             type="button"
             role="tab"
             aria-selected={
-              mode === "sign-up"
+              mode ===
+              "sign-up"
             }
             onClick={() =>
-              changeMode("sign-up")
+              changeMode(
+                "sign-up",
+              )
             }
             className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
-              mode === "sign-up"
+              mode ===
+              "sign-up"
                 ? "bg-surface-raised text-text-primary shadow-sm"
                 : "text-text-muted hover:text-text-primary"
             }`}
@@ -373,22 +623,28 @@ export function EmailPasswordAuth() {
         <h2 className="text-lg font-semibold text-text-primary">
           {isForgotPassword
             ? "Reset your password"
-            : isSignUp
-              ? "Create your Mabojolu account"
-              : "Welcome back"}
+            : isAnonymousSignUp
+              ? "Save your Mabojolu conversations"
+              : isSignUp
+                ? "Create your Mabojolu account"
+                : "Welcome back"}
         </h2>
 
         <p className="mt-1 text-sm leading-5 text-text-secondary">
           {isForgotPassword
             ? "Enter your account email and we will send you a secure reset link."
-            : isSignUp
-              ? "Create an account to save and revisit your conversations."
-              : "Sign in to continue your conversations."}
+            : isAnonymousSignUp
+              ? "Add your email to keep this guest account. After verification, you will create a password."
+              : isSignUp
+                ? "Create an account to save and revisit your conversations."
+                : "Sign in to continue your conversations."}
         </p>
       </div>
 
       <form
-        onSubmit={handleSubmit}
+        onSubmit={
+          handleSubmit
+        }
         className="space-y-4"
       >
         {isSignUp ? (
@@ -403,15 +659,23 @@ export function EmailPasswordAuth() {
             <input
               id="display-name"
               type="text"
-              value={displayName}
-              onChange={(event) =>
+              value={
+                displayName
+              }
+              onChange={(
+                event,
+              ) =>
                 setDisplayName(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               autoComplete="name"
               required
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                !isAuthStateReady
+              }
               placeholder="Your name"
               className="h-11 w-full rounded-xl border border-border-default bg-surface-base px-3.5 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-text-muted focus:ring-2 focus:ring-text-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
@@ -430,20 +694,27 @@ export function EmailPasswordAuth() {
             id="email"
             type="email"
             value={email}
-            onChange={(event) =>
+            onChange={(
+              event,
+            ) =>
               setEmail(
-                event.target.value,
+                event.target
+                  .value,
               )
             }
             autoComplete="email"
             required
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting ||
+              !isAuthStateReady
+            }
             placeholder="you@example.com"
             className="h-11 w-full rounded-xl border border-border-default bg-surface-base px-3.5 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-text-muted focus:ring-2 focus:ring-text-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
           />
         </div>
 
-        {!isForgotPassword ? (
+        {!isForgotPassword &&
+        !isAnonymousSignUp ? (
           <div>
             <div className="mb-1.5 flex items-center justify-between gap-3">
               <label
@@ -456,7 +727,9 @@ export function EmailPasswordAuth() {
               {!isSignUp ? (
                 <button
                   type="button"
-                  disabled={isSubmitting}
+                  disabled={
+                    isSubmitting
+                  }
                   onClick={() =>
                     changeMode(
                       "forgot-password",
@@ -472,10 +745,15 @@ export function EmailPasswordAuth() {
             <input
               id="password"
               type="password"
-              value={password}
-              onChange={(event) =>
+              value={
+                password
+              }
+              onChange={(
+                event,
+              ) =>
                 setPassword(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               autoComplete={
@@ -485,14 +763,18 @@ export function EmailPasswordAuth() {
               }
               required
               minLength={8}
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                !isAuthStateReady
+              }
               placeholder="At least 8 characters"
               className="h-11 w-full rounded-xl border border-border-default bg-surface-base px-3.5 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-text-muted focus:ring-2 focus:ring-text-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         ) : null}
 
-        {isSignUp ? (
+        {isSignUp &&
+        !isAnonymousSignUp ? (
           <div>
             <label
               htmlFor="confirm-password"
@@ -504,31 +786,53 @@ export function EmailPasswordAuth() {
             <input
               id="confirm-password"
               type="password"
-              value={confirmPassword}
-              onChange={(event) =>
+              value={
+                confirmPassword
+              }
+              onChange={(
+                event,
+              ) =>
                 setConfirmPassword(
-                  event.target.value,
+                  event.target
+                    .value,
                 )
               }
               autoComplete="new-password"
               required
               minLength={8}
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                !isAuthStateReady
+              }
               placeholder="Enter your password again"
               className="h-11 w-full rounded-xl border border-border-default bg-surface-base px-3.5 text-sm text-text-primary outline-none transition placeholder:text-text-muted focus:border-text-muted focus:ring-2 focus:ring-text-primary/10 disabled:cursor-not-allowed disabled:opacity-60"
             />
           </div>
         ) : null}
 
+        {needsCaptcha ? (
+          <TurnstileWidget
+            key={
+              captchaEpoch
+            }
+            onTokenChange={
+              handleCaptchaTokenChange
+            }
+            className="flex min-h-[65px] items-center justify-center"
+          />
+        ) : null}
+
         {notice ? (
           <div
             role={
-              notice.kind === "error"
+              notice.kind ===
+              "error"
                 ? "alert"
                 : "status"
             }
             className={`rounded-xl border px-3.5 py-3 text-sm leading-5 ${
-              notice.kind === "error"
+              notice.kind ===
+              "error"
                 ? "border-danger/20 bg-danger-subtle text-text-primary"
                 : "border-border-default bg-surface-base text-text-secondary"
             }`}
@@ -539,7 +843,14 @@ export function EmailPasswordAuth() {
 
         <button
           type="submit"
-          disabled={isSubmitting}
+          disabled={
+            isSubmitting ||
+            !isAuthStateReady ||
+            (
+              needsCaptcha &&
+              !captchaToken
+            )
+          }
           className="inline-flex h-11 w-full items-center justify-center rounded-xl bg-surface-inverse px-4 text-sm font-semibold text-text-inverse transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
         >
           {submitLabel}
@@ -550,9 +861,13 @@ export function EmailPasswordAuth() {
         {isForgotPassword ? (
           <button
             type="button"
-            disabled={isSubmitting}
+            disabled={
+              isSubmitting
+            }
             onClick={() =>
-              changeMode("sign-in")
+              changeMode(
+                "sign-in",
+              )
             }
             className="font-semibold text-text-primary underline-offset-4 hover:underline disabled:opacity-50"
           >
@@ -566,7 +881,9 @@ export function EmailPasswordAuth() {
 
             <button
               type="button"
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting
+              }
               onClick={() =>
                 changeMode(
                   isSignUp

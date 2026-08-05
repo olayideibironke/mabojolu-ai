@@ -32,6 +32,7 @@ import { Message } from "./message";
 
 interface ChatShellProps {
   isSignedIn: boolean;
+  isGuest?: boolean;
   userEmail?: string;
   isAdmin?: boolean;
   persistenceKind: "local" | "supabase";
@@ -146,6 +147,7 @@ function saveModelPreference(
 
 export function ChatShell({
   isSignedIn,
+  isGuest = false,
   userEmail,
   isAdmin = false,
   persistenceKind,
@@ -683,7 +685,20 @@ export function ChatShell({
               New chat
             </Button>
 
-            {isSignedIn ? (
+            {isGuest ? (
+              <>
+                <span className="hidden text-xs font-medium text-text-muted sm:inline">
+                  Guest
+                </span>
+
+                <Link
+                  href="/sign-in"
+                  className="inline-flex h-8 shrink-0 items-center justify-center rounded-xl bg-surface-inverse px-3 text-xs font-medium text-text-inverse transition-opacity hover:opacity-90"
+                >
+                  Save chats
+                </Link>
+              </>
+            ) : isSignedIn ? (
               <span className="hidden max-w-[16ch] truncate text-xs text-text-muted sm:inline">
                 {userEmail}
               </span>

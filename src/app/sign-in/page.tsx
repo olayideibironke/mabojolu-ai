@@ -14,22 +14,36 @@ export const metadata: Metadata = {
 /**
  * Mabojolu authentication page.
  *
+ * Registered users and administrators are redirected home because they already
+ * have permanent accounts.
+ *
+ * Anonymous guests are intentionally allowed to stay on this page so they can
+ * upgrade the current guest identity without losing conversations, usage
+ * history, or future billing records connected to that user ID.
+ *
  * The active authentication mode is selected on the server so development-only
  * authentication code is never rendered in the production Supabase flow.
  */
 export default async function SignInPage() {
   const session = await getSession();
 
-  if (session) {
+  if (
+    session &&
+    !session.isAnonymous
+  ) {
     redirect("/");
   }
 
-  const envResult = inspectServerEnv();
+  const envResult =
+    inspectServerEnv();
 
   const authMode =
     envResult.ok
       ? envResult.env.AUTH_MODE
       : "dev";
+
+  const isGuest =
+    session?.isAnonymous === true;
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-surface-base px-4 py-10">
@@ -40,11 +54,15 @@ export default async function SignInPage() {
           </div>
 
           <h1 className="text-2xl font-semibold tracking-[-0.02em] text-text-primary">
-            Welcome to Mabojolu
+            {isGuest
+              ? "Keep your Mabojolu conversations"
+              : "Welcome to Mabojolu"}
           </h1>
 
           <p className="mt-2 text-sm text-text-secondary">
-            Sign in or create your account
+            {isGuest
+              ? "Create an account or sign in to continue"
+              : "Sign in or create your account"}
           </p>
         </div>
 

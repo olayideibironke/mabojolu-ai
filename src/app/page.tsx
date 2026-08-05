@@ -1,30 +1,63 @@
+import { GuestSessionBootstrap } from "@/components/auth/guest-session-bootstrap";
 import { ChatShell } from "@/components/chat/chat-shell";
 import { getSession } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database";
+import { inspectServerEnv } from "@/lib/env";
 
 /**
- * Chat home.
+ * Mabojolu chat home.
  *
- * A Server Component that resolves the session on the server and passes the result
- * into one Client Component boundary. Reading identity here rather than in the
- * browser means the page never renders as though signed in before a check
- * completes, and admin status is decided from the database rather than from
- * anything the client could assert.
+ * Identity is resolved on the server so the browser cannot decide whether a
+ * visitor is a guest, registered user, or administrator.
  *
- * Not redirected when signed out: the interface stays visible and explains that
- * signing in is needed, which is friendlier than bouncing a first-time visitor
- * straight to a form.
+ * In Supabase mode, a completely signed-out visitor receives an anonymous
+ * session automatically. The page then reloads with a secure guest identity
+ * that can own conversations and usage records.
  */
 export default async function HomePage() {
-  const session = await getSession();
-  const database = getDatabase();
+  const session =
+    await getSession();
+
+  const database =
+    getDatabase();
+
+  const envResult =
+    inspectServerEnv();
+
+  const shouldBootstrapGuest =
+    session === null &&
+    envResult.ok &&
+    envResult.env.AUTH_MODE ===
+      "supabase";
 
   return (
-    <ChatShell
-      isSignedIn={session !== null}
-      userEmail={session?.email}
-      isAdmin={session?.profile.role === "admin"}
-      persistenceKind={database.kind}
-    />
+    <>
+      <GuestSessionBootstrap
+        enabled={
+          shouldBootstrapGuest
+        }
+      />
+
+      <ChatShell
+        isSignedIn={
+          session !== null
+        }
+        isGuest={
+          session?.isAnonymous ===
+          true
+        }
+        userEmail={
+          session?.email ||
+          undefined
+        }
+        isAdmin={
+          session?.profile.role ===
+          "admin"
+        }
+        persistenceKind={
+          database.kind
+        }
+      />
+    </>
   );
 }

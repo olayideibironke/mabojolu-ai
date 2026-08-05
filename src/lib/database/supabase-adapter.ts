@@ -21,7 +21,6 @@ import type {
   AttachmentInput,
   AttachmentRecord,
   CreateConversationInput,
-  DatabaseAdapter,
   Profile,
   SafetyEventInput,
   UsageEventInput,
@@ -49,7 +48,7 @@ import type {
  *
  * Not yet verified against a live project: see docs/KNOWN_LIMITATIONS.md.
  */
-export class SupabaseDatabaseAdapter implements DatabaseAdapter {
+export class SupabaseDatabaseAdapter {
   readonly kind = "supabase" as const;
 
   isReady(): boolean {

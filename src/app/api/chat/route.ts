@@ -292,7 +292,8 @@ export async function POST(
       );
     }
 
-    const body = parsed.data;
+    const body =
+      parsed.data;
 
     const lastMessage =
       body.messages.at(-1);
@@ -328,11 +329,15 @@ export async function POST(
     }
 
     /**
-     * Sustained usage, spend, maintenance, and concurrency limits.
+     * Sustained usage, identity allowances, spending, maintenance, and
+     * concurrency limits.
+     *
+     * The full server-resolved session is passed so the limiter can distinguish
+     * an anonymous guest, a registered user, and the Westforge administrator.
      */
     const usageDecision =
       await checkUsageLimits(
-        session.userId,
+        session,
       );
 
     if (
@@ -382,6 +387,7 @@ export async function POST(
           {
             userId:
               session.userId,
+
             title:
               generateConversationTitle(
                 titleSource,
@@ -397,13 +403,14 @@ export async function POST(
      * Persist the user turn before starting generation.
      *
      * Raw image data is intentionally not written into the message database.
-     * It remains in the current request and is passed directly to the local
-     * vision model. This prevents multi-megabyte base64 strings from bloating
-     * ordinary conversation records.
+     * It remains in the current request and is passed directly to the vision
+     * model. This prevents multi-megabyte base64 strings from bloating ordinary
+     * conversation records.
      */
     await database.appendMessage({
       conversationId,
-      userId: session.userId,
+      userId:
+        session.userId,
       role: "user",
       content:
         normalizedLastContent,
@@ -427,13 +434,20 @@ export async function POST(
             );
 
           return {
-            id: message.id,
-            role: message.role,
+            id:
+              message.id,
+
+            role:
+              message.role,
+
             content:
               normalizedMessageContent(
                 message,
               ),
-            status: "complete",
+
+            status:
+              "complete",
+
             createdAt:
               message.createdAt ??
               new Date().toISOString(),
@@ -450,9 +464,13 @@ export async function POST(
     const generation =
       startGeneration({
         messages,
+
         modelId:
           body.modelId,
-        signal: request.signal,
+
+        signal:
+          request.signal,
+
         idempotencyKey:
           body.idempotencyKey,
       });
@@ -460,8 +478,10 @@ export async function POST(
     const requestHasImages =
       messages.some(
         (message) =>
-          (message.attachments
-            ?.length ?? 0) > 0,
+          (
+            message.attachments
+              ?.length ?? 0
+          ) > 0,
       );
 
     if (
@@ -487,12 +507,22 @@ export async function POST(
     const assistantMessage =
       await database.appendMessage({
         conversationId,
-        userId: session.userId,
-        role: "assistant",
-        content: "",
-        status: "streaming",
+
+        userId:
+          session.userId,
+
+        role:
+          "assistant",
+
+        content:
+          "",
+
+        status:
+          "streaming",
+
         model:
           generation.model.id,
+
         promptVersion:
           generation.promptVersion,
 
@@ -560,7 +590,9 @@ export async function POST(
             assistantMessage.id,
             session.userId,
             {
-              content: text,
+              content:
+                text,
+
               status,
 
               ...(usage
@@ -656,14 +688,21 @@ export async function POST(
     releaseGeneration?.();
 
     const error =
-      normalizeError(cause);
+      normalizeError(
+        cause,
+      );
 
-    logChatError(error, {
-      route:
-        "POST /api/chat",
-    });
+    logChatError(
+      error,
+      {
+        route:
+          "POST /api/chat",
+      },
+    );
 
-    return errorResponse(error);
+    return errorResponse(
+      error,
+    );
   }
 }
 
@@ -681,17 +720,20 @@ export function GET(): Response {
         message:
           "This endpoint accepts POST requests only.",
 
-        retryable: false,
+        retryable:
+          false,
       },
     }),
     {
-      status: 405,
+      status:
+        405,
 
       headers: {
         "Content-Type":
           "application/json",
 
-        Allow: "POST",
+        Allow:
+          "POST",
       },
     },
   );

@@ -1,5 +1,11 @@
 import "server-only";
 
+/*
+ * Adds the secure billing methods to SupabaseDatabaseAdapter before the
+ * database factory creates an adapter instance.
+ */
+import "./supabase-billing";
+
 import { inspectServerEnv } from "@/lib/env";
 
 import { LocalDatabaseAdapter } from "./local-adapter";
@@ -9,37 +15,50 @@ import type { DatabaseAdapter } from "./types";
 /**
  * Adapter selection.
  *
- * The one place that decides which backend is in use. Every caller depends on the
- * `DatabaseAdapter` interface, so switching backends is an environment change
- * rather than a code change.
+ * This is the single place that decides which persistence backend Mabojolu
+ * uses. Every caller depends on DatabaseAdapter, so changing backends remains
+ * an environment configuration decision rather than an application rewrite.
  */
 
-let cached: DatabaseAdapter | null = null;
+let cached: DatabaseAdapter | null =
+  null;
 
 export function getDatabase(): DatabaseAdapter {
   if (cached) {
     return cached;
   }
 
-  const envResult = inspectServerEnv();
+  const envResult =
+    inspectServerEnv();
 
-  // An invalid environment falls back to local rather than throwing, so a
-  // misconfiguration surfaces as a clear error from the route that needs
-  // Supabase instead of breaking unrelated pages. Production cannot reach this
-  // path: env validation rejects `PERSISTENCE=local` there.
-  const persistence = envResult.ok ? envResult.env.PERSISTENCE : "local";
+  /*
+   * An invalid local environment falls back to local persistence rather than
+   * crashing unrelated pages. Production environment validation prevents local
+   * persistence from being selected there.
+   */
+  const persistence =
+    envResult.ok
+      ? envResult.env.PERSISTENCE
+      : "local";
 
-  cached =
+  const database: DatabaseAdapter =
     persistence === "supabase"
       ? new SupabaseDatabaseAdapter()
       : new LocalDatabaseAdapter();
 
-  return cached;
+  cached = database;
+
+  return database;
 }
 
-/** Test-only: clear the memoized adapter so a suite can vary the environment. */
+/**
+ * Test-only helper that permits a test suite to change environment settings
+ * between cases.
+ */
 export function resetDatabaseCache(): void {
   cached = null;
 }
 
-export type { DatabaseAdapter } from "./types";
+export type {
+  DatabaseAdapter,
+} from "./types";

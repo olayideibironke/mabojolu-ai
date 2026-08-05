@@ -14,14 +14,20 @@ import type {
 } from "@/types/chat";
 
 import type {
+  AddPrepaidCreditInput,
   AdminMetrics,
   AppendMessageInput,
   AttachmentInput,
   AttachmentRecord,
+  BillingAccount,
+  BillingUsageReservation,
   CreateConversationInput,
   DatabaseAdapter,
   Profile,
+  ReserveBillingUsageInput,
   SafetyEventInput,
+  SettleBillingUsageInput,
+  UpdateBillingSubscriptionInput,
   UsageEventInput,
 } from "./types";
 
@@ -87,6 +93,14 @@ interface StoredAttachment extends AttachmentRecord {
   userId: string;
 }
 
+interface StoredBillingCreditEvent {
+  id: string;
+  userId: string;
+  externalReference: string;
+  amountMicros: number;
+  createdAt: string;
+}
+
 interface Database {
   version: 1;
   profiles: Profile[];
@@ -95,6 +109,9 @@ interface Database {
   usageEvents: StoredUsageEvent[];
   safetyEvents: StoredSafetyEvent[];
   attachments: StoredAttachment[];
+  billingAccounts: BillingAccount[];
+  billingReservations: BillingUsageReservation[];
+  billingCreditEvents: StoredBillingCreditEvent[];
   nextSequence: number;
 }
 
@@ -107,6 +124,9 @@ function emptyDatabase(): Database {
     usageEvents: [],
     safetyEvents: [],
     attachments: [],
+    billingAccounts: [],
+    billingReservations: [],
+    billingCreditEvents: [],
     nextSequence: 1,
   };
 }
@@ -180,6 +200,15 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
         ...attachment,
         messageId: attachment.messageId ?? null,
       }));
+
+      /*
+       * Billing collections were added after the original local schema. Keep
+       * existing development data intact by normalizing missing arrays instead
+       * of bumping the file version and discarding the store.
+       */
+      parsed.billingAccounts ??= [];
+      parsed.billingReservations ??= [];
+      parsed.billingCreditEvents ??= [];
 
       this.cache = parsed;
     } catch {
@@ -784,6 +813,555 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     );
   }
 
+
+  // --- Billing ------------------------------------------------------------
+
+  async getBillingAccount(
+    userId: string,
+  ): Promise<BillingAccount | null> {
+    return this.run((db) => {
+      const account =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId === userId,
+        );
+
+      return account
+        ? cloneBillingAccount(account)
+        : null;
+    });
+  }
+
+  async ensureBillingAccount(
+    userId: string,
+  ): Promise<BillingAccount> {
+    return this.run(async (db) => {
+      const existing =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId === userId,
+        );
+
+      if (existing) {
+        return cloneBillingAccount(
+          existing,
+        );
+      }
+
+      if (
+        !db.profiles.some(
+          (profile) =>
+            profile.id === userId,
+        )
+      ) {
+        throw new Error(
+          "Profile not found for this user.",
+        );
+      }
+
+      const account =
+        createBillingAccount(
+          userId,
+        );
+
+      db.billingAccounts.push(
+        account,
+      );
+
+      await this.persist(db);
+
+      return cloneBillingAccount(
+        account,
+      );
+    });
+  }
+
+  async reserveBillingUsage(
+    input: ReserveBillingUsageInput,
+  ): Promise<BillingUsageReservation | null> {
+    assertPositiveMicros(
+      input.amountMicros,
+      "Reservation amount",
+    );
+
+    return this.run(async (db) => {
+      const existingReservation =
+        db.billingReservations.find(
+          (reservation) =>
+            reservation.id === input.id,
+        );
+
+      if (existingReservation) {
+        if (
+          existingReservation.userId !==
+          input.userId
+        ) {
+          throw new Error(
+            "Billing reservation identifier is already in use.",
+          );
+        }
+
+        return cloneBillingReservation(
+          existingReservation,
+        );
+      }
+
+      const account =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId ===
+            input.userId,
+        );
+
+      if (!account) {
+        return null;
+      }
+
+      const now =
+        new Date();
+
+      const availableSubscriptionMicros =
+        hasActiveSubscription(
+          account,
+          now,
+        )
+          ? Math.max(
+              0,
+              account.includedUsageMicros -
+                account.usedUsageMicros,
+            )
+          : 0;
+
+      let fundingSource:
+        | BillingUsageReservation["fundingSource"]
+        | null = null;
+
+      if (
+        availableSubscriptionMicros >=
+        input.amountMicros
+      ) {
+        account.usedUsageMicros =
+          checkedAddMicros(
+            account.usedUsageMicros,
+            input.amountMicros,
+            "Subscription usage",
+          );
+
+        fundingSource =
+          "subscription";
+      } else if (
+        account.prepaidBalanceMicros >=
+        input.amountMicros
+      ) {
+        account.prepaidBalanceMicros -=
+          input.amountMicros;
+
+        fundingSource =
+          "prepaid";
+      }
+
+      if (!fundingSource) {
+        return null;
+      }
+
+      const nowIso =
+        now.toISOString();
+
+      const reservation:
+        BillingUsageReservation = {
+          id: input.id,
+          userId: input.userId,
+          conversationId:
+            input.conversationId,
+          modelId: input.modelId,
+          fundingSource,
+          reservedMicros:
+            input.amountMicros,
+          actualMicros: null,
+          status: "reserved",
+          createdAt: nowIso,
+          settledAt: null,
+        };
+
+      account.updatedAt =
+        nowIso;
+
+      db.billingReservations.push(
+        reservation,
+      );
+
+      await this.persist(db);
+
+      return cloneBillingReservation(
+        reservation,
+      );
+    });
+  }
+
+  async settleBillingUsage(
+    input: SettleBillingUsageInput,
+  ): Promise<boolean> {
+    assertNonnegativeMicros(
+      input.actualMicros,
+      "Actual usage",
+    );
+
+    return this.run(async (db) => {
+      const reservation =
+        db.billingReservations.find(
+          (candidate) =>
+            candidate.id ===
+              input.reservationId &&
+            candidate.userId ===
+              input.userId,
+        );
+
+      if (!reservation) {
+        return false;
+      }
+
+      if (
+        reservation.status ===
+        "settled"
+      ) {
+        return (
+          reservation.actualMicros ===
+          input.actualMicros
+        );
+      }
+
+      if (
+        reservation.status !==
+        "reserved" ||
+        input.actualMicros >
+          reservation.reservedMicros
+      ) {
+        return false;
+      }
+
+      const account =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId ===
+            input.userId,
+        );
+
+      if (!account) {
+        return false;
+      }
+
+      const refundMicros =
+        reservation.reservedMicros -
+        input.actualMicros;
+
+      refundReservation(
+        account,
+        reservation,
+        refundMicros,
+      );
+
+      const nowIso =
+        new Date().toISOString();
+
+      reservation.actualMicros =
+        input.actualMicros;
+
+      reservation.status =
+        "settled";
+
+      reservation.settledAt =
+        nowIso;
+
+      account.updatedAt =
+        nowIso;
+
+      await this.persist(db);
+
+      return true;
+    });
+  }
+
+  async releaseBillingUsage(
+    reservationId: string,
+    userId: string,
+  ): Promise<boolean> {
+    return this.run(async (db) => {
+      const reservation =
+        db.billingReservations.find(
+          (candidate) =>
+            candidate.id ===
+              reservationId &&
+            candidate.userId ===
+              userId,
+        );
+
+      if (!reservation) {
+        return false;
+      }
+
+      if (
+        reservation.status ===
+        "released"
+      ) {
+        return true;
+      }
+
+      if (
+        reservation.status !==
+        "reserved"
+      ) {
+        return false;
+      }
+
+      const account =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId ===
+            userId,
+        );
+
+      if (!account) {
+        return false;
+      }
+
+      refundReservation(
+        account,
+        reservation,
+        reservation.reservedMicros,
+      );
+
+      const nowIso =
+        new Date().toISOString();
+
+      reservation.status =
+        "released";
+
+      reservation.actualMicros =
+        0;
+
+      reservation.settledAt =
+        nowIso;
+
+      account.updatedAt =
+        nowIso;
+
+      await this.persist(db);
+
+      return true;
+    });
+  }
+
+  async updateBillingSubscription(
+    input: UpdateBillingSubscriptionInput,
+  ): Promise<BillingAccount> {
+    assertNonnegativeMicros(
+      input.includedUsageMicros,
+      "Included usage",
+    );
+
+    return this.run(async (db) => {
+      let account =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId ===
+            input.userId,
+        );
+
+      if (!account) {
+        if (
+          !db.profiles.some(
+            (profile) =>
+              profile.id ===
+              input.userId,
+          )
+        ) {
+          throw new Error(
+            "Profile not found for this user.",
+          );
+        }
+
+        account =
+          createBillingAccount(
+            input.userId,
+          );
+
+        db.billingAccounts.push(
+          account,
+        );
+      }
+
+      account.planId =
+        input.planId;
+
+      account.subscriptionStatus =
+        input.subscriptionStatus;
+
+      if (
+        input.stripeCustomerId !==
+        undefined
+      ) {
+        account.stripeCustomerId =
+          input.stripeCustomerId;
+      }
+
+      if (
+        input.stripeSubscriptionId !==
+        undefined
+      ) {
+        account.stripeSubscriptionId =
+          input.stripeSubscriptionId;
+      }
+
+      if (
+        input.currentPeriodStart !==
+        undefined
+      ) {
+        account.currentPeriodStart =
+          input.currentPeriodStart;
+      }
+
+      if (
+        input.currentPeriodEnd !==
+        undefined
+      ) {
+        account.currentPeriodEnd =
+          input.currentPeriodEnd;
+      }
+
+      account.includedUsageMicros =
+        input.includedUsageMicros;
+
+      if (
+        input.resetPeriodUsage
+      ) {
+        account.usedUsageMicros =
+          0;
+      }
+
+      account.updatedAt =
+        new Date().toISOString();
+
+      await this.persist(db);
+
+      return cloneBillingAccount(
+        account,
+      );
+    });
+  }
+
+  async addPrepaidCredit(
+    input: AddPrepaidCreditInput,
+  ): Promise<BillingAccount> {
+    assertPositiveMicros(
+      input.amountMicros,
+      "Prepaid credit",
+    );
+
+    const externalReference =
+      input.externalReference.trim();
+
+    if (!externalReference) {
+      throw new Error(
+        "A payment reference is required.",
+      );
+    }
+
+    return this.run(async (db) => {
+      const existingCredit =
+        db.billingCreditEvents.find(
+          (event) =>
+            event.externalReference ===
+            externalReference,
+        );
+
+      if (existingCredit) {
+        if (
+          existingCredit.userId !==
+          input.userId
+        ) {
+          throw new Error(
+            "Payment reference is already associated with another user.",
+          );
+        }
+
+        const existingAccount =
+          db.billingAccounts.find(
+            (candidate) =>
+              candidate.userId ===
+              input.userId,
+          );
+
+        if (!existingAccount) {
+          throw new Error(
+            "Billing account not found for an existing payment.",
+          );
+        }
+
+        return cloneBillingAccount(
+          existingAccount,
+        );
+      }
+
+      let account =
+        db.billingAccounts.find(
+          (candidate) =>
+            candidate.userId ===
+            input.userId,
+        );
+
+      if (!account) {
+        if (
+          !db.profiles.some(
+            (profile) =>
+              profile.id ===
+              input.userId,
+          )
+        ) {
+          throw new Error(
+            "Profile not found for this user.",
+          );
+        }
+
+        account =
+          createBillingAccount(
+            input.userId,
+          );
+
+        db.billingAccounts.push(
+          account,
+        );
+      }
+
+      account.prepaidBalanceMicros =
+        checkedAddMicros(
+          account.prepaidBalanceMicros,
+          input.amountMicros,
+          "Prepaid balance",
+        );
+
+      const nowIso =
+        new Date().toISOString();
+
+      account.updatedAt =
+        nowIso;
+
+      db.billingCreditEvents.push({
+        id: randomUUID(),
+        userId: input.userId,
+        externalReference,
+        amountMicros:
+          input.amountMicros,
+        createdAt: nowIso,
+      });
+
+      await this.persist(db);
+
+      return cloneBillingAccount(
+        account,
+      );
+    });
+  }
+
   // --- Attachments --------------------------------------------------------
 
   async createAttachment(
@@ -1126,6 +1704,27 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
             row.id !== userId,
         );
 
+      db.billingAccounts =
+        db.billingAccounts.filter(
+          (account) =>
+            account.userId !==
+            userId,
+        );
+
+      db.billingReservations =
+        db.billingReservations.filter(
+          (reservation) =>
+            reservation.userId !==
+            userId,
+        );
+
+      db.billingCreditEvents =
+        db.billingCreditEvents.filter(
+          (event) =>
+            event.userId !==
+            userId,
+        );
+
       // Usage events are retained but unlinked, so aggregate cost reporting
       // survives an account deletion without keeping personal data.
       db.usageEvents =
@@ -1154,6 +1753,168 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       await this.persist(db);
     });
   }
+}
+
+
+function createBillingAccount(
+  userId: string,
+): BillingAccount {
+  const now =
+    new Date().toISOString();
+
+  return {
+    userId,
+    planId: "none",
+    subscriptionStatus:
+      "none",
+    stripeCustomerId: null,
+    stripeSubscriptionId: null,
+    currentPeriodStart: null,
+    currentPeriodEnd: null,
+    includedUsageMicros: 0,
+    usedUsageMicros: 0,
+    prepaidBalanceMicros: 0,
+    createdAt: now,
+    updatedAt: now,
+  };
+}
+
+function cloneBillingAccount(
+  account: BillingAccount,
+): BillingAccount {
+  return {
+    ...account,
+  };
+}
+
+function cloneBillingReservation(
+  reservation: BillingUsageReservation,
+): BillingUsageReservation {
+  return {
+    ...reservation,
+  };
+}
+
+function hasActiveSubscription(
+  account: BillingAccount,
+  now: Date,
+): boolean {
+  if (
+    account.subscriptionStatus !==
+      "active" &&
+    account.subscriptionStatus !==
+      "trialing"
+  ) {
+    return false;
+  }
+
+  if (
+    !account.currentPeriodEnd
+  ) {
+    return true;
+  }
+
+  const periodEnd =
+    Date.parse(
+      account.currentPeriodEnd,
+    );
+
+  return (
+    Number.isFinite(periodEnd) &&
+    periodEnd > now.getTime()
+  );
+}
+
+function refundReservation(
+  account: BillingAccount,
+  reservation: BillingUsageReservation,
+  amountMicros: number,
+): void {
+  if (amountMicros <= 0) {
+    return;
+  }
+
+  if (
+    reservation.fundingSource ===
+    "subscription"
+  ) {
+    account.usedUsageMicros =
+      Math.max(
+        0,
+        account.usedUsageMicros -
+          amountMicros,
+      );
+
+    return;
+  }
+
+  account.prepaidBalanceMicros =
+    checkedAddMicros(
+      account.prepaidBalanceMicros,
+      amountMicros,
+      "Prepaid balance",
+    );
+}
+
+function assertPositiveMicros(
+  value: number,
+  label: string,
+): void {
+  assertNonnegativeMicros(
+    value,
+    label,
+  );
+
+  if (value === 0) {
+    throw new Error(
+      `${label} must be greater than zero.`,
+    );
+  }
+}
+
+function assertNonnegativeMicros(
+  value: number,
+  label: string,
+): void {
+  if (
+    !Number.isSafeInteger(value) ||
+    value < 0
+  ) {
+    throw new Error(
+      `${label} must be a nonnegative integer number of microdollars.`,
+    );
+  }
+}
+
+function checkedAddMicros(
+  current: number,
+  amount: number,
+  label: string,
+): number {
+  assertNonnegativeMicros(
+    current,
+    label,
+  );
+
+  assertNonnegativeMicros(
+    amount,
+    label,
+  );
+
+  const result =
+    current + amount;
+
+  if (
+    !Number.isSafeInteger(
+      result,
+    )
+  ) {
+    throw new Error(
+      `${label} exceeds the supported maximum.`,
+    );
+  }
+
+  return result;
 }
 
 function toConversation(

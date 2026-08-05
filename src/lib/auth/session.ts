@@ -3,39 +3,60 @@ import "server-only";
 import { cookies } from "next/headers";
 
 import { getDatabase } from "@/lib/database";
-import { inspectServerEnv } from "@/lib/env";
 import type { Profile } from "@/lib/database/types";
+import { inspectServerEnv } from "@/lib/env";
 
 /**
  * Server-side session resolution.
  *
- * Every protected route and page resolves identity here. Two modes:
+ * Every protected route and page resolves identity here.
  *
- *   supabase  The real path. The session comes from a Supabase-issued cookie and
- *             is verified against the auth server.
- *   dev       A local stand-in so ownership boundaries and per-user behaviour are
- *             genuinely exercisable without an auth provider.
+ * supabase:
+ * Real registered accounts and anonymous guest sessions issued by Supabase.
  *
- * Dev mode trusts a cookie with no cryptographic verification. That is a real
- * hole, so it is closed by construction rather than by convention: env
- * validation refuses to start in production with `AUTH_MODE=dev`, and this module
- * checks again at the point of use. Two independent guards, because a single one
- * can be misconfigured.
+ * dev:
+ * Fixed local identities used to test ownership and role boundaries without an
+ * external authentication provider.
  */
+
+export type SessionKind =
+  | "guest"
+  | "user"
+  | "admin";
 
 export interface Session {
   userId: string;
+
+  /**
+   * Real deliverable email for a registered account.
+   *
+   * Anonymous visitors use an empty string here so Mabojolu never exposes the
+   * internal placeholder address stored in the profiles table.
+   */
   email: string;
+
   profile: Profile;
+
+  /**
+   * Product-level identity state used by the UI and authorization layer.
+   */
+  kind: SessionKind;
+
+  /**
+   * True only for a temporary Supabase anonymous account.
+   */
+  isAnonymous: boolean;
 }
 
 /** Cookie holding the local development identity. */
-const DEV_SESSION_COOKIE = "mabojolu-dev-session";
+const DEV_SESSION_COOKIE =
+  "mabojolu-dev-session";
 
 /**
  * A stable synthetic identity for development.
  *
- * A fixed UUID, so a restart does not orphan the conversations created before it.
+ * A fixed UUID means restarting the development server does not orphan local
+ * conversations.
  */
 const DEV_USER = {
   id: "00000000-0000-4000-8000-000000000001",
@@ -46,9 +67,8 @@ const DEV_USER = {
 /**
  * A second development identity.
  *
- * Its purpose is testing: switching to it proves that user A cannot read user
- * B's conversations. Without a second account, ownership enforcement can only be
- * asserted, not demonstrated.
+ * Switching identities proves that one user cannot access another user's
+ * conversations.
  */
 const DEV_USER_ALT = {
   id: "00000000-0000-4000-8000-000000000002",
@@ -57,32 +77,43 @@ const DEV_USER_ALT = {
 } as const;
 
 export function devUsers() {
-  return [DEV_USER, DEV_USER_ALT];
+  return [
+    DEV_USER,
+    DEV_USER_ALT,
+  ];
 }
 
 /**
- * The current session, or null when not signed in.
+ * Resolve the current session.
  *
- * Returns null rather than throwing, so a caller decides between redirecting a
- * page and returning 401 from an API route.
+ * Returns null rather than throwing so each caller can decide whether to render
+ * guest access, redirect to sign-in, or return an unauthorized API response.
  */
 export async function getSession(): Promise<Session | null> {
-  const envResult = inspectServerEnv();
+  const envResult =
+    inspectServerEnv();
 
   if (!envResult.ok) {
-    // A misconfigured environment must not resolve to a signed-in user.
     return null;
   }
 
-  const env = envResult.env;
+  const env =
+    envResult.env;
 
   if (env.AUTH_MODE === "dev") {
-    // Defence in depth: env validation already rejects this combination, and
-    // this check means a bypass of that layer still fails closed.
-    if (env.NODE_ENV === "production") {
+    /*
+     * Defence in depth. Environment validation already rejects dev
+     * authentication in production, but this second check prevents accidental
+     * exposure even if that validation is bypassed.
+     */
+    if (
+      env.NODE_ENV ===
+      "production"
+    ) {
       console.error(
         "[mabojolu] refusing dev auth in production. Set AUTH_MODE=supabase.",
       );
+
       return null;
     }
 
@@ -93,130 +124,306 @@ export async function getSession(): Promise<Session | null> {
 }
 
 async function getDevSession(): Promise<Session | null> {
-  const store = await cookies();
-  const value = store.get(DEV_SESSION_COOKIE)?.value;
+  const store =
+    await cookies();
+
+  const value =
+    store.get(
+      DEV_SESSION_COOKIE,
+    )?.value;
 
   if (!value) {
     return null;
   }
 
-  // Only the two known identities are accepted. An arbitrary cookie value cannot
-  // conjure a user, which keeps even the development path from inventing
-  // identities.
-  const user = devUsers().find((candidate) => candidate.id === value);
+  const user =
+    devUsers().find(
+      (candidate) =>
+        candidate.id === value,
+    );
 
   if (!user) {
     return null;
   }
 
-  const database = getDatabase();
-  const profile = await database.upsertProfile({
-    id: user.id,
-    email: user.email,
-    displayName: user.displayName,
-  });
+  const database =
+    getDatabase();
 
-  return { userId: user.id, email: user.email, profile };
+  const profile =
+    await database.upsertProfile({
+      id: user.id,
+      email: user.email,
+      displayName:
+        user.displayName,
+    });
+
+  const kind: SessionKind =
+    profile.role === "admin"
+      ? "admin"
+      : "user";
+
+  return {
+    userId: user.id,
+    email: user.email,
+    profile,
+    kind,
+    isAnonymous: false,
+  };
 }
 
 async function getSupabaseSession(): Promise<Session | null> {
-  // Imported lazily so the Supabase client is not pulled into the bundle when
-  // running in dev auth mode.
-  const { createServerSupabaseClient } = await import("./supabase-server");
+  /*
+   * Imported lazily so Supabase is not pulled into the local development
+   * authentication bundle.
+   */
+  const {
+    createServerSupabaseClient,
+  } = await import(
+    "./supabase-server"
+  );
 
-  const client = await createServerSupabaseClient();
+  const client =
+    await createServerSupabaseClient();
 
   if (!client) {
     return null;
   }
 
   /*
-   * `getUser()`, not `getSession()`.
+   * getUser(), not getSession().
    *
-   * `getSession()` reads the cookie and decodes the JWT without contacting the
-   * auth server, so a forged or expired token can appear valid. `getUser()`
-   * verifies it. On a server, where the cookie is attacker-supplied input, only
-   * the verifying call is safe.
+   * getUser() verifies the token against Supabase Auth rather than trusting an
+   * attacker-controlled cookie value.
    */
-  const { data, error } = await client.auth.getUser();
+  const {
+    data,
+    error,
+  } =
+    await client.auth.getUser();
 
-  if (error || !data.user?.email) {
+  const user =
+    data.user;
+
+  if (
+    error ||
+    !user
+  ) {
     return null;
   }
 
-  const database = getDatabase();
+  const isAnonymous =
+    user.is_anonymous === true;
 
-  // The signup trigger creates the profile, but upserting keeps this resilient
-  // if a user existed before the trigger was installed.
-  const profile = await database.upsertProfile({
-    id: data.user.id,
-    email: data.user.email,
-  });
+  const realEmail =
+    user.email?.trim() ?? "";
 
-  return { userId: data.user.id, email: data.user.email, profile };
+  /*
+   * Anonymous visitors normally have no email. The database requires one for
+   * profile consistency, so the guest receives a stable internal address that
+   * is never returned to the browser or displayed in the interface.
+   */
+  const profileEmail =
+    realEmail.length > 0
+      ? realEmail
+      : `guest-${user.id}@anonymous.mabojolu.invalid`;
+
+  const rawDisplayName =
+    user.user_metadata
+      ?.display_name;
+
+  const displayName =
+    typeof rawDisplayName ===
+      "string" &&
+    rawDisplayName.trim().length >
+      0
+      ? rawDisplayName.trim()
+      : undefined;
+
+  const database =
+    getDatabase();
+
+  /*
+   * The signup trigger normally creates this profile. Upserting keeps the
+   * application resilient for users created before the trigger existed and
+   * replaces the internal guest email when the account is later upgraded.
+   */
+  const profile =
+    await database.upsertProfile({
+      id: user.id,
+      email: profileEmail,
+
+      ...(displayName === undefined
+        ? {}
+        : {
+            displayName,
+          }),
+    });
+
+  const kind: SessionKind =
+    profile.role === "admin"
+      ? "admin"
+      : isAnonymous
+        ? "guest"
+        : "user";
+
+  return {
+    userId: user.id,
+
+    /*
+     * Never expose the internal guest placeholder through the session object.
+     */
+    email:
+      isAnonymous
+        ? ""
+        : realEmail,
+
+    profile,
+    kind,
+    isAnonymous,
+  };
 }
 
-/** The session, or a thrown 401-shaped error. For API routes. */
+/**
+ * Require any authenticated identity, including an anonymous guest.
+ */
 export async function requireSession(): Promise<Session> {
-  const session = await getSession();
+  const session =
+    await getSession();
 
   if (!session) {
-    const { chatError } = await import("@/lib/ai/errors");
-    throw chatError("unauthorized");
+    const {
+      chatError,
+    } = await import(
+      "@/lib/ai/errors"
+    );
+
+    throw chatError(
+      "unauthorized",
+    );
   }
 
   return session;
 }
 
 /**
- * The session, requiring an admin role.
+ * Require a permanent registered account.
  *
- * The role is read from the database rather than from a token claim or header, so
- * a client cannot assert its own privilege.
+ * Anonymous visitors can use guest features, but account-only operations such
+ * as billing management and permanent account settings must use this guard.
+ */
+export async function requireRegisteredSession(): Promise<Session> {
+  const session =
+    await requireSession();
+
+  if (session.isAnonymous) {
+    const {
+      chatError,
+    } = await import(
+      "@/lib/ai/errors"
+    );
+
+    throw chatError(
+      "forbidden",
+      {
+        message:
+          "Create an account to continue.",
+      },
+    );
+  }
+
+  return session;
+}
+
+/**
+ * Require the Westforge administrator role.
+ *
+ * The role is read from the database rather than accepted from a request,
+ * browser value, email address, or token claim.
  */
 export async function requireAdminSession(): Promise<Session> {
-  const session = await requireSession();
+  const session =
+    await requireSession();
 
-  if (session.profile.role !== "admin") {
-    const { chatError } = await import("@/lib/ai/errors");
-    // Deliberately 404-shaped copy would be better still, but `forbidden` is
-    // honest and the admin route is not secret.
-    throw chatError("forbidden", {
-      message: "You do not have access to this area.",
-    });
+  if (
+    session.profile.role !==
+    "admin"
+  ) {
+    const {
+      chatError,
+    } = await import(
+      "@/lib/ai/errors"
+    );
+
+    throw chatError(
+      "forbidden",
+      {
+        message:
+          "You do not have access to this area.",
+      },
+    );
   }
 
   return session;
 }
 
 /** Set the development session cookie. Dev mode only. */
-export async function setDevSession(userId: string): Promise<boolean> {
-  const envResult = inspectServerEnv();
+export async function setDevSession(
+  userId: string,
+): Promise<boolean> {
+  const envResult =
+    inspectServerEnv();
 
-  if (!envResult.ok || envResult.env.AUTH_MODE !== "dev") {
-    return false;
-  }
-  if (envResult.env.NODE_ENV === "production") {
-    return false;
-  }
-  if (!devUsers().some((user) => user.id === userId)) {
+  if (
+    !envResult.ok ||
+    envResult.env.AUTH_MODE !==
+      "dev"
+  ) {
     return false;
   }
 
-  const store = await cookies();
-  store.set(DEV_SESSION_COOKIE, userId, {
-    httpOnly: true,
-    sameSite: "lax",
-    // Not `secure`, because local development is served over http.
-    secure: false,
-    path: "/",
-    maxAge: 60 * 60 * 24 * 7,
-  });
+  if (
+    envResult.env.NODE_ENV ===
+    "production"
+  ) {
+    return false;
+  }
+
+  if (
+    !devUsers().some(
+      (user) =>
+        user.id === userId,
+    )
+  ) {
+    return false;
+  }
+
+  const store =
+    await cookies();
+
+  store.set(
+    DEV_SESSION_COOKIE,
+    userId,
+    {
+      httpOnly: true,
+      sameSite: "lax",
+      secure: false,
+      path: "/",
+      maxAge:
+        60 *
+        60 *
+        24 *
+        7,
+    },
+  );
 
   return true;
 }
 
 export async function clearDevSession(): Promise<void> {
-  const store = await cookies();
-  store.delete(DEV_SESSION_COOKIE);
+  const store =
+    await cookies();
+
+  store.delete(
+    DEV_SESSION_COOKIE,
+  );
 }
