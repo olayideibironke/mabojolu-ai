@@ -182,13 +182,13 @@ const DEEP_RESEARCH_MARKERS = [
 ];
 
 const PROCESS_NARRATION_PATTERNS = [
-  /^i(?:'|’)?ll\s+(?:research|search|investigate|look up|gather|check)/i,
+  /^i(?:'|â€™)?ll\s+(?:research|search|investigate|look up|gather|check)/i,
   /^i\s+will\s+(?:research|search|investigate|look up|gather|check)/i,
   /^let\s+me\s+(?:research|search|investigate|look up|continue|check)/i,
-  /^i(?:'|’)?ve\s+gathered\s+(?:initial|some|preliminary)/i,
+  /^i(?:'|â€™)?ve\s+gathered\s+(?:initial|some|preliminary)/i,
   /^i\s+have\s+gathered\s+(?:initial|some|preliminary)/i,
   /^i\s+need\s+(?:to|more)\s+(?:research|search|information|targeted)/i,
-  /^first,?\s+i(?:'|’)?ll\s+(?:research|search|check|look up)/i,
+  /^first,?\s+i(?:'|â€™)?ll\s+(?:research|search|check|look up)/i,
   /^before\s+(?:i\s+answer|answering),?\s+i/i,
   /^searching\s+(?:the\s+web|official|for)/i,
   /^researching\s+(?:the|official|current)/i,
@@ -1442,6 +1442,16 @@ function toGenerationUsage(
  * Provider error messages and credentials are never returned directly to the
  * browser.
  */
+const PROVIDER_UNAVAILABLE_MESSAGE =
+  "Mabojolu is temporarily unavailable. Please try again shortly.";
+
+/**
+ * Map Anthropic SDK exceptions onto Mabojolu's provider-independent errors.
+ *
+ * Detailed provider errors remain available in protected server logs. Users
+ * receive a neutral availability message that does not expose billing,
+ * credentials, account configuration, or infrastructure details.
+ */
 function translateError(
   cause: unknown,
 ): ReturnType<typeof chatError> {
@@ -1456,13 +1466,31 @@ function translateError(
 
   if (
     cause instanceof
-    Anthropic.AuthenticationError
+    Anthropic.BadRequestError
   ) {
+    /*
+     * Only confirmed token or context-window failures should appear as an
+     * oversized conversation. Billing, access, tool configuration, and other
+     * HTTP 400 responses are ordinary provider-availability failures.
+     */
+    if (
+      isContextTooLargeError(
+        cause,
+      )
+    ) {
+      return chatError(
+        "context_too_large",
+        {
+          cause,
+        },
+      );
+    }
+
     return chatError(
-      "provider_not_configured",
+      "provider_unavailable",
       {
         message:
-          "The AI provider credential was rejected. Check the configured API key.",
+          PROVIDER_UNAVAILABLE_MESSAGE,
 
         cause,
       },
@@ -1471,13 +1499,17 @@ function translateError(
 
   if (
     cause instanceof
-    Anthropic.PermissionDeniedError
+      Anthropic.AuthenticationError ||
+    cause instanceof
+      Anthropic.PermissionDeniedError ||
+    cause instanceof
+      Anthropic.NotFoundError
   ) {
     return chatError(
-      "provider_not_configured",
+      "provider_unavailable",
       {
         message:
-          "The configured credential does not have access to the selected model or live web search.",
+          PROVIDER_UNAVAILABLE_MESSAGE,
 
         cause,
       },
@@ -1489,62 +1521,27 @@ function translateError(
     Anthropic.RateLimitError
   ) {
     const header =
-      cause.headers?.get?.("retry-after");
+      cause.headers?.get?.(
+        "retry-after",
+      );
 
     const parsed = header
-      ? Number.parseInt(header, 10)
+      ? Number.parseInt(
+          header,
+          10,
+        )
       : Number.NaN;
 
-    return chatError("rate_limited", {
-      message:
-        "The AI service is busy right now. Please wait a moment and try again.",
-
-      retryAfterSeconds:
-        Number.isFinite(parsed)
-          ? parsed
-          : undefined,
-
-      cause,
-    });
-  }
-
-  if (
-    cause instanceof
-    Anthropic.BadRequestError
-  ) {
-    if (
-      isWebSearchConfigurationError(
-        cause,
-      )
-    ) {
-      return chatError(
-        "provider_unavailable",
-        {
-          message:
-            "Live web access is temporarily unavailable. Please try again later.",
-
-          cause,
-        },
-      );
-    }
-
     return chatError(
-      "context_too_large",
-      {
-        cause,
-      },
-    );
-  }
-
-  if (
-    cause instanceof
-    Anthropic.NotFoundError
-  ) {
-    return chatError(
-      "provider_unavailable",
+      "rate_limited",
       {
         message:
-          "The selected model is not available. Please choose another model.",
+          PROVIDER_UNAVAILABLE_MESSAGE,
+
+        retryAfterSeconds:
+          Number.isFinite(parsed)
+            ? parsed
+            : undefined,
 
         cause,
       },
@@ -1558,6 +1555,9 @@ function translateError(
     return chatError(
       "provider_timeout",
       {
+        message:
+          PROVIDER_UNAVAILABLE_MESSAGE,
+
         cause,
       },
     );
@@ -1570,6 +1570,9 @@ function translateError(
     return chatError(
       "provider_unavailable",
       {
+        message:
+          PROVIDER_UNAVAILABLE_MESSAGE,
+
         cause,
       },
     );
@@ -1582,6 +1585,9 @@ function translateError(
     return chatError(
       "provider_unavailable",
       {
+        message:
+          PROVIDER_UNAVAILABLE_MESSAGE,
+
         cause,
       },
     );
@@ -1596,10 +1602,10 @@ function translateError(
 }
 
 /**
- * Distinguish a disabled or unsupported web-search configuration from an
- * ordinary oversized-context request, since both arrive as HTTP 400 errors.
+ * Recognize genuine token and context-window errors without treating unrelated
+ * Anthropic HTTP 400 responses as oversized conversations.
  */
-function isWebSearchConfigurationError(
+function isContextTooLargeError(
   cause: InstanceType<
     typeof Anthropic.BadRequestError
   >,
@@ -1608,9 +1614,32 @@ function isWebSearchConfigurationError(
     cause.message.toLowerCase();
 
   return (
-    message.includes("web search") ||
-    message.includes("web_search") ||
-    message.includes("server tool") ||
-    message.includes("tool type")
+    message.includes(
+      "prompt is too long",
+    ) ||
+    message.includes(
+      "maximum context length",
+    ) ||
+    message.includes(
+      "context window",
+    ) ||
+    message.includes(
+      "context length",
+    ) ||
+    message.includes(
+      "too many tokens",
+    ) ||
+    message.includes(
+      "exceeds the context",
+    ) ||
+    message.includes(
+      "exceed the context",
+    ) ||
+    message.includes(
+      "input length and max_tokens",
+    ) ||
+    message.includes(
+      "request exceeds the maximum",
+    )
   );
 }
