@@ -1531,6 +1531,8 @@ export class CognitiveRuntime {
           after,
 
           evidenceId:
+            this.environment.id +
+            "::" +
             observation.id,
 
           observedAt:
