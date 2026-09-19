@@ -107,6 +107,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - evidence-based competence modeling;
 - autonomous curriculum selection from a safe challenge catalog with measured
   held-out improvement;
+- autonomous synthetic challenge generation with behaviorally adaptive
+  difficulty and isolated held-out evaluation;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -116,31 +118,32 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is autonomous challenge generation
-with isolated evaluation:
+The current central intelligence milestone is multi-family learning and transfer
+boundaries:
 
-1. detect a competence gap from evidence rather than from a manually selected
-   next exercise;
-2. generate a fresh synthetic practice task from an approved safe task family;
-3. adapt generated difficulty as competence changes;
-4. keep hidden environment structure behind the CognitiveEnvironment interface;
-5. accept training outcomes only for challenges Mabojolu actually generated;
-6. prevent duplicate, mutated, or evaluation-partition tasks from contaminating
-   the training competence model;
-7. maintain a separate held-out evaluation partition and reject exact task
-   leakage from practice;
-8. verify that autonomously generated practice improves performance on a
-   renamed held-out task that the generator never receives.
+1. support more than one qualitatively different synthetic causal family;
+2. track competence independently across those families;
+3. let Mabojolu allocate practice toward the family with the largest useful
+   competence gap;
+4. form reusable skills from experience inside each family;
+5. verify that skill knowledge from one family is not falsely treated as
+   competence in another;
+6. preserve one shared train / evaluation isolation boundary across challenge
+   kinds;
+7. measure whether family-specific practice improves a harder held-out task from
+   that same family;
+8. use negative-transfer evidence to define where future abstractions must be
+   learned rather than assumed.
 
-The stronger scientific question is now whether Mabojolu can turn a measured
-capability gap into its own useful learning experience and then demonstrate that
-the resulting competence transfers outside the generated practice instances.
+The stronger scientific question is now whether Mabojolu can broaden what it
+learns without collapsing distinct problem structures into one misleading
+analogy.
 
-This remains controlled synthetic learning. A later milestone should broaden
-challenge families, generate richer causal structures, preserve strict train /
-evaluation separation, and test whether learning progress transfers across
-qualitatively different task families rather than only renamed instances of one
-relational structure.
+This checkpoint should not be described as learned cross-family abstraction.
+True abstract transfer requires Mabojolu to discover a higher-order principle
+that is supported in multiple different task families and then use that learned
+principle to improve a third unfamiliar family. That is a later, stricter
+milestone.
 
 ## Safety and audit principle
 
