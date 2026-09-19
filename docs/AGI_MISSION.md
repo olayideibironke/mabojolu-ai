@@ -124,8 +124,9 @@ The current central intelligence milestone is cross-family abstract principle
 induction:
 
 1. identify a higher-order causal-control pattern from raw transition evidence;
-2. require supporting evidence from at least two distinct task families before
-   activating the principle;
+2. require supporting evidence from at least two distinct structural task-family
+   kinds before activating the principle, so relabeling one structure is not
+   enough;
 3. store the abstraction without source action labels or source state-variable
    names;
 4. keep same-family repetition insufficient for an abstract-transfer claim;
@@ -141,7 +142,8 @@ induction:
 The controlled principle currently under test is: an accepted action that has
 no observable effect may become goal-effective after other actions produce
 observable progress, so a deferred action can be retried after progress before
-generic exploration exhausts unrelated alternatives.
+generic exploration exhausts unrelated alternatives. Activation requires this
+pattern to appear across structurally different family kinds.
 
 The stronger scientific question is whether Mabojolu can learn a policy-level
 regularity across different causal representations and use it in a third
