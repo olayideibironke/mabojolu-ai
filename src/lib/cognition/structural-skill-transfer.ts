@@ -298,9 +298,6 @@ export class StructuralSkillTransferSession {
 
     private readonly goalKey:
       string,
-
-    private readonly availableActionCount:
-      number,
   ) {}
 
   recommend(
@@ -734,9 +731,6 @@ export class StructuralSkillTransferEngine {
     return new StructuralSkillTransferSession(
       selected.skill,
       goalKey,
-      input
-        .availableActions
-        .length,
     );
   }
 }
