@@ -23,6 +23,7 @@ import type {
 
 import {
   InducedContextApplicabilityModel,
+  type InducedContextSignature,
 } from "./principle-context-signature";
 
 import {
@@ -394,15 +395,11 @@ class FeatureCalibrationWorld
 
   getAvailableActions():
     readonly string[] {
-    const target =
-      this.config
-        .repeatUseful
-        ? 2
-        : 1;
-
     if (
+      this.config
+        .repeatUseful &&
       this.progress >=
-        target
+        2
     ) {
       return [
         this.config
@@ -629,7 +626,7 @@ function calibrate(input: {
   feature:
     LearnedContextFeatureApplicabilityModel;
 }):
-  string {
+  InducedContextSignature {
   const configs:
     CalibrationConfig[] = [
     {
@@ -713,8 +710,9 @@ function calibrate(input: {
     },
   ];
 
-  let firstPositiveSignature =
-    "";
+  let firstPositiveSignature:
+    InducedContextSignature |
+    undefined;
 
   configs.forEach(
     (
@@ -773,12 +771,18 @@ function calibrate(input: {
       ) {
         firstPositiveSignature =
           selection
-            ?.inducedContextSignature
-            ?.key ??
-          "";
+            ?.inducedContextSignature;
       }
     },
   );
+
+  if (
+    !firstPositiveSignature
+  ) {
+    throw new Error(
+      "Expected calibration to expose an induced context signature.",
+    );
+  }
 
   return firstPositiveSignature;
 }
@@ -909,61 +913,68 @@ describe(
           },
         });
 
-        expect(
+        const heldOutSignature =
           firstSelection
-            ?.inducedContextSignature
-            ?.key,
+            ?.inducedContextSignature;
+
+        expect(
+          heldOutSignature,
+        ).toBeDefined();
+
+        if (
+          !heldOutSignature
+        ) {
+          return;
+        }
+
+        expect(
+          heldOutSignature.key,
         ).not.toBe(
-          calibrationSignature,
+          calibrationSignature.key,
         );
 
-        expect(
+        const calibrationProjection =
           feature.project(
             "principle-repeat-monotonic-progress-once",
-            {
-              key:
-                calibrationSignature,
+            calibrationSignature,
+          );
 
-              features:
-                firstSelection
-                  ?.inducedContextSignature
-                  ?.features ??
-                {
-                  historyLength:
-                    "0",
+        const heldOutProjection =
+          feature.project(
+            "principle-repeat-monotonic-progress-once",
+            heldOutSignature,
+          );
 
-                  distinctActionsSeen:
-                    "0",
-
-                  lastChangeArity:
-                    "none",
-
-                  lastValueShapes: [],
-
-                  candidateAttempts:
-                    "0",
-
-                  candidateNoEffectAttempts:
-                    "0",
-
-                  candidateEffectAttempts:
-                    "0",
-
-                  candidateMatchesLastAction:
-                    false,
-
-                  candidateMatchesLastProductiveAction:
-                    false,
-
-                  stepsSinceCandidateAttempt:
-                    "never",
-                },
-            },
-          )
+        expect(
+          calibrationProjection
             .selectedFeatures,
         ).toEqual([
           "lastChangeArity",
         ]);
+
+        expect(
+          heldOutProjection
+            .selectedFeatures,
+        ).toEqual([
+          "lastChangeArity",
+        ]);
+
+        expect(
+          heldOutProjection
+            .projectionKey,
+        ).toBe(
+          calibrationProjection
+            .projectionKey,
+        );
+
+        expect(
+          firstSelection
+            ?.learnedContextProjection
+            ?.projectionKey,
+        ).toBe(
+          heldOutProjection
+            .projectionKey,
+        );
       },
     );
 
