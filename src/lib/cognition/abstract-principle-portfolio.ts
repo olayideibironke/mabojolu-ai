@@ -23,6 +23,11 @@ import type {
 } from "./validated-predicate-search";
 
 import type {
+  AdaptivePredicateSummary,
+  AdaptiveValidatedPredicateApplicabilityModel,
+} from "./adaptive-predicate-champion";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
   LearnedContextProjection,
 } from "./context-feature-learning";
@@ -90,7 +95,8 @@ export interface PrincipleSelection {
     "relational-learned" |
     "predicate-prior" |
     "predicate-learned" |
-    "validated-predicate-learned";
+    "validated-predicate-learned" |
+    "adaptive-predicate-champion";
 
   applicabilityEvidenceCount:
     number;
@@ -115,6 +121,9 @@ export interface PrincipleSelection {
 
   predicateValidation?:
     PredicateValidationSummary;
+
+  predicateAdaptation?:
+    AdaptivePredicateSummary;
 }
 
 export interface AbstractPrinciplePortfolioSnapshot {
@@ -229,6 +238,9 @@ export class AbstractPrinciplePortfolio {
 
     validatedSymbolicPredicateApplicabilityModel?:
       ValidatedSymbolicPredicateApplicabilityModel;
+
+    adaptiveValidatedPredicateApplicabilityModel?:
+      AdaptiveValidatedPredicateApplicabilityModel;
   }):
     AbstractPrinciplePortfolioController {
     return new AbstractPrinciplePortfolioController(
@@ -246,6 +258,8 @@ export class AbstractPrinciplePortfolio {
         ?.symbolicPredicateApplicabilityModel,
       input
         ?.validatedSymbolicPredicateApplicabilityModel,
+      input
+        ?.adaptiveValidatedPredicateApplicabilityModel,
     );
   }
 
@@ -353,6 +367,9 @@ export class AbstractPrinciplePortfolioController {
 
     private readonly validatedSymbolicPredicateApplicabilityModel?:
       ValidatedSymbolicPredicateApplicabilityModel,
+
+    private readonly adaptiveValidatedPredicateApplicabilityModel?:
+      AdaptiveValidatedPredicateApplicabilityModel,
   ) {
     this.deferredController =
       new AbstractPrincipleController(
@@ -543,6 +560,28 @@ export class AbstractPrinciplePortfolioController {
           .inducedContextSignature
       ) {
         this.validatedSymbolicPredicateApplicabilityModel
+          .record({
+            principleId:
+              this.pendingSelection
+                .selection
+                .principleId,
+
+            signature:
+              this.pendingSelection
+                .selection
+                .inducedContextSignature,
+
+            useful,
+          });
+      }
+
+      if (
+        this.adaptiveValidatedPredicateApplicabilityModel &&
+        this.pendingSelection
+          .selection
+          .inducedContextSignature
+      ) {
+        this.adaptiveValidatedPredicateApplicabilityModel
           .record({
             principleId:
               this.pendingSelection
@@ -1426,7 +1465,8 @@ export class AbstractPrinciplePortfolioController {
       this.composedContextFeatureApplicabilityModel ||
       this.relationalContextFeatureApplicabilityModel ||
       this.symbolicPredicateApplicabilityModel ||
-      this.validatedSymbolicPredicateApplicabilityModel
+      this.validatedSymbolicPredicateApplicabilityModel ||
+      this.adaptiveValidatedPredicateApplicabilityModel
     ) {
       this.pendingSelection = {
         selection: {
