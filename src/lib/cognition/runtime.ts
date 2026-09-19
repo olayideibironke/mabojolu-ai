@@ -1,4 +1,10 @@
 import {
+  AbstractPrincipleController,
+  CrossFamilyPrincipleLibrary,
+  type AbstractPrinciple,
+} from "./abstract-principle";
+
+import {
   AutonomousCausalHypothesisEngine,
   type AutonomousCausalHypothesis,
 } from "./autonomous-hypothesis";
@@ -89,6 +95,7 @@ type ActionChoiceStrategy =
   | "structural-skill"
   | "structural-transfer"
   | "transfer"
+  | "abstract-principle"
   | "scientific-discovery-setup"
   | "hypothesis-experiment"
   | "exploration"
@@ -154,6 +161,19 @@ export interface CognitiveRuntimeOptions {
    */
   skillLibrary?:
     AutonomousSkillLibrary;
+
+  /**
+   * Explicit task-family identity used only for cross-family abstraction
+   * evidence. Episodes without a family label do not contribute.
+   */
+  taskFamily?:
+    string;
+
+  /**
+   * Cross-family higher-order principle store.
+   */
+  abstractPrincipleLibrary?:
+    CrossFamilyPrincipleLibrary;
 }
 
 export interface CognitiveRunResult {
@@ -175,6 +195,9 @@ export interface CognitiveRunResult {
 
   structuralSkillTransfer?:
     StructuralSkillTransferState;
+
+  abstractPrinciple?:
+    AbstractPrinciple;
 
   generatedHypotheses:
     AutonomousCausalHypothesis[];
@@ -321,6 +344,18 @@ export class CognitiveRuntime {
     StructuralSkillTransferEngine |
     undefined;
 
+  private readonly taskFamily:
+    string |
+    undefined;
+
+  private readonly abstractPrincipleLibrary:
+    CrossFamilyPrincipleLibrary |
+    undefined;
+
+  private readonly abstractPrincipleController:
+    AbstractPrincipleController |
+    undefined;
+
   private structuralSession:
     StructuralTransferSession |
     undefined;
@@ -373,6 +408,19 @@ export class CognitiveRuntime {
 
     this.skillLibrary =
       options.skillLibrary;
+
+    this.taskFamily =
+      options.taskFamily;
+
+    this.abstractPrincipleLibrary =
+      options.abstractPrincipleLibrary;
+
+    this.abstractPrincipleController =
+      this.abstractPrincipleLibrary
+        ? new AbstractPrincipleController(
+            this.abstractPrincipleLibrary,
+          )
+        : undefined;
 
     this.skillComposer =
       this.skillLibrary
@@ -739,6 +787,21 @@ export class CognitiveRuntime {
             this.now(),
         });
 
+      this.abstractPrincipleController
+        ?.observeTransition({
+          action,
+
+          accepted:
+            environmentResult
+              .accepted,
+
+          changedKeys:
+            changes.map(
+              (change) =>
+                change.key,
+            ),
+        });
+
       this.advanceGoalHierarchyFromObservation(
         after,
       );
@@ -995,6 +1058,17 @@ export class CognitiveRuntime {
       };
     }
 
+    const abstractPrinciple =
+      this.nextAbstractPrincipleAction(
+        availableActions,
+      );
+
+    if (
+      abstractPrinciple
+    ) {
+      return abstractPrinciple;
+    }
+
     const hypothesisExperiment =
       this.nextAutonomousHypothesisAction(
         availableActions,
@@ -1104,6 +1178,35 @@ export class CognitiveRuntime {
 
       strategy:
         "state-exploration",
+    };
+  }
+
+  private nextAbstractPrincipleAction(
+    availableActions:
+      readonly string[],
+  ): ActionChoice | undefined {
+    const recommendation =
+      this.abstractPrincipleController
+        ?.recommend(
+          availableActions,
+        );
+
+    if (
+      !recommendation
+    ) {
+      return undefined;
+    }
+
+    return {
+      action:
+        recommendation.action,
+
+      strategy:
+        "abstract-principle",
+
+      expectedEffects: [
+        "Cross-family evidence suggests retrying this deferred no-effect action after observed target-world progress before exhausting unrelated alternatives.",
+      ],
     };
   }
 
@@ -2076,6 +2179,9 @@ export class CognitiveRuntime {
       case "transfer":
         return "transfer";
 
+      case "abstract-principle":
+        return "abstract-principle";
+
       case "scientific-discovery-setup":
         return "scientific-discovery-setup";
 
@@ -2120,6 +2226,11 @@ export class CognitiveRuntime {
       case "transfer":
         return [
           "Prior successful experience suggests this action contributes to the goal.",
+        ];
+
+      case "abstract-principle":
+        return [
+          "A higher-order principle induced across distinct task families suggests retrying a deferred action after observable progress.",
         ];
 
       case "scientific-discovery-setup":
@@ -2839,7 +2950,8 @@ export class CognitiveRuntime {
 
     if (
       this.memory ||
-      this.skillLibrary
+      this.skillLibrary ||
+      this.abstractPrincipleLibrary
     ) {
       completedAt =
         this.now();
@@ -2879,6 +2991,41 @@ export class CognitiveRuntime {
           )
         : undefined;
 
+    const episodeEvidenceId =
+      completedAt
+        ? recordedEpisodeId ??
+          this.environment.id +
+            "::" +
+            completedAt
+        : undefined;
+
+    if (
+      this.abstractPrincipleLibrary &&
+      this.taskFamily &&
+      goalConditions &&
+      completedAt &&
+      episodeEvidenceId
+    ) {
+      this.abstractPrincipleLibrary
+        .learnFromEpisode({
+          episodeId:
+            episodeEvidenceId,
+
+          family:
+            this.taskFamily,
+
+          solved,
+
+          goalConditions,
+
+          transitions:
+            this.episodeTransitions,
+
+          observedAt:
+            completedAt,
+        });
+    }
+
     if (
       this.skillLibrary &&
       goalConditions &&
@@ -2888,7 +3035,7 @@ export class CognitiveRuntime {
         this.skillLibrary
           .learnFromEpisode({
             episodeId:
-              recordedEpisodeId ??
+              episodeEvidenceId ??
               this.environment.id +
                 "::" +
                 completedAt,
@@ -3014,6 +3161,35 @@ export class CognitiveRuntime {
             structuralSkillTransfer:
               this.structuralSkillSession
                 .getState(),
+          }
+        : {}),
+
+      ...(this.abstractPrincipleLibrary
+          ?.getPrinciple()
+        ? {
+            abstractPrinciple: {
+              ...this.abstractPrincipleLibrary
+                .getPrinciple() as
+                AbstractPrinciple,
+
+              supportFamilies: [
+                ...(
+                  this.abstractPrincipleLibrary
+                    .getPrinciple() as
+                    AbstractPrinciple
+                )
+                  .supportFamilies,
+              ],
+
+              supportEpisodeIds: [
+                ...(
+                  this.abstractPrincipleLibrary
+                    .getPrinciple() as
+                    AbstractPrinciple
+                )
+                  .supportEpisodeIds,
+              ],
+            },
           }
         : {}),
 
