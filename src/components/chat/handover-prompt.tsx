@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -15,10 +16,18 @@ import {
 
 interface HandoverPromptProps {
   level:
+    "none" |
     "prepare" |
     "urgent";
 
   packet:
+
+  string;
+
+  openRequestKey?:
+    number;
+
+  
     string;
 
   onContinueInNewChat:
@@ -31,6 +40,7 @@ interface HandoverPromptProps {
 export function HandoverPrompt({
   level,
   packet,
+  openRequestKey = 0,
   onContinueInNewChat,
 }: HandoverPromptProps) {
   const [
@@ -42,6 +52,19 @@ export function HandoverPrompt({
     copied,
     setCopied,
   ] = useState(false);
+
+  useEffect(() => {
+    if (
+      openRequestKey >
+        0
+    ) {
+      setIsOpen(
+        true,
+      );
+    }
+  }, [
+    openRequestKey,
+  ]);
 
   const heading =
     level ===
@@ -102,6 +125,7 @@ export function HandoverPrompt({
 
   return (
     <>
+      {level !== "none" ? (
       <div className="mx-auto w-full max-w-[1040px] px-4 pb-2 sm:px-6">
         <div
           className={
@@ -137,6 +161,7 @@ export function HandoverPrompt({
           </div>
         </div>
       </div>
+      ) : null}
 
       {isOpen ? (
         <div
