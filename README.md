@@ -26,6 +26,7 @@ has been verified from what has only been written.
 | Rate limits, quotas, size caps | Verified |
 | Tests, lint, types, production build | All passing |
 | **Local Ollama inference** | **Primary runtime.** No external API key or per-token charge. |
+| **Browser artifact control plane** | Versioned manifest, origin validation, SRI enforcement, Mabojolu-first routing, upstream transition fallback. No Westforge mirror deployed yet. |
 | **Optional Anthropic compatibility** | Disabled by default; requires explicit paid-provider opt-in and credentials. |
 | **Live Supabase row-level security** | **Pending external configuration.** Written and reviewed, never executed. |
 
@@ -220,6 +221,7 @@ so the API does not confirm that an id exists to a caller with no right to know.
 | [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) | Deployment checklist and rollback |
 | [docs/CONTEXT_MANAGEMENT.md](docs/CONTEXT_MANAGEMENT.md) | How conversation context is built and budgeted |
 | [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md) | Limitations and unverified areas |
+| [docs/AGI_MISSION.md](docs/AGI_MISSION.md) | Mabojolu G general-intelligence mission, evidence rules, and cognitive roadmap |
 | [CLAUDE.md](CLAUDE.md) | Development rules for future sessions |
 
 ---
