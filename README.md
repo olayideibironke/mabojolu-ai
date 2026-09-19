@@ -25,12 +25,14 @@ has been verified from what has only been written.
 | Admin access control | Verified: 404 for non-admin and anonymous |
 | Rate limits, quotas, size caps | Verified |
 | Tests, lint, types, production build | All passing |
-| **Live Anthropic provider** | **Pending external configuration.** Not verified. |
+| **Local Ollama inference** | **Primary runtime.** No external API key or per-token charge. |
+| **Optional Anthropic compatibility** | Disabled by default; requires explicit paid-provider opt-in and credentials. |
 | **Live Supabase row-level security** | **Pending external configuration.** Written and reviewed, never executed. |
 
-Everything above runs today against a local mock AI provider and local
-file-backed persistence, with no external accounts and no cost. The two pending
-items require credentials and are detailed in
+The cognitive kernel and default inference architecture are local-first. Ollama
+serves the real local models without an external API key or per-token provider
+bill. Mock mode remains available for deterministic tests. Supabase production
+persistence still requires its own configured project and is documented in
 [docs/KNOWN_LIMITATIONS.md](docs/KNOWN_LIMITATIONS.md).
 
 ---
@@ -45,29 +47,23 @@ npm run dev
 ```
 
 Open <http://localhost:3000> and sign in with one of the two local development
-identities. No API key and no database are required: the default configuration
-uses a mock AI provider and stores conversations in a JSON file under
+identities. No external AI API key is required. Mabojolu defaults to Ollama for
+real local inference and stores development conversations in a JSON file under
 `.mabojolu-data/`.
 
-The mock provider echoes your message and states plainly that it is not a real
-model response, so mock output is never mistaken for a real answer.
+Ollama must be running on the configured local endpoint and the selected local
+model must be installed. The default model registry contains Mabojolu Fast,
+Regular, and Quality local modes. Mock mode remains available for automated
+tests and deterministic UI work.
 
 Copy `.env.example` to `.env.local` if you want to change any defaults. Every
 variable is documented there.
 
-### Connecting a real model
+### Optional paid-provider compatibility
 
-1. Create an API key at <https://platform.claude.com> (Settings, then API keys).
-   A Claude.ai or Claude Code subscription does **not** include API access; the
-   API is billed separately.
-2. Add to `.env.local`:
-
-   ```bash
-   AI_PROVIDER=anthropic
-   ANTHROPIC_API_KEY=sk-ant-...
-   ```
-
-3. Restart the dev server.
+Paid external inference is not required for Mabojolu to operate and is disabled
+by default. An operator must deliberately set both the external provider and the
+paid-provider opt-in flag before a cloud API can be used.
 
 Never commit `.env.local`. It is git-ignored; `.env.example` is the only env file
 that is tracked, and it contains no real values.
