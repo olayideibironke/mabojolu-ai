@@ -38,6 +38,7 @@ interface ChatShellProps {
   userEmail?: string;
   isAdmin?: boolean;
   persistenceKind: "local" | "supabase";
+  contextTokenBudget: number;
 }
 
 const MODEL_STORAGE_KEY =
@@ -161,6 +162,7 @@ export function ChatShell({
   userEmail,
   isAdmin = false,
   persistenceKind,
+  contextTokenBudget,
 }: ChatShellProps) {
   const history =
     useConversations(
@@ -745,10 +747,13 @@ export function ChatShell({
           messages,
           modelId:
             selectedModelId,
+
+          contextTokenBudget,
         }),
       [
         messages,
         selectedModelId,
+        contextTokenBudget,
       ],
     );
 
