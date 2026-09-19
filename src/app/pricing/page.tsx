@@ -52,9 +52,9 @@ export default function PricingPage() {
           </h1>
 
           <p className="mx-auto mt-5 max-w-2xl text-base leading-7 text-text-secondary">
-            Use Mabojolu without creating an account, then sign up free to keep
-            your conversations. Paid plans will provide expanded usage and
-            additional capabilities.
+            Try Mabojolu with 10 free responses before signup. Registered free
+            accounts receive 20 completed responses in a rolling 4-hour window,
+            then can wait for free access to refresh or choose Pro when available.
           </p>
         </section>
 
@@ -69,15 +69,16 @@ export default function PricingPage() {
             </h2>
 
             <p className="mt-3 text-sm leading-6 text-text-secondary">
-              Begin prompting immediately. Create a free account when you are
-              ready to keep your conversations and continue using Mabojolu.
+              Begin with 10 guest responses. Sign up free to keep your
+              conversations and receive 20 completed responses per rolling
+              4-hour window.
             </p>
 
             <ul className="mt-7 space-y-3 text-sm text-text-primary">
-              <li>Start without creating an account</li>
-              <li>Free registered account</li>
+              <li>10 guest responses before signup</li>
+              <li>20 registered free responses per 4-hour rolling window</li>
+              <li>Free access refreshes automatically after waiting</li>
               <li>Saved conversation history</li>
-              <li>Text and image analysis</li>
             </ul>
 
             <Link
