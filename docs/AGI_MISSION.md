@@ -109,6 +109,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   held-out improvement;
 - autonomous synthetic challenge generation with behaviorally adaptive
   difficulty and isolated held-out evaluation;
+- multi-family autonomous practice across distinct Boolean-gating and numeric
+  threshold causal structures with explicit negative-transfer boundaries;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -118,32 +120,36 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is multi-family learning and transfer
-boundaries:
+The current central intelligence milestone is cross-family abstract principle
+induction:
 
-1. support more than one qualitatively different synthetic causal family;
-2. track competence independently across those families;
-3. let Mabojolu allocate practice toward the family with the largest useful
-   competence gap;
-4. form reusable skills from experience inside each family;
-5. verify that skill knowledge from one family is not falsely treated as
-   competence in another;
-6. preserve one shared train / evaluation isolation boundary across challenge
-   kinds;
-7. measure whether family-specific practice improves a harder held-out task from
-   that same family;
-8. use negative-transfer evidence to define where future abstractions must be
-   learned rather than assumed.
+1. identify a higher-order causal-control pattern from raw transition evidence;
+2. require supporting evidence from at least two distinct task families before
+   activating the principle;
+3. store the abstraction without source action labels or source state-variable
+   names;
+4. keep same-family repetition insufficient for an abstract-transfer claim;
+5. enter a third unfamiliar family without predicting which target action fills
+   the abstract role before observing target evidence;
+6. use target-world evidence to bind the abstraction to a concrete deferred
+   action;
+7. test whether the learned principle reduces work relative to the same third
+   family without cross-family evidence;
+8. retain contradiction accounting so repeated incompatible evidence can retire
+   the principle.
 
-The stronger scientific question is now whether Mabojolu can broaden what it
-learns without collapsing distinct problem structures into one misleading
-analogy.
+The controlled principle currently under test is: an accepted action that has
+no observable effect may become goal-effective after other actions produce
+observable progress, so a deferred action can be retried after progress before
+generic exploration exhausts unrelated alternatives.
 
-This checkpoint should not be described as learned cross-family abstraction.
-True abstract transfer requires Mabojolu to discover a higher-order principle
-that is supported in multiple different task families and then use that learned
-principle to improve a third unfamiliar family. That is a later, stricter
-milestone.
+The stronger scientific question is whether Mabojolu can learn a policy-level
+regularity across different causal representations and use it in a third
+representation without copying source symbols or a source skill.
+
+Even if verified, one such principle is not AGI. Later work must induce multiple
+competing abstractions, learn when each abstraction applies, and transfer them
+across a wider distribution of unseen task families.
 
 ## Safety and audit principle
 
