@@ -21,6 +21,18 @@ export interface ContextTransitionEvidence {
 }
 
 export interface InducedContextFeatures {
+  historyLength:
+    "0" |
+    "1" |
+    "2" |
+    "3+";
+
+  distinctActionsSeen:
+    "0" |
+    "1" |
+    "2" |
+    "3+";
+
   lastChangeArity:
     "none" |
     "one" |
@@ -126,6 +138,38 @@ function bucketCount(
   }
 
   return "2+";
+}
+
+function historyCountBucket(
+  count:
+    number,
+):
+  "0" |
+  "1" |
+  "2" |
+  "3+" {
+  if (
+    count <=
+      0
+  ) {
+    return "0";
+  }
+
+  if (
+    count ===
+      1
+  ) {
+    return "1";
+  }
+
+  if (
+    count ===
+      2
+  ) {
+    return "2";
+  }
+
+  return "3+";
 }
 
 function valueType(
@@ -408,6 +452,22 @@ export class StructuralContextSignatureEncoder {
 
     const features:
       InducedContextFeatures = {
+      historyLength:
+        historyCountBucket(
+          this.transitions
+            .length,
+        ),
+
+      distinctActionsSeen:
+        historyCountBucket(
+          new Set(
+            this.transitions.map(
+              (transition) =>
+                transition.action,
+            ),
+          ).size,
+        ),
+
       lastChangeArity:
         last
           ? changeArity(
