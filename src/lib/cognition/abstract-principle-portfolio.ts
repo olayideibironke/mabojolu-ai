@@ -804,7 +804,8 @@ export class AbstractPrinciplePortfolioController {
 
     if (
       this.applicabilityModel ||
-      this.inducedContextApplicabilityModel
+      this.inducedContextApplicabilityModel ||
+      this.learnedContextFeatureApplicabilityModel
     ) {
       this.pendingSelection = {
         selection: {
@@ -814,6 +815,24 @@ export class AbstractPrinciplePortfolioController {
             ...selected
               .applicabilityContext,
           },
+
+          ...(selected
+              .learnedContextProjection
+            ? {
+                learnedContextProjection: {
+                  selectedFeatures: [
+                    ...selected
+                      .learnedContextProjection
+                      .selectedFeatures,
+                  ],
+
+                  projectionKey:
+                    selected
+                      .learnedContextProjection
+                      .projectionKey,
+                },
+              }
+            : {}),
 
           ...(selected
               .inducedContextSignature
@@ -853,6 +872,24 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .learnedContextProjection
+        ? {
+            learnedContextProjection: {
+              selectedFeatures: [
+                ...selected
+                  .learnedContextProjection
+                  .selectedFeatures,
+              ],
+
+              projectionKey:
+                selected
+                  .learnedContextProjection
+                  .projectionKey,
+            },
+          }
+        : {}),
 
       ...(selected
           .inducedContextSignature
@@ -897,6 +934,24 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .learnedContextProjection
+              ? {
+                  learnedContextProjection: {
+                    selectedFeatures: [
+                      ...selection
+                        .learnedContextProjection
+                        .selectedFeatures,
+                    ],
+
+                    projectionKey:
+                      selection
+                        .learnedContextProjection
+                        .projectionKey,
+                  },
+                }
+              : {}),
 
             ...(selection
                 .inducedContextSignature
