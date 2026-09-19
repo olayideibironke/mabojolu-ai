@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { createServerSupabaseClient } from "@/lib/auth/supabase-server";
+import { resolveAuthCallbackTarget } from "@/lib/auth/recovery";
 
 /**
  * Authentication callback.
@@ -23,21 +24,10 @@ export async function GET(
   const code =
     searchParams.get("code");
 
-  /*
-   * Open-redirect protection.
-   *
-   * Only local relative paths are accepted. This prevents a crafted
-   * authentication link from redirecting a newly signed-in user to an
-   * external website.
-   */
   const requestedNext =
-    searchParams.get("next") ?? "/";
-
-  const next =
-    requestedNext.startsWith("/") &&
-    !requestedNext.startsWith("//")
-      ? requestedNext
-      : "/";
+    searchParams.get(
+      "next",
+    );
 
   if (!code) {
     return Response.redirect(
@@ -62,11 +52,22 @@ export async function GET(
     );
   }
 
+  const flowId =
+    searchParams.get(
+      "sb_flow_id",
+    );
+
   const {
+    data,
     error,
   } =
     await client.auth.exchangeCodeForSession(
       code,
+      flowId
+        ? {
+            flowId,
+          }
+        : undefined,
     );
 
   if (error) {
@@ -85,6 +86,15 @@ export async function GET(
       302,
     );
   }
+
+  const next =
+    resolveAuthCallbackTarget({
+      requestedNext,
+
+      recoverySentAt:
+        data.user
+          ?.recovery_sent_at,
+    });
 
   return Response.redirect(
     new URL(
