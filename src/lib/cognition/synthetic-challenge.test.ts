@@ -112,8 +112,17 @@ describe(
           id:
             "evaluation-copy",
 
+          family:
+            "renamed-family-label",
+
           partition:
             "evaluation",
+
+          difficulty:
+            0.95,
+
+          context:
+            "renamed-context",
         };
 
         expect(
@@ -149,8 +158,17 @@ describe(
               id:
                 "evaluation-copy",
 
+              family:
+                "renamed-family-label",
+
               partition:
                 "evaluation",
+
+              difficulty:
+                0.95,
+
+              context:
+                "renamed-context",
             }),
         ).toThrow(
           "duplicates a practice challenge",
