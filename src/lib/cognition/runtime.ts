@@ -6,6 +6,7 @@ import {
 
 import {
   AbstractPrinciplePortfolio,
+  AbstractPrinciplePortfolioController,
   type AbstractPrinciplePortfolioSnapshot,
 } from "./abstract-principle-portfolio";
 
@@ -385,6 +386,10 @@ export class CognitiveRuntime {
     AbstractPrinciplePortfolio |
     undefined;
 
+  private readonly abstractPrinciplePortfolioController:
+    AbstractPrinciplePortfolioController |
+    undefined;
+
   private readonly abstractPrincipleController:
     AbstractPrincipleController |
     undefined;
@@ -453,6 +458,10 @@ export class CognitiveRuntime {
 
     this.abstractPrinciplePortfolio =
       options.abstractPrinciplePortfolio;
+
+    this.abstractPrinciplePortfolioController =
+      this.abstractPrinciplePortfolio
+        ?.createController();
 
     this.abstractPrincipleController =
       this.abstractPrincipleLibrary
@@ -827,9 +836,9 @@ export class CognitiveRuntime {
         });
 
       if (
-        this.abstractPrinciplePortfolio
+        this.abstractPrinciplePortfolioController
       ) {
-        this.abstractPrinciplePortfolio
+        this.abstractPrinciplePortfolioController
           .observeTransition({
             action,
 
@@ -1248,7 +1257,7 @@ export class CognitiveRuntime {
       readonly string[],
   ): ActionChoice | undefined {
     const portfolioRecommendation =
-      this.abstractPrinciplePortfolio
+      this.abstractPrinciplePortfolioController
         ?.recommend(
           availableActions,
         );
@@ -3221,7 +3230,7 @@ export class CognitiveRuntime {
         ?.getPrinciple();
 
     const abstractPrinciplePortfolio =
-      this.abstractPrinciplePortfolio
+      this.abstractPrinciplePortfolioController
         ?.getSnapshot();
 
     return {
