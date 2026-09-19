@@ -47,6 +47,7 @@ export interface PrincipleSelection {
 
   applicabilitySource:
     "static" |
+    "model-prior" |
     "learned";
 
   applicabilityEvidenceCount:
@@ -402,7 +403,10 @@ export class AbstractPrinciplePortfolioController {
 
           applicabilitySource:
             learned
-              ? "learned"
+              ? learned.evidenceCount >
+                  0
+                ? "learned"
+                : "model-prior"
               : "static",
 
           applicabilityEvidenceCount:
@@ -474,7 +478,10 @@ export class AbstractPrinciplePortfolioController {
 
           applicabilitySource:
             learned
-              ? "learned"
+              ? learned.evidenceCount >
+                  0
+                ? "learned"
+                : "model-prior"
               : "static",
 
           applicabilityEvidenceCount:
