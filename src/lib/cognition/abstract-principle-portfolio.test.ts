@@ -8,6 +8,10 @@ import {
   AbstractPrinciplePortfolio,
 } from "./abstract-principle-portfolio";
 
+import {
+  PrincipleApplicabilityModel,
+} from "./principle-applicability-model";
+
 import type {
   AbstractPrincipleEpisode,
 } from "./abstract-principle";
@@ -522,6 +526,161 @@ describe(
           selected?.score,
         ).toBeGreaterThan(
           0.6,
+        );
+      },
+    );
+
+    it(
+      "lets learned applicability override the legacy static preference",
+      () => {
+        const portfolio =
+          trainedPortfolio();
+
+        const model =
+          new PrincipleApplicabilityModel();
+
+        const numericContext = {
+          progressKind:
+            "numeric" as const,
+
+          candidateRelation:
+            "productive-repeat" as const,
+        };
+
+        const deferredContext = {
+          progressKind:
+            "numeric" as const,
+
+          candidateRelation:
+            "deferred-action" as const,
+        };
+
+        model.record({
+          principleId:
+            "principle-repeat-monotonic-progress-once",
+
+          context:
+            numericContext,
+
+          useful:
+            false,
+        });
+
+        model.record({
+          principleId:
+            "principle-repeat-monotonic-progress-once",
+
+          context:
+            numericContext,
+
+          useful:
+            false,
+        });
+
+        model.record({
+          principleId:
+            "principle-deferred-goal-retry-after-progress",
+
+          context:
+            deferredContext,
+
+          useful:
+            true,
+        });
+
+        const controller =
+          portfolio.createController({
+            applicabilityModel:
+              model,
+          });
+
+        controller.observeTransition({
+          action:
+            "TRY-GOAL",
+
+          accepted:
+            true,
+
+          before: {
+            level:
+              0,
+
+            done:
+              false,
+          },
+
+          after: {
+            level:
+              0,
+
+            done:
+              false,
+          },
+
+          changedKeys: [],
+
+          goalSatisfied:
+            false,
+        });
+
+        controller.observeTransition({
+          action:
+            "ADVANCE",
+
+          accepted:
+            true,
+
+          before: {
+            level:
+              0,
+
+            done:
+              false,
+          },
+
+          after: {
+            level:
+              1,
+
+            done:
+              false,
+          },
+
+          changedKeys: [
+            "level",
+          ],
+
+          goalSatisfied:
+            false,
+        });
+
+        const selected =
+          controller.recommend([
+            "TRY-GOAL",
+            "ADVANCE",
+          ]);
+
+        expect(
+          selected,
+        ).toMatchObject({
+          action:
+            "TRY-GOAL",
+
+          principleKind:
+            "deferred-goal-retry-after-progress",
+
+          applicabilitySource:
+            "learned",
+
+          applicabilityEvidenceCount:
+            1,
+        });
+
+        expect(
+          selected
+            ?.applicability,
+        ).toBeCloseTo(
+          2 / 3,
         );
       },
     );
