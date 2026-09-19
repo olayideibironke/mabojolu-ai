@@ -37,6 +37,11 @@ import {
 } from "./scientific-discovery";
 
 import {
+  AutonomousSkillLibrary,
+  type SkillRecommendation,
+} from "./skill-library";
+
+import {
   createCognitiveState,
   reduceCognitiveState,
 } from "./state";
@@ -68,6 +73,7 @@ interface ActionAttempt {
 
 type ActionChoiceStrategy =
   | "world-model-plan"
+  | "skill"
   | "structural-transfer"
   | "transfer"
   | "scientific-discovery-setup"
@@ -84,6 +90,12 @@ interface ActionChoice {
 
   expectedEffects?:
     string[];
+
+  skillId?:
+    string;
+
+  skillStepIndex?:
+    number;
 }
 
 export interface CognitiveRuntimeOptions {
@@ -121,6 +133,14 @@ export interface CognitiveRuntimeOptions {
    */
   hypothesisEngine?:
     AutonomousCausalHypothesisEngine;
+
+  /**
+   * Cross-environment reusable skill store.
+   *
+   * A skill is activated only after repeated successful evidence.
+   */
+  skillLibrary?:
+    AutonomousSkillLibrary;
 }
 
 export interface CognitiveRunResult {
@@ -133,6 +153,9 @@ export interface CognitiveRunResult {
 
   recalledPlan?:
     RecalledPlan;
+
+  recalledSkill?:
+    SkillRecommendation;
 
   generatedHypotheses:
     AutonomousCausalHypothesis[];
@@ -190,6 +213,15 @@ export class CognitiveRuntime {
 
   private transferIndex = 0;
 
+  private recalledSkill:
+    SkillRecommendation |
+    undefined;
+
+  private skillIndex = 0;
+
+  private skillAbandoned =
+    false;
+
   private readonly maxCycles:
     number;
 
@@ -237,6 +269,10 @@ export class CognitiveRuntime {
 
   private readonly structuralTransfer:
     StructuralTransferLibrary |
+    undefined;
+
+  private readonly skillLibrary:
+    AutonomousSkillLibrary |
     undefined;
 
   private structuralSession:
@@ -288,6 +324,9 @@ export class CognitiveRuntime {
 
     this.structuralTransfer =
       options.structuralTransfer;
+
+    this.skillLibrary =
+      options.skillLibrary;
 
     this.planner =
       this.worldModel
@@ -410,6 +449,11 @@ export class CognitiveRuntime {
         .observe();
 
     this.initializeAutonomousGoalDecomposition(
+      snapshot,
+      initialActions,
+    );
+
+    this.initializeSkillTransfer(
       snapshot,
       initialActions,
     );
@@ -696,6 +740,13 @@ export class CognitiveRuntime {
         observation,
       );
 
+      this.recordSkillExecutionOutcome(
+        choice,
+        before,
+        after,
+        observation,
+      );
+
       this.episodeTransitions.push({
         action,
 
@@ -793,6 +844,17 @@ export class CognitiveRuntime {
       modeled
     ) {
       return modeled;
+    }
+
+    const skill =
+      this.nextSkillAction(
+        availableActions,
+      );
+
+    if (
+      skill
+    ) {
+      return skill;
     }
 
     const structural =
@@ -1321,6 +1383,200 @@ export class CognitiveRuntime {
     };
   }
 
+  private initializeSkillTransfer(
+    initialState:
+      EnvironmentSnapshot,
+
+    availableActions:
+      readonly string[],
+  ): void {
+    if (
+      !this.skillLibrary
+    ) {
+      return;
+    }
+
+    const goalReader =
+      this.environment
+        .getGoalConditions;
+
+    if (
+      !goalReader
+    ) {
+      return;
+    }
+
+    this.recalledSkill =
+      this.skillLibrary
+        .recommendSkill({
+          currentState:
+            initialState,
+
+          goalConditions:
+            goalReader.call(
+              this.environment,
+            ),
+
+          availableActions,
+        });
+  }
+
+  private nextSkillAction(
+    availableActions:
+      readonly string[],
+  ): ActionChoice | undefined {
+    if (
+      !this.recalledSkill ||
+      this.skillAbandoned
+    ) {
+      return undefined;
+    }
+
+    while (
+      this.skillIndex <
+      this.recalledSkill
+        .skill
+        .steps
+        .length
+    ) {
+      const stepIndex =
+        this.skillIndex;
+
+      const step =
+        this.recalledSkill
+          .skill
+          .steps[
+            stepIndex
+          ];
+
+      this.skillIndex +=
+        1;
+
+      if (
+        !availableActions.includes(
+          step.action,
+        )
+      ) {
+        this.skillAbandoned =
+          true;
+
+        return undefined;
+      }
+
+      return {
+        action:
+          step.action,
+
+        strategy:
+          "skill",
+
+        skillId:
+          this.recalledSkill
+            .skill
+            .id,
+
+        skillStepIndex:
+          stepIndex,
+
+        expectedEffects:
+          step.effects.map(
+            (effect) =>
+              `${effect.key}: ${String(
+                effect.before,
+              )} -> ${String(
+                effect.after,
+              )}`,
+          ),
+      };
+    }
+
+    return undefined;
+  }
+
+  private recordSkillExecutionOutcome(
+    choice:
+      ActionChoice,
+
+    before:
+      EnvironmentSnapshot,
+
+    after:
+      EnvironmentSnapshot,
+
+    observation:
+      Observation,
+  ): void {
+    if (
+      choice.strategy !==
+        "skill" ||
+      !choice.skillId ||
+      choice.skillStepIndex ===
+        undefined ||
+      !this.skillLibrary
+    ) {
+      return;
+    }
+
+    const update =
+      this.skillLibrary
+        .observeExecution({
+          skillId:
+            choice.skillId,
+
+          stepIndex:
+            choice.skillStepIndex,
+
+          before,
+
+          after,
+
+          evidenceId:
+            observation.id,
+
+          observedAt:
+            observation
+              .observedAt,
+        });
+
+    if (
+      !update ||
+      update.matched
+    ) {
+      return;
+    }
+
+    this.skillAbandoned =
+      true;
+
+    this.apply({
+      type:
+        "learning.recorded",
+
+      learning: {
+        id:
+          this.nextId(
+            "learning",
+          ),
+
+        kind:
+          "correction",
+
+        statement:
+          `Learned skill ${choice.skillId} failed at step ${choice.skillStepIndex + 1}, so Mabojolu abandoned the skill and returned to evidence-driven problem solving.`,
+
+        confidence:
+          0.95,
+
+        derivedFromIds: [
+          observation.id,
+        ],
+
+        createdAt:
+          this.now(),
+      },
+    });
+  }
+
   private initializeStructuralTransfer(
     initialState:
       EnvironmentSnapshot,
@@ -1442,6 +1698,9 @@ export class CognitiveRuntime {
       case "world-model-plan":
         return "world-model-plan";
 
+      case "skill":
+        return "skill";
+
       case "structural-transfer":
         return "structural-transfer";
 
@@ -1467,6 +1726,11 @@ export class CognitiveRuntime {
       case "world-model-plan":
         return [
           "The learned causal world model predicts this action advances the goal.",
+        ];
+
+      case "skill":
+        return [
+          "A repeatedly supported reusable skill predicts this action advances the goal.",
         ];
 
       case "structural-transfer":
@@ -2186,26 +2450,83 @@ export class CognitiveRuntime {
         });
     }
 
-    this.memory
-      ?.recordEpisode({
-        environmentId:
-          this.environment.id,
+    let recordedEpisodeId:
+      string |
+      undefined;
 
-        goalDescription:
-          this.environment
-            .goalDescription,
+    let completedAt:
+      string |
+      undefined;
 
-        solved,
+    if (
+      this.memory ||
+      this.skillLibrary
+    ) {
+      completedAt =
+        this.now();
+    }
 
-        cycles:
-          this.state.cycle,
+    if (
+      this.memory &&
+      completedAt
+    ) {
+      recordedEpisodeId =
+        this.memory
+          .recordEpisode({
+            environmentId:
+              this.environment.id,
 
-        transitions:
-          this.episodeTransitions,
+            goalDescription:
+              this.environment
+                .goalDescription,
 
-        completedAt:
-          this.now(),
-      });
+            solved,
+
+            cycles:
+              this.state.cycle,
+
+            transitions:
+              this.episodeTransitions,
+
+            completedAt,
+          })
+          .id;
+    }
+
+    const goalConditions =
+      goalReader
+        ? goalReader.call(
+            this.environment,
+          )
+        : undefined;
+
+    if (
+      this.skillLibrary &&
+      goalConditions &&
+      completedAt
+    ) {
+      this.skillLibrary
+        .learnFromEpisode({
+          episodeId:
+            recordedEpisodeId ??
+            this.environment.id +
+              "::" +
+              completedAt,
+
+          environmentId:
+            this.environment.id,
+
+          solved,
+
+          goalConditions,
+
+          transitions:
+            this.episodeTransitions,
+
+          observedAt:
+            completedAt,
+        });
+    }
 
     return this.result(
       solved,
@@ -2238,6 +2559,76 @@ export class CognitiveRuntime {
                 ...this.recalledPlan
                   .actions,
               ],
+            },
+          }
+        : {}),
+
+      ...(this.recalledSkill
+        ? {
+            recalledSkill: {
+              ...this.recalledSkill,
+
+              actions: [
+                ...this.recalledSkill
+                  .actions,
+              ],
+
+              skill: {
+                ...this.recalledSkill
+                  .skill,
+
+                preconditions: {
+                  ...this.recalledSkill
+                    .skill
+                    .preconditions,
+                },
+
+                goalEffects: {
+                  ...this.recalledSkill
+                    .skill
+                    .goalEffects,
+                },
+
+                steps:
+                  this.recalledSkill
+                    .skill
+                    .steps
+                    .map(
+                      (step) => ({
+                        ...step,
+
+                        preconditions: {
+                          ...step
+                            .preconditions,
+                        },
+
+                        effects:
+                          step.effects.map(
+                            (effect) => ({
+                              ...effect,
+                            }),
+                          ),
+                      }),
+                    ),
+
+                sourceEpisodeIds: [
+                  ...this.recalledSkill
+                    .skill
+                    .sourceEpisodeIds,
+                ],
+
+                sourceEnvironmentIds: [
+                  ...this.recalledSkill
+                    .skill
+                    .sourceEnvironmentIds,
+                ],
+
+                contradictionEvidenceIds: [
+                  ...this.recalledSkill
+                    .skill
+                    .contradictionEvidenceIds,
+                ],
+              },
             },
           }
         : {}),
