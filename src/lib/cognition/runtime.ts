@@ -15,6 +15,10 @@ import type {
 } from "./context-feature-composition";
 
 import type {
+  RelationalContextFeatureApplicabilityModel,
+} from "./context-feature-relation";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
 } from "./context-feature-learning";
 
@@ -240,6 +244,13 @@ export interface CognitiveRuntimeOptions {
    */
   composedContextFeatureApplicabilityModel?:
     ComposedContextFeatureApplicabilityModel;
+
+  /**
+   * Cross-episode learner that synthesizes relational predicates over
+   * count-like structural context dimensions.
+   */
+  relationalContextFeatureApplicabilityModel?:
+    RelationalContextFeatureApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -521,6 +532,10 @@ export class CognitiveRuntime {
           composedContextFeatureApplicabilityModel:
             options
               .composedContextFeatureApplicabilityModel,
+
+          relationalContextFeatureApplicabilityModel:
+            options
+              .relationalContextFeatureApplicabilityModel,
         });
 
     this.abstractPrincipleController =
