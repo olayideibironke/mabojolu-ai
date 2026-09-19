@@ -1093,6 +1093,43 @@ export class AbstractPrinciplePortfolioController {
           },
 
           ...(selected
+              .relationalContextProjection
+            ? {
+                relationalContextProjection: {
+                  featureId:
+                    selected
+                      .relationalContextProjection
+                      .featureId,
+
+                  left:
+                    selected
+                      .relationalContextProjection
+                      .left,
+
+                  right:
+                    selected
+                      .relationalContextProjection
+                      .right,
+
+                  operator:
+                    selected
+                      .relationalContextProjection
+                      .operator,
+
+                  relationValue:
+                    selected
+                      .relationalContextProjection
+                      .relationValue,
+
+                  projectionKey:
+                    selected
+                      .relationalContextProjection
+                      .projectionKey,
+                },
+              }
+            : {}),
+
+          ...(selected
               .composedContextProjection
             ? {
                 composedContextProjection: {
@@ -1174,6 +1211,43 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .relationalContextProjection
+        ? {
+            relationalContextProjection: {
+              featureId:
+                selected
+                  .relationalContextProjection
+                  .featureId,
+
+              left:
+                selected
+                  .relationalContextProjection
+                  .left,
+
+              right:
+                selected
+                  .relationalContextProjection
+                  .right,
+
+              operator:
+                selected
+                  .relationalContextProjection
+                  .operator,
+
+              relationValue:
+                selected
+                  .relationalContextProjection
+                  .relationValue,
+
+              projectionKey:
+                selected
+                  .relationalContextProjection
+                  .projectionKey,
+            },
+          }
+        : {}),
 
       ...(selected
           .composedContextProjection
@@ -1262,6 +1336,43 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .relationalContextProjection
+              ? {
+                  relationalContextProjection: {
+                    featureId:
+                      selection
+                        .relationalContextProjection
+                        .featureId,
+
+                    left:
+                      selection
+                        .relationalContextProjection
+                        .left,
+
+                    right:
+                      selection
+                        .relationalContextProjection
+                        .right,
+
+                    operator:
+                      selection
+                        .relationalContextProjection
+                        .operator,
+
+                    relationValue:
+                      selection
+                        .relationalContextProjection
+                        .relationValue,
+
+                    projectionKey:
+                      selection
+                        .relationalContextProjection
+                        .projectionKey,
+                  },
+                }
+              : {}),
 
             ...(selection
                 .composedContextProjection
