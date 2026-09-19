@@ -73,8 +73,8 @@ describe(
 
         expect(
           client,
-        ).toContain(
-          'new URL(\n        "./mabojolu-webllm-worker.ts",\n        import.meta.url,',
+        ).toMatch(
+          /new URL\(\s*"\.\/mabojolu-webllm-worker\.ts",\s*import\.meta\.url,/,
         );
 
         expect(
