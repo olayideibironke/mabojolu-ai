@@ -675,6 +675,14 @@ export class AbstractPrinciplePortfolioController {
               deferred.action,
             );
 
+        const adaptiveChampion =
+          this.adaptiveValidatedPredicateApplicabilityModel
+            ?.estimate(
+              deferred
+                .principleId,
+              signature,
+            );
+
         const validatedPredicate =
           this.validatedSymbolicPredicateApplicabilityModel
             ?.estimate(
@@ -732,6 +740,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          adaptiveChampion
+            ?.applicability ??
           validatedPredicate
             ?.applicability ??
           predicate
@@ -772,9 +782,11 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            validatedPredicate
-              ? "validated-predicate-learned"
-              : predicate
+            adaptiveChampion
+              ? "adaptive-predicate-champion"
+              : validatedPredicate
+                ? "validated-predicate-learned"
+                : predicate
                 ? predicate.evidenceCount >
                     0
                   ? "predicate-learned"
@@ -807,6 +819,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            adaptiveChampion
+              ?.evidenceCount ??
             validatedPredicate
               ?.evidenceCount ??
             predicate
@@ -826,7 +840,58 @@ export class AbstractPrinciplePortfolioController {
           applicabilityContext:
             context,
 
-          ...(validatedPredicate
+          ...(adaptiveChampion
+            ? {
+                predicateAdaptation: {
+                  ...adaptiveChampion
+                    .adaptation,
+                },
+
+                symbolicPredicateProjection: {
+                  programId:
+                    adaptiveChampion
+                      .projection
+                      .programId,
+
+                  left:
+                    adaptiveChampion
+                      .projection
+                      .left,
+
+                  right:
+                    adaptiveChampion
+                      .projection
+                      .right,
+
+                  operator:
+                    adaptiveChampion
+                      .projection
+                      .operator,
+
+                  ...(adaptiveChampion
+                      .projection
+                      .parameter !==
+                    undefined
+                    ? {
+                        parameter:
+                          adaptiveChampion
+                            .projection
+                            .parameter,
+                      }
+                    : {}),
+
+                  predicateValue:
+                    adaptiveChampion
+                      .projection
+                      .predicateValue,
+
+                  projectionKey:
+                    adaptiveChampion
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : validatedPredicate
             ? {
                 predicateValidation: {
                   ...validatedPredicate
@@ -1008,7 +1073,8 @@ export class AbstractPrinciplePortfolioController {
               this.composedContextFeatureApplicabilityModel ||
               this.relationalContextFeatureApplicabilityModel ||
               this.symbolicPredicateApplicabilityModel ||
-              this.validatedSymbolicPredicateApplicabilityModel
+              this.validatedSymbolicPredicateApplicabilityModel ||
+              this.adaptiveValidatedPredicateApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
@@ -1042,6 +1108,14 @@ export class AbstractPrinciplePortfolioController {
           this.signatureEncoder
             .encodeCandidate(
               monotonic.action,
+            );
+
+        const adaptiveChampion =
+          this.adaptiveValidatedPredicateApplicabilityModel
+            ?.estimate(
+              monotonic
+                .principleId,
+              signature,
             );
 
         const validatedPredicate =
@@ -1101,6 +1175,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          adaptiveChampion
+            ?.applicability ??
           validatedPredicate
             ?.applicability ??
           predicate
@@ -1141,9 +1217,11 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            validatedPredicate
-              ? "validated-predicate-learned"
-              : predicate
+            adaptiveChampion
+              ? "adaptive-predicate-champion"
+              : validatedPredicate
+                ? "validated-predicate-learned"
+                : predicate
                 ? predicate.evidenceCount >
                     0
                   ? "predicate-learned"
@@ -1176,6 +1254,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            adaptiveChampion
+              ?.evidenceCount ??
             validatedPredicate
               ?.evidenceCount ??
             predicate
@@ -1195,7 +1275,58 @@ export class AbstractPrinciplePortfolioController {
           applicabilityContext:
             context,
 
-          ...(validatedPredicate
+          ...(adaptiveChampion
+            ? {
+                predicateAdaptation: {
+                  ...adaptiveChampion
+                    .adaptation,
+                },
+
+                symbolicPredicateProjection: {
+                  programId:
+                    adaptiveChampion
+                      .projection
+                      .programId,
+
+                  left:
+                    adaptiveChampion
+                      .projection
+                      .left,
+
+                  right:
+                    adaptiveChampion
+                      .projection
+                      .right,
+
+                  operator:
+                    adaptiveChampion
+                      .projection
+                      .operator,
+
+                  ...(adaptiveChampion
+                      .projection
+                      .parameter !==
+                    undefined
+                    ? {
+                        parameter:
+                          adaptiveChampion
+                            .projection
+                            .parameter,
+                      }
+                    : {}),
+
+                  predicateValue:
+                    adaptiveChampion
+                      .projection
+                      .predicateValue,
+
+                  projectionKey:
+                    adaptiveChampion
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : validatedPredicate
             ? {
                 predicateValidation: {
                   ...validatedPredicate
@@ -1377,7 +1508,8 @@ export class AbstractPrinciplePortfolioController {
               this.composedContextFeatureApplicabilityModel ||
               this.relationalContextFeatureApplicabilityModel ||
               this.symbolicPredicateApplicabilityModel ||
-              this.validatedSymbolicPredicateApplicabilityModel
+              this.validatedSymbolicPredicateApplicabilityModel ||
+              this.adaptiveValidatedPredicateApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
