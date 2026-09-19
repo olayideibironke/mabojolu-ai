@@ -138,40 +138,55 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is continual challenger/champion
-predicate validation under fresh reserves:
+The current central intelligence milestone is fresh-reserve challenger/champion
+predicate adaptation under concept drift:
 
-1. preserve the v0.9 rule that a fitted predicate remains inert until its own
-   sequestered holdout approves it;
-2. treat the first approved generation as the champion rather than as a
-   permanently trusted rule;
-3. collect each later challenger from entirely fresh fitting evidence;
-4. freeze that challenger before collecting its fresh validation reserve;
-5. score both the challenger and incumbent champion on the challenger's reserve
-   without adding those reserve outcomes to either model's applicability
-   evidence;
-6. promote the challenger only when it independently passes the v0.9 held-out
-   gate and strictly outperforms the incumbent on the same reserve;
-7. keep the incumbent on ties so repeated validation does not create gratuitous
-   model churn;
-8. retain a validated incumbent when a challenger fails, rather than allowing a
-   failed update to erase working knowledge;
-9. expose champion generation, active challenger generation, replacement count,
-   last replacement decision, and both reserve accuracies for audit;
-10. verify concept drift by reversing the learned useful side of the structural
-    predicate, requiring the fresh challenger to beat the stale champion before
-    runtime behavior changes.
+1. bootstrap an initial symbolic champion through the verified fit/freeze/holdout
+   process before allowing it to affect action selection;
+2. monitor the validated champion only on fresh operational outcomes;
+3. detect degradation from a bounded recent correctness window rather than from
+   training or holdout scores;
+4. keep the drift-trigger window as incumbent operational evidence and never
+   reuse it as challenger fitting data;
+5. start challenger fitting only on outcomes observed after the drift trigger;
+6. freeze the challenger before its own validation reserve begins;
+7. compare challenger accuracy, incumbent champion accuracy, and the
+   majority-class baseline on exactly the same fresh challenger holdout;
+8. replace the champion only when the challenger exceeds the minimum validation
+   threshold and strictly beats both incumbent and baseline;
+9. retain the incumbent when the challenger fails that comparison;
+10. exclude challenger validation outcomes from the replacement champion's
+    applicability evidence after promotion;
+11. expose champion generation, replacement count, drift-window state,
+    challenger fit/validation counts, and the last comparison result in the
+    audit trail.
 
-The first continual protocol remains deliberately compact: six fresh fitting
-observations and three fresh validation observations per generation. Validation
-evidence is never recycled as fitting or operational applicability evidence.
+The first controlled drift protocol uses a three-outcome operational correctness
+window. When champion accuracy across that complete window falls to 0.5 or
+below, Mabojolu opens a challenger cycle. The trigger observations remain part
+of the incumbent's operational history but the challenger starts with an empty
+fit partition.
 
-This closes one major v0.9 gap: the system can now replace an obsolete validated
-rule without repeatedly tuning against the original holdout. It still does not
-solve statistical multiple-testing correction across many generations or a
-growing symbolic grammar, gradual drift calibration, nonstationary reserve
-sizing, external benchmark leakage, or independent external replication. Those
-remain explicit next research problems.
+The controlled replacement experiment first validates an equality-based
+champion. A later distribution shift makes one-step differences useful. After
+three fresh incumbent errors, the challenger receives six new fit outcomes and
+then three additional held-out outcomes. The challenger learns
+abs(historyLength - distinctActionsSeen) <= 1 and replaces the equality champion
+only because it reaches perfect fresh-holdout accuracy while the incumbent and
+majority baseline each reach only two-thirds.
+
+The runtime comparison keeps a frozen v0.9 equality champion as the control. On
+the same post-drift 3+/2 target, the frozen champion selects the wrong
+higher-order abstraction first and needs an extra cycle. The v1.0 adaptive model
+uses its generation-2 champion to choose the productive repeat immediately.
+
+Even if verified, this remains a small controlled drift protocol. It does not
+yet solve gradual drift, noisy change-point detection, repeated challenger
+search under multiple-testing pressure, rollback after a bad promotion,
+catastrophic forgetting across older regimes, or adaptive allocation of finite
+validation reserves. Stronger work should add reversible champion history,
+statistical drift confidence, regime memory, and safeguards against repeatedly
+searching until a challenger happens to pass by chance.
 
 ## Safety and audit principle
 
