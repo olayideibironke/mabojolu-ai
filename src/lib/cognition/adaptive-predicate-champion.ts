@@ -56,6 +56,12 @@ export interface AdaptivePredicateSummary {
   driftWindowAccuracy?:
     number;
 
+  lastDriftTriggerEvidenceCount?:
+    number;
+
+  lastDriftTriggerAccuracy?:
+    number;
+
   challengerFitEvidenceCount:
     number;
 
@@ -149,6 +155,12 @@ interface PrincipleState {
     ChallengerState;
 
   replacementCount:
+    number;
+
+  lastDriftTriggerEvidenceCount?:
+    number;
+
+  lastDriftTriggerAccuracy?:
     number;
 
   lastChallengerValidationAccuracy?:
@@ -1190,6 +1202,15 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     state:
       PrincipleState,
   ): void {
+    state.lastDriftTriggerEvidenceCount =
+      state.recentChampionCorrectness
+        .length;
+
+    state.lastDriftTriggerAccuracy =
+      this.recentAccuracy(
+        state,
+      );
+
     state.phase =
       "challenger-fit";
 
@@ -1501,6 +1522,26 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
               this.recentAccuracy(
                 state,
               ),
+          }
+        : {}),
+
+      ...(state
+          .lastDriftTriggerEvidenceCount !==
+        undefined
+        ? {
+            lastDriftTriggerEvidenceCount:
+              state
+                .lastDriftTriggerEvidenceCount,
+          }
+        : {}),
+
+      ...(state
+          .lastDriftTriggerAccuracy !==
+        undefined
+        ? {
+            lastDriftTriggerAccuracy:
+              state
+                .lastDriftTriggerAccuracy,
           }
         : {}),
 
