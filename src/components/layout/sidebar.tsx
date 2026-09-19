@@ -65,18 +65,19 @@ const PINNED_STORAGE_KEY =
 const PROJECT_STORAGE_KEY =
   "mabojolu-project-conversations";
 
-function readStoredIds(
-  key:
-    string,
+const SIDEBAR_STORAGE_EVENT =
+  "mabojolu-sidebar-storage-change";
+
+function parseStoredIds(
+  raw:
+    string |
+    null,
 ):
   string[] {
   try {
     const parsed =
       JSON.parse(
-        window.localStorage
-          .getItem(
-            key,
-          ) ??
+        raw ??
           "[]",
       );
 
@@ -96,6 +97,131 @@ function readStoredIds(
   }
 }
 
+function readStoredIds(
+  key:
+    string,
+):
+  string[] {
+  if (
+    typeof window ===
+      "undefined"
+  ) {
+    return [];
+  }
+
+  try {
+    return parseStoredIds(
+      window.localStorage
+        .getItem(
+          key,
+        ),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function storedIdsSnapshot(
+  key:
+    string,
+):
+  string {
+  if (
+    typeof window ===
+      "undefined"
+  ) {
+    return "[]";
+  }
+
+  try {
+    return (
+      window.localStorage
+        .getItem(
+          key,
+        ) ??
+      "[]"
+    );
+  } catch {
+    return "[]";
+  }
+}
+
+function useStoredIds(
+  key:
+    string,
+):
+  string[] {
+  const subscribe =
+    useCallback(
+      (
+        callback:
+          () => void,
+      ) => {
+        const handleStorage =
+          (
+            event:
+              StorageEvent,
+          ) => {
+            if (
+              event.key ===
+                key ||
+              event.key ===
+                null
+            ) {
+              callback();
+            }
+          };
+
+        const handleLocal =
+          () => {
+            callback();
+          };
+
+        window.addEventListener(
+          "storage",
+          handleStorage,
+        );
+
+        window.addEventListener(
+          SIDEBAR_STORAGE_EVENT,
+          handleLocal,
+        );
+
+        return () => {
+          window.removeEventListener(
+            "storage",
+            handleStorage,
+          );
+
+          window.removeEventListener(
+            SIDEBAR_STORAGE_EVENT,
+            handleLocal,
+          );
+        };
+      },
+      [key],
+    );
+
+  const raw =
+    useSyncExternalStore(
+      subscribe,
+      () =>
+        storedIdsSnapshot(
+          key,
+        ),
+      () =>
+        "[]",
+    );
+
+  return useMemo(
+    () =>
+      parseStoredIds(
+        raw,
+      ),
+    [raw],
+  );
+}
+
 function writeStoredIds(
   key:
     string,
@@ -111,6 +237,12 @@ function writeStoredIds(
           ids,
         ),
       );
+
+    window.dispatchEvent(
+      new Event(
+        SIDEBAR_STORAGE_EVENT,
+      ),
+    );
   } catch {
     /*
      * Navigation preferences remain usable in memory when browser storage is
@@ -156,15 +288,15 @@ export function Sidebar({
     setRenameDraft,
   ] = useState("");
 
-  const [
-    pinnedIds,
-    setPinnedIds,
-  ] = useState<string[]>([]);
+  const pinnedIds =
+    useStoredIds(
+      PINNED_STORAGE_KEY,
+    );
 
-  const [
-    projectIds,
-    setProjectIds,
-  ] = useState<string[]>([]);
+  const projectIds =
+    useStoredIds(
+      PROJECT_STORAGE_KEY,
+    );
 
   const [
     showAllChats,
@@ -197,84 +329,6 @@ export function Sidebar({
   const hasPermanentAccount =
     isSignedIn &&
     !isGuest;
-
-  useEffect(() => {
-    setPinnedIds(
-      readStoredIds(
-        PINNED_STORAGE_KEY,
-      ),
-    );
-
-    setProjectIds(
-      readStoredIds(
-        PROJECT_STORAGE_KEY,
-      ),
-    );
-  }, []);
-
-  useEffect(() => {
-    const validIds =
-      new Set(
-        conversations.map(
-          (conversation) =>
-            conversation.id,
-        ),
-      );
-
-    setPinnedIds(
-      (
-        current,
-      ) => {
-        const next =
-          current.filter(
-            (id) =>
-              validIds.has(
-                id,
-              ),
-          );
-
-        if (
-          next.length !==
-            current.length
-        ) {
-          writeStoredIds(
-            PINNED_STORAGE_KEY,
-            next,
-          );
-        }
-
-        return next;
-      },
-    );
-
-    setProjectIds(
-      (
-        current,
-      ) => {
-        const next =
-          current.filter(
-            (id) =>
-              validIds.has(
-                id,
-              ),
-          );
-
-        if (
-          next.length !==
-            current.length
-        ) {
-          writeStoredIds(
-            PROJECT_STORAGE_KEY,
-            next,
-          );
-        }
-
-        return next;
-      },
-    );
-  }, [
-    conversations,
-  ]);
 
   const pendingDeleteId =
     requestedDeleteId &&
@@ -419,11 +473,11 @@ export function Sidebar({
           "pinned" |
           "project",
       ) => {
-        const setter =
+        const current =
           kind ===
             "pinned"
-            ? setPinnedIds
-            : setProjectIds;
+            ? pinnedIds
+            : projectIds;
 
         const storageKey =
           kind ===
@@ -431,36 +485,31 @@ export function Sidebar({
             ? PINNED_STORAGE_KEY
             : PROJECT_STORAGE_KEY;
 
-        setter(
-          (
-            current,
-          ) => {
-            const next =
-              current.includes(
-                id,
+        const next =
+          current.includes(
+            id,
+          )
+            ? current.filter(
+                (
+                  value,
+                ) =>
+                  value !==
+                  id,
               )
-                ? current.filter(
-                    (
-                      value,
-                    ) =>
-                      value !==
-                      id,
-                  )
-                : [
-                    ...current,
-                    id,
-                  ];
+            : [
+                ...current,
+                id,
+              ];
 
-            writeStoredIds(
-              storageKey,
-              next,
-            );
-
-            return next;
-          },
+        writeStoredIds(
+          storageKey,
+          next,
         );
       },
-      [],
+      [
+        pinnedIds,
+        projectIds,
+      ],
     );
 
   const pinned =
