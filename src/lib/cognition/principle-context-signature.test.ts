@@ -369,6 +369,153 @@ describe(
     );
 
     it(
+      "preserves v0.4 core matching while full-feature mode detects nuisance history differences",
+      () => {
+        const shortHistory =
+          new StructuralContextSignatureEncoder();
+
+        shortHistory.observe({
+          action:
+            "STEP",
+
+          accepted:
+            true,
+
+          before: {
+            value:
+              0,
+          },
+
+          after: {
+            value:
+              1,
+          },
+
+          changedKeys: [
+            "value",
+          ],
+        });
+
+        const longerHistory =
+          new StructuralContextSignatureEncoder();
+
+        longerHistory.observe({
+          action:
+            "OTHER",
+
+          accepted:
+            true,
+
+          before: {
+            value:
+              0,
+          },
+
+          after: {
+            value:
+              0,
+          },
+
+          changedKeys: [],
+        });
+
+        longerHistory.observe({
+          action:
+            "STEP",
+
+          accepted:
+            true,
+
+          before: {
+            value:
+              0,
+          },
+
+          after: {
+            value:
+              1,
+          },
+
+          changedKeys: [
+            "value",
+          ],
+        });
+
+        const first =
+          shortHistory
+            .encodeCandidate(
+              "STEP",
+            );
+
+        const second =
+          longerHistory
+            .encodeCandidate(
+              "STEP",
+            );
+
+        expect(
+          first.key,
+        ).toBe(
+          second.key,
+        );
+
+        expect(
+          JSON.stringify(
+            first.features,
+          ),
+        ).not.toBe(
+          JSON.stringify(
+            second.features,
+          ),
+        );
+
+        const core =
+          new InducedContextApplicabilityModel();
+
+        core.record({
+          principleId:
+            "principle-a",
+
+          signature:
+            first,
+
+          useful:
+            true,
+        });
+
+        expect(
+          core.estimate(
+            "principle-a",
+            second,
+          ).evidenceCount,
+        ).toBe(1);
+
+        const full =
+          new InducedContextApplicabilityModel(
+            "full",
+          );
+
+        full.record({
+          principleId:
+            "principle-a",
+
+          signature:
+            first,
+
+          useful:
+            true,
+        });
+
+        expect(
+          full.estimate(
+            "principle-a",
+            second,
+          ).evidenceCount,
+        ).toBe(0);
+      },
+    );
+
+    it(
       "keeps evidence separate across structural signatures and principles",
       () => {
         const firstEncoder =
