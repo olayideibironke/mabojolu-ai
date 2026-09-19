@@ -192,7 +192,7 @@ function thresholdEpisode():
           "FINISH",
 
         before: {
-          progress:
+          counter:
             0,
 
           done:
@@ -200,7 +200,7 @@ function thresholdEpisode():
         },
 
         after: {
-          progress:
+          counter:
             0,
 
           done:
@@ -218,7 +218,7 @@ function thresholdEpisode():
           "INC",
 
         before: {
-          progress:
+          counter:
             0,
 
           done:
@@ -226,7 +226,7 @@ function thresholdEpisode():
         },
 
         after: {
-          progress:
+          counter:
             1,
 
           done:
@@ -234,7 +234,7 @@ function thresholdEpisode():
         },
 
         changedKeys: [
-          "progress",
+          "counter",
         ],
 
         accepted:
@@ -246,7 +246,7 @@ function thresholdEpisode():
           "FINISH",
 
         before: {
-          progress:
+          counter:
             1,
 
           done:
@@ -254,7 +254,7 @@ function thresholdEpisode():
         },
 
         after: {
-          progress:
+          counter:
             1,
 
           done:
@@ -272,7 +272,7 @@ function thresholdEpisode():
           "INC",
 
         before: {
-          progress:
+          counter:
             1,
 
           done:
@@ -280,7 +280,7 @@ function thresholdEpisode():
         },
 
         after: {
-          progress:
+          counter:
             2,
 
           done:
@@ -288,7 +288,7 @@ function thresholdEpisode():
         },
 
         changedKeys: [
-          "progress",
+          "counter",
         ],
 
         accepted:
@@ -300,7 +300,7 @@ function thresholdEpisode():
           "FINISH",
 
         before: {
-          progress:
+          counter:
             2,
 
           done:
@@ -308,7 +308,7 @@ function thresholdEpisode():
         },
 
         after: {
-          progress:
+          counter:
             2,
 
           done:
@@ -531,7 +531,7 @@ describe(
             "INC",
             "ready",
             "latched",
-            "progress",
+            "counter",
             "done",
           ]
         ) {
