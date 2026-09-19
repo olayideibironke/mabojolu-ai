@@ -10,6 +10,10 @@ import type {
   AbstractPrinciplePortfolioSnapshot,
 } from "./abstract-principle-portfolio";
 
+import type {
+  PrincipleApplicabilityModel,
+} from "./principle-applicability-model";
+
 import {
   AutonomousCausalHypothesisEngine,
   type AutonomousCausalHypothesis,
@@ -196,6 +200,13 @@ export interface CognitiveRuntimeOptions {
    */
   abstractPrinciplePortfolio?:
     AbstractPrinciplePortfolio;
+
+  /**
+   * Persistent evidence model for learning which abstraction applies in which
+   * generic target context. Only used with abstractPrinciplePortfolio.
+   */
+  principleApplicabilityModel?:
+    PrincipleApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -461,7 +472,11 @@ export class CognitiveRuntime {
 
     this.abstractPrinciplePortfolioController =
       this.abstractPrinciplePortfolio
-        ?.createController();
+        ?.createController({
+          applicabilityModel:
+            options
+              .principleApplicabilityModel,
+        });
 
     this.abstractPrincipleController =
       this.abstractPrincipleLibrary
