@@ -154,9 +154,11 @@ absent from both the induced signature and the learned projection.
 The evaluation deliberately adds generic nuisance dimensions such as history
 length and number of distinct observed actions. Calibration evidence varies
 success and failure while those nuisance dimensions do not predict outcome. The
-learner must discover which structural dimension carries predictive information,
-then generalize despite a held-out nuisance shift that defeats exact-signature
-matching.
+verified v0.4 core signature key remains unchanged for backward compatibility;
+v0.5 uses a separate full-feature exact mode as the comparator. The learner must
+discover which structural dimension carries predictive information, then
+generalize despite a held-out nuisance shift that defeats full-feature exact
+matching without regressing the earlier core-signature transfer capability.
 
 Even if verified, this is learned feature relevance over an engineered feature
 vocabulary, not autonomous latent representation discovery. A stronger later
