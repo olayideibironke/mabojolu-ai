@@ -30,6 +30,12 @@ const BROWSER_FAILURE_COOLDOWN_MS =
 const BROWSER_DISPLAY_MODEL =
   "mabojolu-browser-fast";
 
+const BROWSER_ARTIFACT_MANIFEST_URL =
+  process.env
+    .NEXT_PUBLIC_MABOJOLU_ARTIFACT_MANIFEST_URL
+    ?.trim() ||
+  null;
+
 const SYSTEM_PROMPT =
   "You are Mabojolu, a helpful on-device AI assistant. " +
   "Answer accurately and clearly. You are running entirely on the user's device. " +
@@ -931,6 +937,9 @@ export async function streamBrowserChat(
         modelCandidates:
           deviceProfile
             .modelCandidates,
+
+        artifactManifestUrl:
+          BROWSER_ARTIFACT_MANIFEST_URL,
 
         messages:
           context.messages,
