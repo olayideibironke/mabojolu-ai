@@ -126,15 +126,9 @@ function featureValue(
       feature
     ];
 
-  return Array.isArray(
+  return JSON.stringify(
     value,
-  )
-    ? JSON.stringify(
-        value,
-      )
-    : JSON.stringify(
-        value,
-      );
+  );
 }
 
 function informationGainFor(
