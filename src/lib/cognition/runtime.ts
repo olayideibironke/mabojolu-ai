@@ -3103,6 +3103,10 @@ export class CognitiveRuntime {
     solved:
       boolean,
   ): CognitiveRunResult {
+    const abstractPrinciple =
+      this.abstractPrincipleLibrary
+        ?.getPrinciple();
+
     return {
       solved,
 
@@ -3164,29 +3168,18 @@ export class CognitiveRuntime {
           }
         : {}),
 
-      ...(this.abstractPrincipleLibrary
-          ?.getPrinciple()
+      ...(abstractPrinciple
         ? {
             abstractPrinciple: {
-              ...this.abstractPrincipleLibrary
-                .getPrinciple() as
-                AbstractPrinciple,
+              ...abstractPrinciple,
 
               supportFamilies: [
-                ...(
-                  this.abstractPrincipleLibrary
-                    .getPrinciple() as
-                    AbstractPrinciple
-                )
+                ...abstractPrinciple
                   .supportFamilies,
               ],
 
               supportEpisodeIds: [
-                ...(
-                  this.abstractPrincipleLibrary
-                    .getPrinciple() as
-                    AbstractPrinciple
-                )
+                ...abstractPrinciple
                   .supportEpisodeIds,
               ],
             },
