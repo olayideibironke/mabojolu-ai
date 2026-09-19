@@ -111,6 +111,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   difficulty and isolated held-out evaluation;
 - multi-family autonomous practice across distinct Boolean-gating and numeric
   threshold causal structures with explicit negative-transfer boundaries;
+- controlled cross-family induction of a symbol-independent higher-order
+  policy principle with measured improvement in a third unfamiliar family;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -120,38 +122,41 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is cross-family abstract principle
-induction:
+The current central intelligence milestone is competing abstractions with
+contextual principle selection:
 
-1. identify a higher-order causal-control pattern from raw transition evidence;
-2. require supporting evidence from at least two distinct structural task-family
-   kinds before activating the principle, so relabeling one structure is not
-   enough;
-3. store the abstraction without source action labels or source state-variable
-   names;
-4. keep same-family repetition insufficient for an abstract-transfer claim;
-5. enter a third unfamiliar family without predicting which target action fills
-   the abstract role before observing target evidence;
-6. use target-world evidence to bind the abstraction to a concrete deferred
-   action;
-7. test whether the learned principle reduces work relative to the same third
-   family without cross-family evidence;
-8. retain contradiction accounting so repeated incompatible evidence can retire
-   the principle.
+1. induce more than one higher-order principle from independent cross-family
+   evidence;
+2. keep each principle's support, contradictions, confidence, and provenance
+   separate;
+3. keep persistent principle evidence separate from per-episode target binding
+   state;
+4. allow multiple active principles to become simultaneously eligible in a new
+   target environment;
+5. estimate target applicability from directly observed evidence rather than
+   source symbols;
+6. score competing recommendations using contextual applicability and learned
+   evidence confidence;
+7. select the principle with the strongest current fit, while preserving the
+   other principle for later evidence in the same episode;
+8. verify that contextual selection improves a fourth unfamiliar family beyond
+   both no abstraction and a single broad abstraction.
 
-The controlled principle currently under test is: an accepted action that has
-no observable effect may become goal-effective after other actions produce
-observable progress, so a deferred action can be retried after progress before
-generic exploration exhausts unrelated alternatives. Activation requires this
-pattern to appear across structurally different family kinds.
+The two controlled principles under test are:
 
-The stronger scientific question is whether Mabojolu can learn a policy-level
-regularity across different causal representations and use it in a third
-representation without copying source symbols or a source skill.
+- retry a previously deferred no-effect goal action after observable progress;
+- after directly observing monotonic numeric progress, repeat that productive
+  action once before returning to the deferred goal attempt.
 
-Even if verified, one such principle is not AGI. Later work must induce multiple
-competing abstractions, learn when each abstraction applies, and transfer them
-across a wider distribution of unseen task families.
+A fourth-family task is constructed so both principles become plausible after
+the same observation but recommend different actions. The portfolio must first
+select the more specific numeric-progress abstraction, then later select the
+broader deferred-goal abstraction when the numeric repeat has been consumed.
+
+Even if verified, this is still controlled abstraction selection, not AGI.
+Later work must learn applicability models from broader evidence rather than
+using only hand-engineered contextual features, expand the abstraction set, and
+remain robust when principles conflict, partially apply, or fail.
 
 ## Safety and audit principle
 
