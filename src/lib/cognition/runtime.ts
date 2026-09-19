@@ -11,6 +11,11 @@ import {
   type SnapshotChange,
 } from "./environment";
 
+import {
+  HierarchicalGoalReasoner,
+  type GoalHierarchySnapshot,
+} from "./goal-hierarchy";
+
 import type {
   CognitiveMemory,
   EpisodeTransition,
@@ -73,6 +78,12 @@ interface ActionChoice {
 
   expectedEffects?:
     string[];
+
+  hierarchyGoalId?:
+    string;
+
+  predictedState?:
+    EnvironmentSnapshot;
 }
 
 export interface CognitiveRuntimeOptions {
@@ -125,6 +136,9 @@ export interface CognitiveRunResult {
 
   generatedHypotheses:
     AutonomousCausalHypothesis[];
+
+  goalHierarchy:
+    GoalHierarchySnapshot;
 
   state:
     CognitiveState;
@@ -179,6 +193,21 @@ export class CognitiveRuntime {
   private readonly clock:
     () => string;
 
+  private readonly goalHierarchy:
+    HierarchicalGoalReasoner;
+
+  private readonly rootGoalId:
+    string;
+
+  private hierarchyPlanInitialized =
+    false;
+
+  private hierarchyPlanGoalIds:
+    string[] = [];
+
+  private hierarchyPlanIndex =
+    0;
+
   private readonly memory:
     CognitiveMemory |
     undefined;
@@ -226,6 +255,11 @@ export class CognitiveRuntime {
       (() =>
         new Date()
           .toISOString());
+
+    this.goalHierarchy =
+      new HierarchicalGoalReasoner(
+        this.clock,
+      );
 
     this.memory =
       options.memory;
@@ -292,6 +326,9 @@ export class CognitiveRuntime {
         createdAt,
     };
 
+    this.rootGoalId =
+      goal.id;
+
     this.apply({
       type:
         "goal.updated",
@@ -309,6 +346,17 @@ export class CognitiveRuntime {
       occurredAt:
         this.now(),
     });
+
+    this.goalHierarchy
+      .registerRoot({
+        ...goal,
+
+        status:
+          "active",
+
+        updatedAt:
+          this.now(),
+      });
   }
 
   run():
@@ -561,6 +609,11 @@ export class CognitiveRuntime {
           observedAt:
             this.now(),
         });
+
+      this.updateGoalHierarchyAfterAction(
+        choice,
+        after,
+      );
 
       const structuralUpdate =
         this.structuralSession
@@ -975,6 +1028,15 @@ export class CognitiveRuntime {
       return undefined;
     }
 
+    this.initializeGoalHierarchyFromPlan(
+      plan.steps,
+    );
+
+    const hierarchyGoalId =
+      this.hierarchyPlanGoalIds[
+        this.hierarchyPlanIndex
+      ];
+
     return {
       action:
         firstStep.action,
@@ -991,9 +1053,219 @@ export class CognitiveRuntime {
               effect.after,
             )}`,
         ),
+
+      ...(hierarchyGoalId
+        ? {
+            hierarchyGoalId,
+          }
+        : {}),
+
+      predictedState: {
+        ...firstStep
+          .predictedState,
+      },
     };
   }
 
+  private initializeGoalHierarchyFromPlan(
+    steps:
+      readonly {
+        action: string;
+        predictedState:
+          EnvironmentSnapshot;
+      }[],
+  ): void {
+    if (
+      this.hierarchyPlanInitialized ||
+      steps.length ===
+        0
+    ) {
+      return;
+    }
+
+    const specifications =
+      steps.map(
+        (
+          step,
+          index,
+        ) => {
+          const id =
+            `hierarchy-step-${index + 1}`;
+
+          const previousId =
+            index > 0
+              ? `hierarchy-step-${index}`
+              : undefined;
+
+          const stateDescription =
+            Object.entries(
+              step.predictedState,
+            )
+              .sort(
+                ([left], [right]) =>
+                  left.localeCompare(
+                    right,
+                  ),
+              )
+              .map(
+                ([key, value]) =>
+                  `${key}=${String(
+                    value,
+                  )}`,
+              )
+              .join(", ");
+
+          return {
+            id,
+
+            description:
+              `Reach modeled state after action ${step.action}.`,
+
+            priority:
+              Math.max(
+                1,
+                100 -
+                  index,
+              ),
+
+            successCriteria: [
+              `Observable state matches: ${stateDescription}.`,
+            ],
+
+            ...(previousId
+              ? {
+                  dependsOnGoalIds: [
+                    previousId,
+                  ],
+                }
+              : {}),
+          };
+        },
+      );
+
+    this.goalHierarchy
+      .decompose(
+        this.rootGoalId,
+        specifications,
+      );
+
+    this.hierarchyPlanGoalIds =
+      specifications.map(
+        (specification) =>
+          specification.id,
+      );
+
+    this.hierarchyPlanInitialized =
+      true;
+
+    const next =
+      this.goalHierarchy
+        .nextActionableGoal();
+
+    if (
+      next
+    ) {
+      this.goalHierarchy
+        .activate(
+          next.id,
+        );
+    }
+
+    this.syncGoalHierarchyToState();
+  }
+
+  private updateGoalHierarchyAfterAction(
+    choice:
+      ActionChoice,
+
+    after:
+      EnvironmentSnapshot,
+  ): void {
+    if (
+      !choice.hierarchyGoalId ||
+      !choice.predictedState
+    ) {
+      return;
+    }
+
+    const predictionMatched =
+      snapshotSignature(
+        choice.predictedState,
+      ) ===
+      snapshotSignature(
+        after,
+      );
+
+    if (
+      predictionMatched
+    ) {
+      this.goalHierarchy
+        .complete(
+          choice
+            .hierarchyGoalId,
+        );
+
+      this.hierarchyPlanIndex +=
+        1;
+
+      const next =
+        this.goalHierarchy
+          .nextActionableGoal();
+
+      if (
+        next
+      ) {
+        this.goalHierarchy
+          .activate(
+            next.id,
+          );
+      }
+    } else {
+      this.goalHierarchy
+        .block(
+          choice
+            .hierarchyGoalId,
+          "The observed state did not match the modeled subgoal prediction.",
+        );
+    }
+
+    this.syncGoalHierarchyToState();
+  }
+
+  private syncGoalHierarchyToState():
+    void {
+    const snapshot =
+      this.goalHierarchy
+        .getSnapshot();
+
+    for (
+      const goal of
+        snapshot.goals
+    ) {
+      this.apply({
+        type:
+          "goal.updated",
+
+        goal,
+      });
+    }
+
+    if (
+      snapshot.activeGoalId
+    ) {
+      this.apply({
+        type:
+          "goal.activated",
+
+        goalId:
+          snapshot
+            .activeGoalId,
+
+        occurredAt:
+          this.now(),
+      });
+    }
+  }
   private nextAutonomousHypothesisAction(
     availableActions:
       readonly string[],
@@ -1828,23 +2100,13 @@ export class CognitiveRuntime {
 
   private completeGoal():
     void {
-    const activeGoalId =
-      this.state
-        .activeGoalId;
-
-    if (
-      !activeGoalId
-    ) {
-      return;
-    }
-
     const goal =
       this.state
         .goals
         .find(
           (candidate) =>
             candidate.id ===
-            activeGoalId,
+            this.rootGoalId,
         );
 
     if (
@@ -1852,6 +2114,13 @@ export class CognitiveRuntime {
     ) {
       return;
     }
+
+    this.goalHierarchy
+      .complete(
+        this.rootGoalId,
+      );
+
+    this.syncGoalHierarchyToState();
 
     this.apply({
       type:
@@ -1868,7 +2137,6 @@ export class CognitiveRuntime {
       },
     });
   }
-
   private finishRun(
     solved:
       boolean,
@@ -1990,6 +2258,10 @@ export class CognitiveRuntime {
               ],
             }),
           ),
+
+      goalHierarchy:
+        this.goalHierarchy
+          .getSnapshot(),
 
       state:
         this.state,
