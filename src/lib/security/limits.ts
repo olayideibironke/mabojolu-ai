@@ -144,7 +144,7 @@ export async function checkUsageLimits(
       /**
        * Count successful assistant responses across the guest's complete history rather than using a rolling window.
        *
-       * A guest receives five successful exploratory responses total. Waiting or refreshing
+       * A guest receives ten successful exploratory responses total. Waiting or refreshing
        * must not create another allowance. Upgrading the anonymous account keeps
        * the same user ID and therefore preserves the conversation history.
        */
