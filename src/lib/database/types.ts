@@ -83,7 +83,9 @@ export interface UsageEventInput {
 }
 
 export type PluginProviderId =
-  | "google"
+  | "google-calendar"
+  | "google-drive"
+  | "google-gmail"
   | "microsoft"
   | "github";
 
