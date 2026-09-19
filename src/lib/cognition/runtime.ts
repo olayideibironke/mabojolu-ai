@@ -5,6 +5,11 @@ import {
 } from "./abstract-principle";
 
 import {
+  AbstractPrinciplePortfolio,
+  type AbstractPrinciplePortfolioSnapshot,
+} from "./abstract-principle-portfolio";
+
+import {
   AutonomousCausalHypothesisEngine,
   type AutonomousCausalHypothesis,
 } from "./autonomous-hypothesis";
@@ -181,6 +186,15 @@ export interface CognitiveRuntimeOptions {
    */
   abstractPrincipleLibrary?:
     CrossFamilyPrincipleLibrary;
+
+  /**
+   * Multi-principle abstraction store and contextual selector.
+   *
+   * When supplied, this takes precedence over abstractPrincipleLibrary for
+   * episode learning and target-world abstraction selection.
+   */
+  abstractPrinciplePortfolio?:
+    AbstractPrinciplePortfolio;
 }
 
 export interface CognitiveRunResult {
@@ -206,6 +220,9 @@ export interface CognitiveRunResult {
   abstractPrinciple?:
     AbstractPrinciple;
 
+  abstractPrinciplePortfolio?:
+    AbstractPrinciplePortfolioSnapshot;
+
   generatedHypotheses:
     AutonomousCausalHypothesis[];
 
@@ -230,7 +247,7 @@ export interface CognitiveRunResult {
  * 4. Compose multiple learned skills when no single skill reaches the goal.
  * 5. Test a learned skill's relational structure under renamed target symbols.
  * 6. Use broader structural transfer or same-environment episodic transfer.
- * 7. Apply an active higher-order principle learned across distinct task families.
+ * 7. Score and select among active higher-order principles using target evidence.
  * 8. Run causal-hypothesis experiments and evidence-driven exploration.
  *
  * Every real transition is fed back into the world model, so incorrect
@@ -364,6 +381,10 @@ export class CognitiveRuntime {
     CrossFamilyPrincipleLibrary |
     undefined;
 
+  private readonly abstractPrinciplePortfolio:
+    AbstractPrinciplePortfolio |
+    undefined;
+
   private readonly abstractPrincipleController:
     AbstractPrincipleController |
     undefined;
@@ -429,6 +450,9 @@ export class CognitiveRuntime {
 
     this.abstractPrincipleLibrary =
       options.abstractPrincipleLibrary;
+
+    this.abstractPrinciplePortfolio =
+      options.abstractPrinciplePortfolio;
 
     this.abstractPrincipleController =
       this.abstractPrincipleLibrary
@@ -802,20 +826,43 @@ export class CognitiveRuntime {
             this.now(),
         });
 
-      this.abstractPrincipleController
-        ?.observeTransition({
-          action,
+      if (
+        this.abstractPrinciplePortfolio
+      ) {
+        this.abstractPrinciplePortfolio
+          .observeTransition({
+            action,
 
-          accepted:
-            environmentResult
-              .accepted,
+            accepted:
+              environmentResult
+                .accepted,
 
-          changedKeys:
-            changes.map(
-              (change) =>
-                change.key,
-            ),
-        });
+            before,
+
+            after,
+
+            changedKeys:
+              changes.map(
+                (change) =>
+                  change.key,
+              ),
+          });
+      } else {
+        this.abstractPrincipleController
+          ?.observeTransition({
+            action,
+
+            accepted:
+              environmentResult
+                .accepted,
+
+            changedKeys:
+              changes.map(
+                (change) =>
+                  change.key,
+              ),
+          });
+      }
 
       this.advanceGoalHierarchyFromObservation(
         after,
@@ -1200,6 +1247,40 @@ export class CognitiveRuntime {
     availableActions:
       readonly string[],
   ): ActionChoice | undefined {
+    const portfolioRecommendation =
+      this.abstractPrinciplePortfolio
+        ?.recommend(
+          availableActions,
+        );
+
+    if (
+      portfolioRecommendation
+    ) {
+      return {
+        action:
+          portfolioRecommendation
+            .action,
+
+        strategy:
+          "abstract-principle",
+
+        expectedEffects: [
+          "Competing cross-family abstractions were scored against target-world evidence; selected " +
+          portfolioRecommendation
+            .principleKind +
+          " with applicability " +
+          portfolioRecommendation
+            .applicability
+            .toFixed(2) +
+          " and evidence confidence " +
+          portfolioRecommendation
+            .confidence
+            .toFixed(2) +
+          ".",
+        ],
+      };
+    }
+
     const recommendation =
       this.abstractPrincipleController
         ?.recommend(
@@ -2966,7 +3047,8 @@ export class CognitiveRuntime {
     if (
       this.memory ||
       this.skillLibrary ||
-      this.abstractPrincipleLibrary
+      this.abstractPrincipleLibrary ||
+      this.abstractPrinciplePortfolio
     ) {
       completedAt =
         this.now();
@@ -3015,34 +3097,46 @@ export class CognitiveRuntime {
         : undefined;
 
     if (
-      this.abstractPrincipleLibrary &&
       this.taskFamily &&
       this.taskFamilyKind &&
       goalConditions &&
       completedAt &&
       episodeEvidenceId
     ) {
-      this.abstractPrincipleLibrary
-        .learnFromEpisode({
-          episodeId:
-            episodeEvidenceId,
+      const principleEpisode = {
+        episodeId:
+          episodeEvidenceId,
 
-          family:
-            this.taskFamily,
+        family:
+          this.taskFamily,
 
-          familyKind:
-            this.taskFamilyKind,
+        familyKind:
+          this.taskFamilyKind,
 
-          solved,
+        solved,
 
-          goalConditions,
+        goalConditions,
 
-          transitions:
-            this.episodeTransitions,
+        transitions:
+          this.episodeTransitions,
 
-          observedAt:
-            completedAt,
-        });
+        observedAt:
+          completedAt,
+      };
+
+      if (
+        this.abstractPrinciplePortfolio
+      ) {
+        this.abstractPrinciplePortfolio
+          .learnFromEpisode(
+            principleEpisode,
+          );
+      } else {
+        this.abstractPrincipleLibrary
+          ?.learnFromEpisode(
+            principleEpisode,
+          );
+      }
     }
 
     if (
@@ -3126,6 +3220,10 @@ export class CognitiveRuntime {
       this.abstractPrincipleLibrary
         ?.getPrinciple();
 
+    const abstractPrinciplePortfolio =
+      this.abstractPrinciplePortfolio
+        ?.getSnapshot();
+
     return {
       solved,
 
@@ -3184,6 +3282,12 @@ export class CognitiveRuntime {
             structuralSkillTransfer:
               this.structuralSkillSession
                 .getState(),
+          }
+        : {}),
+
+      ...(abstractPrinciplePortfolio
+        ? {
+            abstractPrinciplePortfolio,
           }
         : {}),
 
