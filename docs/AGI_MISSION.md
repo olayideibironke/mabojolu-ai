@@ -117,6 +117,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   measured improvement in a fourth unfamiliar family;
 - learned principle applicability from cross-episode application outcomes with
   explicit priors and principle-specific utility feedback;
+- induced symbol-independent structural context signatures that transfer
+  applicability across renamed actions and state variables;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -126,36 +128,41 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is induced structural context
-signatures for abstraction applicability:
+The current central intelligence milestone is learned structural context feature
+relevance and compression:
 
-1. derive applicability context directly from raw target-world transition
-   history rather than requiring hand-authored semantic labels such as
-   numeric/nonnumeric or productive-repeat/deferred-action as the evidence key;
-2. discard source action labels and state-variable names from the resulting
-   signature;
-3. retain only structural relations such as prior candidate effects, change
-   arity, value-transition shape, action recurrence, and temporal distance;
-4. assign an explicit uncertainty prior to unseen principle/signature pairs;
-5. learn applicability independently for each principle and induced signature;
-6. transfer that learned applicability across renamed actions and renamed state
-   variables when the underlying structural signature matches;
-7. keep persistent signature-level evidence separate from per-episode raw
-   history and bindings;
-8. compare a calibrated signature model against an identical uncalibrated model
-   on a held-out conflict.
+1. start from the full induced structural signature rather than choosing the
+   supposedly important dimensions by hand;
+2. collect both successful and failed principle-application outcomes across
+   episodes;
+3. estimate how much each structural dimension reduces uncertainty about
+   principle usefulness;
+4. rank dimensions using evidence rather than a fixed semantic preference;
+5. compress applicability context to the most predictive evidenced dimensions;
+6. ignore nuisance structural differences when they do not predict utility;
+7. transfer learned applicability to a held-out context whose full structural
+   signature is new but whose learned predictive projection matches prior
+   successful experience;
+8. compare the compressed feature learner against an exact-signature learner
+   trained on the same application outcomes.
 
-The signature encoder is deterministic and symbol-independent. It observes raw
-before/after values and action recurrence, then emits a canonical structural
-signature containing no source symbols. The applicability learner uses that
-signature as its evidence key.
+The first controlled learner uses empirical information gain to select structural
+dimensions independently per principle. An explicit Beta prior remains in place
+for unseen learned projections. Raw action labels and state-variable names remain
+absent from both the induced signature and the learned projection.
 
-This is a stronger removal of hand-authored semantic applicability categories,
-but it is not yet learned latent representation discovery. The structural
-feature vocabulary itself is still engineered. A later milestone should learn
-or compress useful context dimensions from broader experience, test robustness
-to irrelevant observations and noisy transitions, and determine whether the
-learned representation transfers beyond structurally isomorphic histories.
+The evaluation deliberately adds generic nuisance dimensions such as history
+length and number of distinct observed actions. Calibration evidence varies
+success and failure while those nuisance dimensions do not predict outcome. The
+learner must discover which structural dimension carries predictive information,
+then generalize despite a held-out nuisance shift that defeats exact-signature
+matching.
+
+Even if verified, this is learned feature relevance over an engineered feature
+vocabulary, not autonomous latent representation discovery. A stronger later
+milestone should create or combine context features from experience itself,
+rather than only selecting among dimensions supplied by the architecture, and
+should survive noisy, sparse, and partially contradictory evidence.
 
 ## Safety and audit principle
 
