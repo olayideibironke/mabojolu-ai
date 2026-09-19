@@ -448,6 +448,9 @@ describe(
             taskFamily:
               "gated-family",
 
+            taskFamilyKind:
+              "gated-sequence",
+
             maxCycles:
               8,
 
