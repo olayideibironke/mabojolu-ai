@@ -230,7 +230,6 @@ async function getSupabaseSession(): Promise<Session | null> {
     isAnonymous
       ? null
       : user.email_confirmed_at ??
-        user.confirmed_at ??
         user.created_at ??
         null;
 
