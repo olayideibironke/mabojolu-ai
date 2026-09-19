@@ -333,11 +333,20 @@ describe(
                   .kind,
             ),
         ).toEqual([
-          "experiment",
-          "experiment",
+          "structural-transfer",
+          "structural-transfer",
           "structural-transfer",
           "structural-transfer",
         ]);
+
+        expect(
+          target.state
+            .actions[0]
+            ?.proposal
+            .expectedEffects[0],
+        ).toContain(
+          "reduce uncertainty",
+        );
 
         expect(
           target.recalledPlan,
@@ -403,12 +412,18 @@ describe(
 
         expect(
           target.state
-            .actions[3]
-            ?.proposal
-            .kind,
-        ).toBe(
-          "structural-transfer",
-        );
+            .actions
+            .slice(
+              0,
+              4,
+            )
+            .every(
+              (action) =>
+                action.proposal
+                  .kind ===
+                "structural-transfer",
+            ),
+        ).toBe(true);
 
         expect(
           target.state
