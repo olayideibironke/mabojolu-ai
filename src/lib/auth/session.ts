@@ -383,20 +383,11 @@ export async function requireAdminSession(): Promise<Session> {
 export async function setDevSession(
   userId: string,
 ): Promise<boolean> {
-  const envResult =
-    inspectServerEnv();
-
   if (
-    !envResult.ok ||
-    envResult.env.AUTH_MODE !==
-      "dev"
-  ) {
-    return false;
-  }
-
-  if (
-    envResult.env.NODE_ENV ===
-    "production"
+    authRuntimeMode() !==
+      "dev" ||
+    process.env.NODE_ENV ===
+      "production"
   ) {
     return false;
   }
