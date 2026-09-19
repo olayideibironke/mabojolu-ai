@@ -439,12 +439,23 @@ class RelationalCalibrationWorld
         this.preludeCount +=
           1;
 
+        if (
+          this.preludeCount ===
+            1
+        ) {
+          this.setupOne =
+            true;
+        } else {
+          this.setupTwo =
+            true;
+        }
+
         return {
           accepted:
             true,
 
           summary:
-            "Invisible priming attempt completed.",
+            "Observable same-action priming completed.",
         };
       }
 
