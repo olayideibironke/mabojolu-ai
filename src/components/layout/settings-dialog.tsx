@@ -30,9 +30,9 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Fast",
     label: "Mabojolu Fast",
     description:
-      "The quickest local response mode with the lowest processor demand.",
+      "Browser-first on compatible WebGPU devices, with local Ollama fallback.",
     bestFor:
-      "Short questions, quick explanations, simple drafting, and everyday assistance.",
+      "Private on-device responses, short questions, quick explanations, simple drafting, and everyday assistance.",
   },
   {
     id: "mabojolu-regular",
