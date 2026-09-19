@@ -1,8 +1,8 @@
 "use client";
 
 import {
-  detectBrowserComputeCapabilities,
-} from "./browser-compute";
+  profileBrowserDevice,
+} from "./browser-device-profile";
 
 import {
   selectComputeRoute,
@@ -17,8 +17,11 @@ import type {
   ChatMessage,
 } from "@/types/chat";
 
-const BROWSER_MODEL_ID =
-  "Llama-3.2-1B-Instruct-q4f16_1-MLC";
+const BROWSER_FAILURE_STORAGE_KEY =
+  "mabojolu-browser-compute-disabled-until";
+
+const BROWSER_FAILURE_COOLDOWN_MS =
+  30 * 60 * 1_000;
 
 const BROWSER_DISPLAY_MODEL =
   "mabojolu-browser-fast";
@@ -114,17 +117,104 @@ function workerInstance():
   return sharedWorker;
 }
 
+function browserComputeTemporarilyDisabled():
+  boolean {
+  try {
+    if (
+      typeof window ===
+        "undefined"
+    ) {
+      return false;
+    }
+
+    const raw =
+      window.localStorage
+        .getItem(
+          BROWSER_FAILURE_STORAGE_KEY,
+        );
+
+    if (
+      !raw
+    ) {
+      return false;
+    }
+
+    const disabledUntil =
+      Number(raw);
+
+    if (
+      !Number.isFinite(
+        disabledUntil,
+      ) ||
+      disabledUntil <=
+        Date.now()
+    ) {
+      window.localStorage
+        .removeItem(
+          BROWSER_FAILURE_STORAGE_KEY,
+        );
+
+      return false;
+    }
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function markBrowserComputeFailure():
+  void {
+  try {
+    if (
+      typeof window ===
+        "undefined"
+    ) {
+      return;
+    }
+
+    window.localStorage
+      .setItem(
+        BROWSER_FAILURE_STORAGE_KEY,
+        String(
+          Date.now() +
+            BROWSER_FAILURE_COOLDOWN_MS,
+        ),
+      );
+  } catch {
+    // Routing still falls back after the current failed request.
+  }
+}
+
+function clearBrowserComputeFailure():
+  void {
+  try {
+    if (
+      typeof window ===
+        "undefined"
+    ) {
+      return;
+    }
+
+    window.localStorage
+      .removeItem(
+        BROWSER_FAILURE_STORAGE_KEY,
+      );
+  } catch {
+    // A successful generation does not depend on storage cleanup.
+  }
+}
+
 function browserRouteAvailable():
   boolean {
   if (
-    typeof Worker ===
-      "undefined"
+    browserComputeTemporarilyDisabled()
   ) {
     return false;
   }
 
-  const capabilities =
-    detectBrowserComputeCapabilities();
+  const profile =
+    profileBrowserDevice();
 
   const route =
     selectComputeRoute([
@@ -139,8 +229,8 @@ function browserRouteAvailable():
           "user",
 
         available:
-          capabilities
-            .eligible,
+          profile.tier !==
+            "unavailable",
 
         supportsStreaming:
           true,
@@ -526,6 +616,45 @@ export async function streamBrowserChat(
   const requestId =
     body.idempotencyKey;
 
+  const deviceProfile =
+    profileBrowserDevice();
+
+  if (
+    deviceProfile
+      .modelCandidates
+      .length ===
+      0
+  ) {
+    await settlePersistence({
+      conversationId:
+        start.conversationId,
+
+      assistantMessageId:
+        start.messageId,
+
+      content: "",
+
+      status:
+        "failed",
+
+      errorCode:
+        "browser_compute_unavailable",
+    });
+
+    callbacks.onError({
+      code:
+        "provider_unavailable",
+
+      message:
+        "On-device inference is unavailable on this device. Retry to use Mabojolu's local server inference.",
+
+      retryable:
+        true,
+    });
+
+    return;
+  }
+
   const worker =
     workerInstance();
 
@@ -588,6 +717,13 @@ export async function streamBrowserChat(
                 : "complete",
           });
 
+          if (
+            finishReason !==
+              "aborted"
+          ) {
+            clearBrowserComputeFailure();
+          }
+
           callbacks.onDone({
             finishReason,
           });
@@ -610,6 +746,8 @@ export async function streamBrowserChat(
             true;
 
           cleanup();
+
+          markBrowserComputeFailure();
 
           await settlePersistence({
             conversationId:
@@ -743,8 +881,9 @@ export async function streamBrowserChat(
 
         requestId,
 
-        modelId:
-          BROWSER_MODEL_ID,
+        modelCandidates:
+          deviceProfile
+            .modelCandidates,
 
         messages:
           browserMessages(
@@ -752,7 +891,8 @@ export async function streamBrowserChat(
           ),
 
         maxOutputTokens:
-          1024,
+          deviceProfile
+            .maxOutputTokens,
       });
     },
   );
@@ -760,5 +900,6 @@ export async function streamBrowserChat(
 
 export {
   BROWSER_DISPLAY_MODEL,
-  BROWSER_MODEL_ID,
+  BROWSER_FAILURE_COOLDOWN_MS,
+  BROWSER_FAILURE_STORAGE_KEY,
 };
