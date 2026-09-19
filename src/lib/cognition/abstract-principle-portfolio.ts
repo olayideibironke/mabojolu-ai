@@ -1266,6 +1266,55 @@ export class AbstractPrinciplePortfolioController {
           },
 
           ...(selected
+              .symbolicPredicateProjection
+            ? {
+                symbolicPredicateProjection: {
+                  programId:
+                    selected
+                      .symbolicPredicateProjection
+                      .programId,
+
+                  left:
+                    selected
+                      .symbolicPredicateProjection
+                      .left,
+
+                  right:
+                    selected
+                      .symbolicPredicateProjection
+                      .right,
+
+                  operator:
+                    selected
+                      .symbolicPredicateProjection
+                      .operator,
+
+                  ...(selected
+                      .symbolicPredicateProjection
+                      .parameter !==
+                    undefined
+                    ? {
+                        parameter:
+                          selected
+                            .symbolicPredicateProjection
+                            .parameter,
+                      }
+                    : {}),
+
+                  predicateValue:
+                    selected
+                      .symbolicPredicateProjection
+                      .predicateValue,
+
+                  projectionKey:
+                    selected
+                      .symbolicPredicateProjection
+                      .projectionKey,
+                },
+              }
+            : {}),
+
+          ...(selected
               .relationalContextProjection
             ? {
                 relationalContextProjection: {
@@ -1384,6 +1433,55 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .symbolicPredicateProjection
+        ? {
+            symbolicPredicateProjection: {
+              programId:
+                selected
+                  .symbolicPredicateProjection
+                  .programId,
+
+              left:
+                selected
+                  .symbolicPredicateProjection
+                  .left,
+
+              right:
+                selected
+                  .symbolicPredicateProjection
+                  .right,
+
+              operator:
+                selected
+                  .symbolicPredicateProjection
+                  .operator,
+
+              ...(selected
+                  .symbolicPredicateProjection
+                  .parameter !==
+                undefined
+                ? {
+                    parameter:
+                      selected
+                        .symbolicPredicateProjection
+                        .parameter,
+                  }
+                : {}),
+
+              predicateValue:
+                selected
+                  .symbolicPredicateProjection
+                  .predicateValue,
+
+              projectionKey:
+                selected
+                  .symbolicPredicateProjection
+                  .projectionKey,
+            },
+          }
+        : {}),
 
       ...(selected
           .relationalContextProjection
@@ -1509,6 +1607,55 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .symbolicPredicateProjection
+              ? {
+                  symbolicPredicateProjection: {
+                    programId:
+                      selection
+                        .symbolicPredicateProjection
+                        .programId,
+
+                    left:
+                      selection
+                        .symbolicPredicateProjection
+                        .left,
+
+                    right:
+                      selection
+                        .symbolicPredicateProjection
+                        .right,
+
+                    operator:
+                      selection
+                        .symbolicPredicateProjection
+                        .operator,
+
+                    ...(selection
+                        .symbolicPredicateProjection
+                        .parameter !==
+                      undefined
+                      ? {
+                          parameter:
+                            selection
+                              .symbolicPredicateProjection
+                              .parameter,
+                        }
+                      : {}),
+
+                    predicateValue:
+                      selection
+                        .symbolicPredicateProjection
+                        .predicateValue,
+
+                    projectionKey:
+                      selection
+                        .symbolicPredicateProjection
+                        .projectionKey,
+                  },
+                }
+              : {}),
 
             ...(selection
                 .relationalContextProjection
