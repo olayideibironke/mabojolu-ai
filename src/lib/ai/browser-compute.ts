@@ -368,11 +368,11 @@ export class WebLlmBrowserInferenceEngine
 
   private async loadOnce():
     Promise<void> {
-    const module =
+    const webLlmModule =
       await this.loadModule();
 
     this.engine =
-      await module
+      await webLlmModule
         .CreateMLCEngine(
           this.modelId,
           {
