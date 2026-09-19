@@ -155,13 +155,18 @@ function normalizedPresentationOrder(
     0 | 1 | 2,
     0 | 1 | 2,
   ] {
-  return spec
-    .actionPresentationOrder ??
-    [
-      0,
-      1,
-      2,
-    ];
+  if (
+    spec.actionPresentationOrder
+  ) {
+    return spec
+      .actionPresentationOrder;
+  }
+
+  return [
+    0,
+    1,
+    2,
+  ];
 }
 
 export function challengeFingerprint(
