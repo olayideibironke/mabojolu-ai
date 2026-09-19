@@ -7,7 +7,6 @@ import {
   randomBytes,
 } from "node:crypto";
 
-import { serverEnv } from "@/lib/env";
 
 const ALGORITHM =
   "aes-256-gcm";
@@ -15,10 +14,14 @@ const ALGORITHM =
 function encryptionKey():
   Buffer {
   const secret =
-    serverEnv()
-      .MABOJOLU_PLUGIN_ENCRYPTION_KEY;
+    process.env
+      .MABOJOLU_PLUGIN_ENCRYPTION_KEY
+      ?.trim();
 
-  if (!secret) {
+  if (
+    !secret ||
+    secret.length < 32
+  ) {
     throw new Error(
       "Plugin encryption is not configured.",
     );
