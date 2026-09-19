@@ -636,6 +636,14 @@ export class AbstractPrinciplePortfolioController {
               deferred.action,
             );
 
+        const validatedPredicate =
+          this.validatedSymbolicPredicateApplicabilityModel
+            ?.estimate(
+              deferred
+                .principleId,
+              signature,
+            );
+
         const predicate =
           this.symbolicPredicateApplicabilityModel
             ?.estimate(
@@ -685,6 +693,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          validatedPredicate
+            ?.applicability ??
           predicate
             ?.applicability ??
           relational
@@ -723,12 +733,14 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            predicate
-              ? predicate.evidenceCount >
-                  0
-                ? "predicate-learned"
-                : "predicate-prior"
-              : relational
+            validatedPredicate
+              ? "validated-predicate-learned"
+              : predicate
+                ? predicate.evidenceCount >
+                    0
+                  ? "predicate-learned"
+                  : "predicate-prior"
+                : relational
                 ? relational.evidenceCount >
                     0
                   ? "relational-learned"
@@ -756,6 +768,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            validatedPredicate
+              ?.evidenceCount ??
             predicate
               ?.evidenceCount ??
             relational
@@ -773,7 +787,60 @@ export class AbstractPrinciplePortfolioController {
           applicabilityContext:
             context,
 
-          ...(predicate
+          ...(validatedPredicate
+            ? {
+                predicateValidation: {
+                  ...validatedPredicate
+                    .validation,
+                },
+
+                symbolicPredicateProjection: {
+                  programId:
+                    validatedPredicate
+                      .projection
+                      .programId,
+
+                  left:
+                    validatedPredicate
+                      .projection
+                      .left,
+
+                  right:
+                    validatedPredicate
+                      .projection
+                      .right,
+
+                  operator:
+                    validatedPredicate
+                      .projection
+                      .operator,
+
+                  ...(validatedPredicate
+                      .projection
+                      .parameter !==
+                    undefined
+                    ? {
+                        parameter:
+                          validatedPredicate
+                            .projection
+                            .parameter,
+                      }
+                    : {}),
+
+                  predicateValue:
+                    validatedPredicate
+                      .projection
+                      .predicateValue,
+
+                  projectionKey:
+                    validatedPredicate
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : predicate
+              ? {
+                  symbolicPredicateProjection: {
             ? {
                 symbolicPredicateProjection: {
                   programId:
@@ -817,9 +884,9 @@ export class AbstractPrinciplePortfolioController {
                     predicate
                       .projection
                       .projectionKey,
-                },
-              }
-            : {}),
+                  },
+                }
+              : {}),
 
           ...(relational
             ? {
@@ -903,7 +970,8 @@ export class AbstractPrinciplePortfolioController {
               this.learnedContextFeatureApplicabilityModel ||
               this.composedContextFeatureApplicabilityModel ||
               this.relationalContextFeatureApplicabilityModel ||
-              this.symbolicPredicateApplicabilityModel
+              this.symbolicPredicateApplicabilityModel ||
+              this.validatedSymbolicPredicateApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
@@ -937,6 +1005,14 @@ export class AbstractPrinciplePortfolioController {
           this.signatureEncoder
             .encodeCandidate(
               monotonic.action,
+            );
+
+        const validatedPredicate =
+          this.validatedSymbolicPredicateApplicabilityModel
+            ?.estimate(
+              monotonic
+                .principleId,
+              signature,
             );
 
         const predicate =
@@ -988,6 +1064,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          validatedPredicate
+            ?.applicability ??
           predicate
             ?.applicability ??
           relational
@@ -1026,12 +1104,14 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            predicate
-              ? predicate.evidenceCount >
-                  0
-                ? "predicate-learned"
-                : "predicate-prior"
-              : relational
+            validatedPredicate
+              ? "validated-predicate-learned"
+              : predicate
+                ? predicate.evidenceCount >
+                    0
+                  ? "predicate-learned"
+                  : "predicate-prior"
+                : relational
                 ? relational.evidenceCount >
                     0
                   ? "relational-learned"
@@ -1059,6 +1139,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            validatedPredicate
+              ?.evidenceCount ??
             predicate
               ?.evidenceCount ??
             relational
@@ -1076,7 +1158,60 @@ export class AbstractPrinciplePortfolioController {
           applicabilityContext:
             context,
 
-          ...(predicate
+          ...(validatedPredicate
+            ? {
+                predicateValidation: {
+                  ...validatedPredicate
+                    .validation,
+                },
+
+                symbolicPredicateProjection: {
+                  programId:
+                    validatedPredicate
+                      .projection
+                      .programId,
+
+                  left:
+                    validatedPredicate
+                      .projection
+                      .left,
+
+                  right:
+                    validatedPredicate
+                      .projection
+                      .right,
+
+                  operator:
+                    validatedPredicate
+                      .projection
+                      .operator,
+
+                  ...(validatedPredicate
+                      .projection
+                      .parameter !==
+                    undefined
+                    ? {
+                        parameter:
+                          validatedPredicate
+                            .projection
+                            .parameter,
+                      }
+                    : {}),
+
+                  predicateValue:
+                    validatedPredicate
+                      .projection
+                      .predicateValue,
+
+                  projectionKey:
+                    validatedPredicate
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : predicate
+              ? {
+                  symbolicPredicateProjection: {
             ? {
                 symbolicPredicateProjection: {
                   programId:
@@ -1120,9 +1255,9 @@ export class AbstractPrinciplePortfolioController {
                     predicate
                       .projection
                       .projectionKey,
-                },
-              }
-            : {}),
+                  },
+                }
+              : {}),
 
           ...(relational
             ? {
@@ -1206,7 +1341,8 @@ export class AbstractPrinciplePortfolioController {
               this.learnedContextFeatureApplicabilityModel ||
               this.composedContextFeatureApplicabilityModel ||
               this.relationalContextFeatureApplicabilityModel ||
-              this.symbolicPredicateApplicabilityModel
+              this.symbolicPredicateApplicabilityModel ||
+              this.validatedSymbolicPredicateApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
