@@ -21,14 +21,10 @@ interface HandoverPromptProps {
     "urgent";
 
   packet:
-
-  string;
+    string;
 
   openRequestKey?:
     number;
-
-  
-    string;
 
   onContinueInNewChat:
     (
