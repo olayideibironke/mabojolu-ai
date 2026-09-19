@@ -119,6 +119,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   explicit priors and principle-specific utility feedback;
 - induced symbol-independent structural context signatures that transfer
   applicability across renamed actions and state variables;
+- learned structural context feature relevance and compression that ignores
+  evidenced nuisance dimensions beyond exact full-feature matching;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -128,43 +130,40 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is learned structural context feature
-relevance and compression:
+The current central intelligence milestone is autonomous structural context
+feature composition:
 
-1. start from the full induced structural signature rather than choosing the
-   supposedly important dimensions by hand;
-2. collect both successful and failed principle-application outcomes across
-   episodes;
-3. estimate how much each structural dimension reduces uncertainty about
-   principle usefulness;
-4. rank dimensions using evidence rather than a fixed semantic preference;
-5. compress applicability context to the most predictive evidenced dimensions;
-6. ignore nuisance structural differences when they do not predict utility;
-7. transfer learned applicability to a held-out context whose full structural
-   signature is new but whose learned predictive projection matches prior
-   successful experience;
-8. compare the compressed feature learner against an exact-signature learner
-   trained on the same application outcomes.
+1. retain the symbol-independent structural feature vocabulary and the verified
+   v0.5 atomic relevance learner;
+2. construct candidate higher-order context features from combinations of
+   structural dimensions rather than only selecting one supplied dimension;
+3. score every candidate against real success and failure outcomes;
+4. require a generated feature to reduce uncertainty beyond the best atomic
+   feature on the same evidence;
+5. refuse unnecessary composition when an atomic dimension already explains the
+   evidence equally well;
+6. persist the discovered higher-order feature independently per principle;
+7. use the composed feature to resolve an abstraction conflict that the atomic
+   learner cannot resolve;
+8. verify transfer in a renamed held-out task using the same calibration
+   outcomes for both the atomic and composed learners.
 
-The first controlled learner uses empirical information gain to select structural
-dimensions independently per principle. An explicit Beta prior remains in place
-for unseen learned projections. Raw action labels and state-variable names remain
-absent from both the induced signature and the learned projection.
+The first controlled feature-construction grammar is deliberately narrow:
+unordered pairs of existing structural dimensions. Candidate pairs are ranked by
+empirical information gain, and a pair is accepted only when its gain exceeds
+the best atomic information gain.
 
-The evaluation deliberately adds generic nuisance dimensions such as history
-length and number of distinct observed actions. Calibration evidence varies
-success and failure while those nuisance dimensions do not predict outcome. The
-verified v0.4 core signature key remains unchanged for backward compatibility;
-v0.5 uses a separate full-feature exact mode as the comparator. The learner must
-discover which structural dimension carries predictive information, then
-generalize despite a held-out nuisance shift that defeats full-feature exact
-matching without regressing the earlier core-signature transfer capability.
+The falsification dataset uses an XOR-style relationship: every individual
+dimension is uninformative, but a two-dimension interaction predicts whether the
+principle application succeeds. Eight renamed calibration episodes provide
+balanced positive and negative evidence. The held-out conflict then compares the
+verified v0.5 atomic learner with the v0.6 composed-feature learner.
 
-Even if verified, this is learned feature relevance over an engineered feature
-vocabulary, not autonomous latent representation discovery. A stronger later
-milestone should create or combine context features from experience itself,
-rather than only selecting among dimensions supplied by the architecture, and
-should survive noisy, sparse, and partially contradictory evidence.
+Even if verified, this is autonomous feature construction inside an engineered
+pairwise grammar, not open-ended latent representation discovery. Stronger work
+must generate richer transformations or representations rather than only pairs,
+control combinatorial growth, resist spurious compositions under noise, and
+show that invented features remain useful across broader unfamiliar domains.
 
 ## Safety and audit principle
 
