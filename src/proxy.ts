@@ -82,6 +82,56 @@ function applySecurityHeaders(response: NextResponse): NextResponse {
 }
 
 export async function proxy(request: NextRequest) {
+  /*
+   * Supabase falls back to the configured Site URL when a requested redirect
+   * is not present in its allow list. Password-recovery links can therefore
+   * arrive as /?code=... even though Mabojolu requested /auth/callback.
+   *
+   * Route any root-level auth code through Mabojolu's callback handler so the
+   * code is exchanged exactly once and the callback can distinguish a recent
+   * recovery from an ordinary confirmation flow.
+   */
+  if (
+    request.nextUrl.pathname ===
+      "/" &&
+    request.nextUrl.searchParams.has(
+      "code",
+    )
+  ) {
+    const callbackUrl =
+      new URL(
+        "/auth/callback",
+        request.url,
+      );
+
+    for (
+      const key of [
+        "code",
+        "next",
+        "sb_flow_id",
+      ]
+    ) {
+      const value =
+        request.nextUrl.searchParams.get(
+          key,
+        );
+
+      if (value) {
+        callbackUrl.searchParams.set(
+          key,
+          value,
+        );
+      }
+    }
+
+    return applySecurityHeaders(
+      NextResponse.redirect(
+        callbackUrl,
+        302,
+      ),
+    );
+  }
+
   let response = NextResponse.next({ request });
 
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
