@@ -404,6 +404,105 @@ describe("useChat", () => {
     expect(chatCalls()).toHaveLength(1);
   });
 
+  it("starts a handover continuation without carrying the old transcript", async () => {
+    const { result } =
+      renderHook(
+        () =>
+          useChat(),
+      );
+
+    await act(async () => {
+      result.current.send(
+        "Old project context",
+      );
+    });
+
+    await waitFor(() =>
+      expect(
+        result.current
+          .isStreaming,
+      ).toBe(
+        false,
+      ),
+    );
+
+    await act(async () => {
+      result.current
+        .startFreshConversation(
+          "# MABOJOLU CONTINUITY HANDOVER",
+        );
+    });
+
+    await waitFor(() =>
+      expect(
+        result.current
+          .isStreaming,
+      ).toBe(
+        false,
+      ),
+    );
+
+    expect(
+      chatCalls(),
+    ).toHaveLength(
+      2,
+    );
+
+    const secondCall =
+      chatCalls()[1] as [
+        string,
+        RequestInit,
+      ];
+
+    const body =
+      JSON.parse(
+        String(
+          secondCall[1]
+            .body,
+        ),
+      ) as {
+        conversationId?:
+          string;
+        messages:
+          Array<{
+            content:
+              string;
+          }>;
+      };
+
+    expect(
+      body.conversationId,
+    ).toBeUndefined();
+
+    expect(
+      body.messages,
+    ).toHaveLength(
+      1,
+    );
+
+    expect(
+      body.messages[0]
+        .content,
+    ).toBe(
+      "# MABOJOLU CONTINUITY HANDOVER",
+    );
+
+    expect(
+      result.current
+        .messages,
+    ).toHaveLength(
+      2,
+    );
+
+    expect(
+      result.current
+        .messages[0]
+        .content,
+    ).toBe(
+      "# MABOJOLU CONTINUITY HANDOVER",
+    );
+  });
+
   it("clears the transcript and conversation on reset", async () => {
     const { result } = renderHook(() => useChat());
 
