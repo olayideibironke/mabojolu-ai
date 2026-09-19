@@ -123,6 +123,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   evidenced nuisance dimensions beyond exact full-feature matching;
 - autonomous pairwise structural feature composition when no supplied atomic
   dimension explains principle usefulness;
+- autonomous relational context synthesis that extrapolates learned equality or
+  ordering structure to value combinations withheld during calibration;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -132,41 +134,43 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is autonomous relational context
-feature synthesis:
+The current central intelligence milestone is complexity-regularized symbolic
+predicate search:
 
-1. retain the verified atomic and exact-pair context learners;
-2. generate candidate relations over compatible count-like structural
-   dimensions instead of memorizing only their concrete value pairs;
-3. evaluate equality and ordering relations against real success/failure
-   evidence;
-4. require a synthesized relation to reduce outcome uncertainty beyond the best
-   supplied atomic feature;
-5. store the relation itself as the learned context representation rather than
-   source values, action labels, or state-variable names;
-6. apply the learned relation to a value combination never observed during
-   calibration;
-7. compare the relational learner against the verified v0.6 exact pair composer
-   trained on exactly the same application outcomes;
-8. preserve per-principle evidence and fresh per-episode target bindings.
+1. retain the verified atomic, exact-pair, and basic relational learners;
+2. search a broader auditable predicate-program grammar over compatible
+   structural count dimensions;
+3. include both simple comparisons and derived transformations such as signed
+   difference and absolute difference;
+4. score candidate programs by empirical information gain while charging an
+   explicit penalty for extra operations;
+5. admit a program only when its regularized score still exceeds the best
+   supplied atomic feature on the same evidence;
+6. prefer a simpler predicate when a more complex representation explains the
+   evidence equally well;
+7. transfer the selected program to a held-out structural value combination
+   never seen during calibration;
+8. compare against the verified v0.7 relation learner trained on exactly the
+   same application outcomes.
 
-The controlled calibration contains useful repeats when history length and the
-number of distinct observed actions are equal, and failed repeats for several
-unequal combinations. Calibration covers equal 1/1 and 2/2 cases but deliberately
-withholds the equal 3+/3+ combination. Exact pair composition can fit the
-training tuples but has no matching positive evidence for that held-out pair.
-A synthesized equality relation can project all equal-valued cases onto the same
-relational state and therefore extrapolate to 3+/3+.
+The controlled runtime calibration makes repeats useful for structural contexts
+whose history-length and distinct-action counts differ by at most one, while a
+two-step gap fails. The held-out context is 3+/2, a successful concrete pair not
+seen during calibration. The v0.7 ordering grammar can only place that case into
+a mixed greater-than bucket. The v0.8 search can synthesize the predicate
+abs(historyLength - distinctActionsSeen) <= 1 and reuse the broader rule.
 
-The first relation grammar remains intentionally small and auditable: equality,
-less-than, and greater-than over count-like structural dimensions. A candidate
-must improve on the best atomic feature before it is admitted.
+The first symbolic grammar remains intentionally bounded and inspectable:
+equality, ordering, signed-difference equality for small constants, and
+absolute-difference thresholds. Program complexity is penalized explicitly, so
+an equivalent simple equality rule must beat the more complex
+difference-equals-zero form.
 
-Even if verified, this is relational representation synthesis inside an
-engineered operator vocabulary, not open-ended latent representation discovery.
-Later work must invent or search richer operators, test noisy and contradictory
-relations, regularize search complexity, and transfer synthesized relations
-across broader domains whose useful structure is not known in advance.
+Even if verified, this is symbolic program search inside an engineered grammar,
+not open-ended representation invention. Stronger work must expand or learn the
+operator vocabulary, evaluate held-out predictive performance rather than only
+in-sample information gain, resist spurious programs under noisy or adversarial
+evidence, and control search complexity as the grammar grows.
 
 ## Safety and audit principle
 
