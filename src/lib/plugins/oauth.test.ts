@@ -14,7 +14,7 @@ const baseConfig = {
   clientSecret:
     "client-secret",
   redirectUri:
-    "https://mabojolu.example/api/plugins/google/callback",
+    "https://mabojolu.example/api/plugins/google-calendar/callback",
   authorizationUrl:
     "https://accounts.google.com/o/oauth2/v2/auth",
   scopes: [
@@ -33,11 +33,11 @@ describe(
           new URL(
             buildPluginAuthorizationUrl({
               providerId:
-                "google",
+                "google-calendar",
               config: {
                 ...baseConfig,
                 providerId:
-                  "google",
+                  "google-calendar",
               },
               state:
                 "state-1",
