@@ -37,8 +37,7 @@ export type VaultActionMapping =
   >;
 
 const ACTIONS:
-  readonly VaultActionLabel[] =
-  [
+  readonly VaultActionLabel[] = [
     "A",
     "B",
     "C",
@@ -52,7 +51,8 @@ const DEFAULT_MAPPING:
   };
 
 function validateMapping(
-  mapping: VaultActionMapping,
+  mapping:
+    VaultActionMapping,
 ): void {
   const roles =
     Object.values(
@@ -72,10 +72,13 @@ function validateMapping(
     const count =
       roles.filter(
         (candidate) =>
-          candidate === role,
+          candidate ===
+          role,
       ).length;
 
-    if (count !== 1) {
+    if (
+      count !== 1
+    ) {
       throw new Error(
         `Vault mapping must contain exactly one "${role}" action.`,
       );
@@ -134,6 +137,19 @@ export class VaultWorld
     };
   }
 
+  /**
+   * Mabojolu is allowed to know what success looks like.
+   *
+   * This reveals no causal information about how the vault is opened.
+   */
+  getGoalConditions():
+    EnvironmentSnapshot {
+    return {
+      vaultOpen:
+        true,
+    };
+  }
+
   act(
     action: string,
   ): EnvironmentActionResult {
@@ -144,7 +160,8 @@ export class VaultWorld
       )
     ) {
       return {
-        accepted: false,
+        accepted:
+          false,
 
         summary:
           `Action ${action} is not available.`,
@@ -156,15 +173,19 @@ export class VaultWorld
         VaultActionLabel;
 
     const role =
-      this.mapping[label];
+      this.mapping[
+        label
+      ];
 
     switch (role) {
       case "power":
-        this.power = true;
+        this.power =
+          true;
         break;
 
       case "latch":
-        this.latch = true;
+        this.latch =
+          true;
         break;
 
       case "open":
@@ -185,7 +206,8 @@ export class VaultWorld
      * Mabojolu must infer meaning from observable state transitions.
      */
     return {
-      accepted: true,
+      accepted:
+        true,
 
       summary:
         `Action ${label} executed.`,

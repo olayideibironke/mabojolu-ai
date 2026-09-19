@@ -13,6 +13,10 @@ import type {
 } from "./memory";
 
 import {
+  WorldModelPlanner,
+} from "./planner";
+
+import {
   createCognitiveState,
   reduceCognitiveState,
 } from "./state";
@@ -26,6 +30,10 @@ import type {
   Observation,
 } from "./types";
 
+import {
+  WorldModel,
+} from "./world-model";
+
 interface ActionAttempt {
   stateSignature: string;
 
@@ -33,6 +41,7 @@ interface ActionAttempt {
 }
 
 type ActionChoiceStrategy =
+  | "world-model-plan"
   | "transfer"
   | "exploration"
   | "conditional"
@@ -43,6 +52,9 @@ interface ActionChoice {
 
   strategy:
     ActionChoiceStrategy;
+
+  expectedEffects?:
+    string[];
 }
 
 export interface CognitiveRuntimeOptions {
@@ -52,10 +64,16 @@ export interface CognitiveRuntimeOptions {
 
   /**
    * Cross-episode experience store.
-   *
-   * The runtime remains fully usable without memory.
    */
   memory?: CognitiveMemory;
+
+  /**
+   * Explicit causal world model.
+   *
+   * Supplying the same model to multiple runtime instances allows causal
+   * knowledge to persist across episodes independently of sequence memory.
+   */
+  worldModel?: WorldModel;
 }
 
 export interface CognitiveRunResult {
@@ -63,22 +81,29 @@ export interface CognitiveRunResult {
 
   cycles: number;
 
-  actionHistory: string[];
+  actionHistory:
+    string[];
 
   recalledPlan?:
     RecalledPlan;
 
-  state: CognitiveState;
+  state:
+    CognitiveState;
 }
 
 /**
  * Mabojolu G active cognitive runtime.
  *
- * It combines within-episode experimentation with optional cross-episode
- * experience transfer.
+ * Action-selection priority:
  *
- * Memory is treated as fallible prior knowledge rather than unquestionable
- * truth. A transferred action that stops working becomes new evidence.
+ * 1. Use a causal world-model plan when enough knowledge exists.
+ * 2. Use recalled successful episode knowledge when available.
+ * 3. Experiment with never-tried actions.
+ * 4. Re-test actions whose effect may depend on changed state.
+ * 5. Continue state-specific exploration.
+ *
+ * Every real transition is fed back into the world model, so incorrect
+ * predictions become contradiction evidence rather than permanent assumptions.
  */
 export class CognitiveRuntime {
   private state:
@@ -119,6 +144,14 @@ export class CognitiveRuntime {
     CognitiveMemory |
     undefined;
 
+  private readonly worldModel:
+    WorldModel |
+    undefined;
+
+  private readonly planner:
+    WorldModelPlanner |
+    undefined;
+
   constructor(
     private readonly environment:
       CognitiveEnvironment,
@@ -139,6 +172,16 @@ export class CognitiveRuntime {
 
     this.memory =
       options.memory;
+
+    this.worldModel =
+      options.worldModel;
+
+    this.planner =
+      this.worldModel
+        ? new WorldModelPlanner(
+            this.worldModel,
+          )
+        : undefined;
 
     const createdAt =
       this.now();
@@ -180,6 +223,7 @@ export class CognitiveRuntime {
     this.apply({
       type:
         "goal.updated",
+
       goal,
     });
 
@@ -197,13 +241,16 @@ export class CognitiveRuntime {
 
   run():
     CognitiveRunResult {
-    if (this.hasRun) {
+    if (
+      this.hasRun
+    ) {
       throw new Error(
         "A CognitiveRuntime instance can only be run once.",
       );
     }
 
-    this.hasRun = true;
+    this.hasRun =
+      true;
 
     const initialActions =
       this.environment
@@ -257,13 +304,14 @@ export class CognitiveRuntime {
           snapshot,
         );
 
-      if (!choice) {
+      if (
+        !choice
+      ) {
         break;
       }
 
-      const {
-        action,
-      } = choice;
+      const action =
+        choice.action;
 
       const before = {
         ...snapshot,
@@ -297,23 +345,19 @@ export class CognitiveRuntime {
             ),
 
           kind:
-            choice.strategy ===
-            "transfer"
-              ? "transfer"
-              : "experiment",
+            this.actionKind(
+              choice.strategy,
+            ),
 
           description:
             `Execute action ${action} and observe the environment.`,
 
           expectedEffects:
-            choice.strategy ===
-            "transfer"
-              ? [
-                  "Prior successful experience suggests this action contributes to the goal.",
-                ]
-              : [
-                  "The action may reveal information about the environment.",
-                ],
+            choice
+              .expectedEffects ??
+            this.defaultExpectedEffects(
+              choice.strategy,
+            ),
 
           risk: 0,
 
@@ -419,6 +463,28 @@ export class CognitiveRuntime {
         },
       });
 
+      /*
+       * Feed the real transition back into the causal model.
+       *
+       * A prediction that disagreed with reality becomes contradiction evidence
+       * inside WorldModel rather than being silently retained.
+       */
+      this.worldModel
+        ?.observeTransition({
+          action,
+
+          before,
+
+          after,
+
+          accepted:
+            environmentResult
+              .accepted,
+
+          observedAt:
+            this.now(),
+        });
+
       this.learnFromTransition(
         action,
         before,
@@ -428,6 +494,12 @@ export class CognitiveRuntime {
       );
 
       this.recordTransferCorrection(
+        choice,
+        changes,
+        observation,
+      );
+
+      this.recordWorldModelCorrection(
         choice,
         changes,
         observation,
@@ -508,12 +580,26 @@ export class CognitiveRuntime {
     snapshot:
       EnvironmentSnapshot,
   ): ActionChoice | undefined {
+    const modeled =
+      this.nextWorldModelAction(
+        availableActions,
+        snapshot,
+      );
+
+    if (
+      modeled
+    ) {
+      return modeled;
+    }
+
     const transferred =
       this.nextTransferAction(
         availableActions,
       );
 
-    if (transferred) {
+    if (
+      transferred
+    ) {
       return {
         action:
           transferred,
@@ -536,7 +622,9 @@ export class CognitiveRuntime {
           ),
       );
 
-    if (neverAttempted) {
+    if (
+      neverAttempted
+    ) {
       return {
         action:
           neverAttempted,
@@ -606,7 +694,9 @@ export class CognitiveRuntime {
         },
       );
 
-    if (!stateCandidate) {
+    if (
+      !stateCandidate
+    ) {
       return undefined;
     }
 
@@ -619,11 +709,79 @@ export class CognitiveRuntime {
     };
   }
 
+  private nextWorldModelAction(
+    availableActions:
+      readonly string[],
+
+    snapshot:
+      EnvironmentSnapshot,
+  ): ActionChoice | undefined {
+    if (
+      !this.planner
+    ) {
+      return undefined;
+    }
+
+    const goalReader =
+      this.environment
+        .getGoalConditions;
+
+    if (
+      !goalReader
+    ) {
+      return undefined;
+    }
+
+    const goalConditions =
+      goalReader.call(
+        this.environment,
+      );
+
+    const plan =
+      this.planner.plan({
+        currentState:
+          snapshot,
+
+        goalConditions,
+
+        availableActions,
+      });
+
+    const firstStep =
+      plan?.steps[0];
+
+    if (
+      !firstStep
+    ) {
+      return undefined;
+    }
+
+    return {
+      action:
+        firstStep.action,
+
+      strategy:
+        "world-model-plan",
+
+      expectedEffects:
+        firstStep.effects.map(
+          (effect) =>
+            `${effect.key}: ${String(
+              effect.before,
+            )} -> ${String(
+              effect.after,
+            )}`,
+        ),
+    };
+  }
+
   private nextTransferAction(
     availableActions:
       readonly string[],
   ): string | undefined {
-    if (!this.recalledPlan) {
+    if (
+      !this.recalledPlan
+    ) {
       return undefined;
     }
 
@@ -638,7 +796,8 @@ export class CognitiveRuntime {
             this.transferIndex
           ];
 
-      this.transferIndex += 1;
+      this.transferIndex +=
+        1;
 
       if (
         availableActions.includes(
@@ -650,6 +809,44 @@ export class CognitiveRuntime {
     }
 
     return undefined;
+  }
+
+  private actionKind(
+    strategy:
+      ActionChoiceStrategy,
+  ): string {
+    switch (strategy) {
+      case "world-model-plan":
+        return "world-model-plan";
+
+      case "transfer":
+        return "transfer";
+
+      default:
+        return "experiment";
+    }
+  }
+
+  private defaultExpectedEffects(
+    strategy:
+      ActionChoiceStrategy,
+  ): string[] {
+    switch (strategy) {
+      case "world-model-plan":
+        return [
+          "The learned causal world model predicts this action advances the goal.",
+        ];
+
+      case "transfer":
+        return [
+          "Prior successful experience suggests this action contributes to the goal.",
+        ];
+
+      default:
+        return [
+          "The action may reveal information about the environment.",
+        ];
+    }
   }
 
   private learnFromTransition(
@@ -726,7 +923,9 @@ export class CognitiveRuntime {
           action,
         );
 
-    if (!hypothesisId) {
+    if (
+      !hypothesisId
+    ) {
       return;
     }
 
@@ -739,7 +938,9 @@ export class CognitiveRuntime {
             hypothesisId,
         );
 
-    if (!existing) {
+    if (
+      !existing
+    ) {
       return;
     }
 
@@ -865,6 +1066,53 @@ export class CognitiveRuntime {
     });
   }
 
+  private recordWorldModelCorrection(
+    choice:
+      ActionChoice,
+
+    changes:
+      SnapshotChange[],
+
+    observation:
+      Observation,
+  ): void {
+    if (
+      choice.strategy !==
+        "world-model-plan" ||
+      changes.length > 0
+    ) {
+      return;
+    }
+
+    this.apply({
+      type:
+        "learning.recorded",
+
+      learning: {
+        id:
+          this.nextId(
+            "learning",
+          ),
+
+        kind:
+          "correction",
+
+        statement:
+          `World-model-guided action ${choice.action} produced no observable effect, so the causal prediction must be revised.`,
+
+        confidence:
+          0.95,
+
+        derivedFromIds: [
+          observation.id,
+        ],
+
+        createdAt:
+          this.now(),
+      },
+    });
+  }
+
   private recordNoEffectHypothesis(
     action: string,
 
@@ -877,7 +1125,9 @@ export class CognitiveRuntime {
           action,
         );
 
-    if (existingId) {
+    if (
+      existingId
+    ) {
       const existing =
         this.state
           .hypotheses
@@ -887,7 +1137,9 @@ export class CognitiveRuntime {
               existingId,
           );
 
-      if (!existing) {
+      if (
+        !existing
+      ) {
         return;
       }
 
@@ -1076,7 +1328,9 @@ export class CognitiveRuntime {
         )
         .join(", ");
 
-    return `Observable state: ${state}.`;
+    return (
+      `Observable state: ${state}.`
+    );
   }
 
   private describeOutcome(
@@ -1116,7 +1370,9 @@ export class CognitiveRuntime {
       this.state
         .activeGoalId;
 
-    if (!activeGoalId) {
+    if (
+      !activeGoalId
+    ) {
       return;
     }
 
@@ -1129,7 +1385,9 @@ export class CognitiveRuntime {
             activeGoalId,
         );
 
-    if (!goal) {
+    if (
+      !goal
+    ) {
       return;
     }
 
@@ -1150,7 +1408,8 @@ export class CognitiveRuntime {
   }
 
   private finishRun(
-    solved: boolean,
+    solved:
+      boolean,
   ): CognitiveRunResult {
     this.memory
       ?.recordEpisode({
@@ -1179,7 +1438,8 @@ export class CognitiveRuntime {
   }
 
   private result(
-    solved: boolean,
+    solved:
+      boolean,
   ): CognitiveRunResult {
     return {
       solved,
@@ -1224,9 +1484,11 @@ export class CognitiveRuntime {
   }
 
   private nextId(
-    prefix: string,
+    prefix:
+      string,
   ): string {
-    this.sequence += 1;
+    this.sequence +=
+      1;
 
     return (
       `${prefix}-${this.sequence}`
