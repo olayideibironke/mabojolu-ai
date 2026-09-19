@@ -254,6 +254,9 @@ export interface GatewayRequest {
   signal: AbortSignal;
   idempotencyKey?: string;
   promptVersion?: string;
+
+  /** Trusted server-built context from connected workspace plugins. */
+  additionalSystemContext?: string;
 }
 
 export interface GatewayStream {
@@ -320,13 +323,17 @@ export function startGeneration(
       model.maxOutputTokens,
     );
 
+  const systemPrompt =
+    request.additionalSystemContext
+      ? `${prompt.content}\n\n---\n\n${request.additionalSystemContext}`
+      : prompt.content;
+
   const context =
     buildContext({
       messages:
         request.messages,
 
-      systemPrompt:
-        prompt.content,
+      systemPrompt,
 
       model,
 
@@ -352,8 +359,7 @@ export function startGeneration(
       provider.stream({
         model,
 
-        systemPrompt:
-          prompt.content,
+        systemPrompt,
 
         messages:
           context.messages,
