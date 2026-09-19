@@ -269,7 +269,15 @@ export class AbstractPrinciplePortfolioController {
 
     changedKeys:
       readonly string[];
+
+    goalSatisfied?:
+      boolean;
   }): void {
+    const transitionProgressKind =
+      this.progressKindFor(
+        input,
+      );
+
     if (
       this.pendingSelection &&
       this.pendingSelection
@@ -277,6 +285,22 @@ export class AbstractPrinciplePortfolioController {
         input.action &&
       this.applicabilityModel
     ) {
+      const relation =
+        this.pendingSelection
+          .selection
+          .applicabilityContext
+          .candidateRelation;
+
+      const useful =
+        relation ===
+          "productive-repeat"
+          ? input.accepted &&
+            transitionProgressKind ===
+              "numeric"
+          : input.accepted &&
+            input.goalSatisfied ===
+              true;
+
       this.applicabilityModel
         .record({
           principleId:
@@ -289,11 +313,7 @@ export class AbstractPrinciplePortfolioController {
               .selection
               .applicabilityContext,
 
-          useful:
-            input.accepted &&
-            input.changedKeys
-              .length >
-              0,
+          useful,
         });
 
       this.pendingSelection =
@@ -301,9 +321,7 @@ export class AbstractPrinciplePortfolioController {
     }
 
     this.lastProgressKind =
-      this.progressKindFor(
-        input,
-      );
+      transitionProgressKind;
 
     this.deferredController
       .observeTransition({
