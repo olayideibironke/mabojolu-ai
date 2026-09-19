@@ -99,7 +99,7 @@ describe(
             }),
           );
 
-        const module:
+        const webLlmModule:
           WebLlmModule = {
           CreateMLCEngine:
             create,
@@ -109,7 +109,7 @@ describe(
           new WebLlmBrowserInferenceEngine(
             "local-model",
             async () =>
-              module,
+              webLlmModule,
           );
 
         const chunks = [];
