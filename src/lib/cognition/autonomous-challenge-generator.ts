@@ -11,6 +11,7 @@ import {
 
 import {
   EvaluationIsolationGuard,
+  challengeFingerprint,
   type GatedSequenceChallengeSpec,
 } from "./synthetic-challenge";
 
@@ -234,6 +235,15 @@ export class AutonomousChallengeGenerator {
       number
     >();
 
+  private readonly generatedPracticeFingerprints =
+    new Map<
+      string,
+      string
+    >();
+
+  private readonly completedPracticeIds =
+    new Set<string>();
+
   constructor(
     private readonly competence:
       CompetenceModel,
@@ -434,6 +444,14 @@ export class AutonomousChallengeGenerator {
         spec,
       );
 
+    this.generatedPracticeFingerprints
+      .set(
+        spec.id,
+        challengeFingerprint(
+          spec,
+        ),
+      );
+
     return {
       spec,
 
@@ -475,6 +493,35 @@ export class AutonomousChallengeGenerator {
       );
     }
 
+    const expectedFingerprint =
+      this.generatedPracticeFingerprints
+        .get(
+          input.challenge.id,
+        );
+
+    if (
+      !expectedFingerprint ||
+      expectedFingerprint !==
+        challengeFingerprint(
+          input.challenge,
+        )
+    ) {
+      throw new Error(
+        "Practice outcome does not match an autonomously generated challenge.",
+      );
+    }
+
+    if (
+      this.completedPracticeIds
+        .has(
+          input.challenge.id,
+        )
+    ) {
+      throw new Error(
+        "Practice challenge outcome has already been recorded.",
+      );
+    }
+
     const observation:
       CompetenceObservation = {
       taskId:
@@ -499,10 +546,18 @@ export class AutonomousChallengeGenerator {
         input.observedAt,
     };
 
-    return this.planner
-      .recordOutcome(
-        observation,
+    const snapshot =
+      this.planner
+        .recordOutcome(
+          observation,
+        );
+
+    this.completedPracticeIds
+      .add(
+        input.challenge.id,
       );
+
+    return snapshot;
   }
 
   getGenerationCount(
