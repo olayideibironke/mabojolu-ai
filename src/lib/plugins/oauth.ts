@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   getPluginProvider,
+  isGooglePluginProvider,
   type PluginProviderId,
 } from "./registry";
 import type {
@@ -114,8 +115,9 @@ export function buildPluginAuthorizationUrl(input: {
     );
 
   if (
-    input.providerId ===
-      "google"
+    isGooglePluginProvider(
+      input.providerId,
+    )
   ) {
     url.searchParams.set(
       "client_id",
@@ -591,8 +593,9 @@ export async function exchangePluginAuthorizationCode(input: {
 }):
   Promise<PluginTokenResult> {
   if (
-    input.providerId ===
-      "google"
+    isGooglePluginProvider(
+      input.providerId,
+    )
   ) {
     return exchangeGoogle(
       input.code,
