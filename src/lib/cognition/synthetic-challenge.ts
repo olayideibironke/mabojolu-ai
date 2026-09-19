@@ -121,20 +121,57 @@ export function challengeFingerprint(
     spec,
   );
 
+  /*
+   * Content fingerprint for evaluation isolation.
+   *
+   * Metadata such as id, partition, family label, difficulty label, and context
+   * are deliberately excluded. Renaming metadata must not turn a practiced
+   * causal task into a supposedly held-out evaluation.
+   */
   return JSON.stringify({
     kind:
       spec.kind,
 
+    actionLabels: [
+      ...spec.actionLabels,
+    ],
+
+    stateKeys: [
+      ...spec.stateKeys,
+    ],
+
+    actionRoleOrder: [
+      ...spec.actionRoleOrder,
+    ],
+  });
+}
+
+export function challengeInstanceFingerprint(
+  spec:
+    GatedSequenceChallengeSpec,
+): string {
+  validateChallengeSpec(
+    spec,
+  );
+
+  /*
+   * Exact-instance fingerprint for trusted training evidence.
+   */
+  return JSON.stringify({
+    id:
+      spec.id,
+
     family:
       spec.family,
 
+    kind:
+      spec.kind,
+
+    partition:
+      spec.partition,
+
     difficulty:
-      Number(
-        spec.difficulty
-          .toFixed(
-            4,
-          ),
-      ),
+      spec.difficulty,
 
     context:
       spec.context,
@@ -188,6 +225,9 @@ export class EvaluationIsolationGuard {
   private readonly practiceFingerprints =
     new Set<string>();
 
+  private readonly practiceIds =
+    new Set<string>();
+
   registerPractice(
     spec:
       GatedSequenceChallengeSpec,
@@ -206,6 +246,11 @@ export class EvaluationIsolationGuard {
         challengeFingerprint(
           spec,
         ),
+      );
+
+    this.practiceIds
+      .add(
+        spec.id,
       );
   }
 
@@ -242,7 +287,7 @@ export class EvaluationIsolationGuard {
   getPracticeCount():
     number {
     return this
-      .practiceFingerprints
+      .practiceIds
       .size;
   }
 }
