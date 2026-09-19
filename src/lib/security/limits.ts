@@ -5,25 +5,26 @@ import type { Session } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database";
 import { serverEnv } from "@/lib/env";
 
+import {
+  FREE_WINDOW_HOURS,
+  FREE_WINDOW_MESSAGE_LIMIT,
+  GUEST_TOTAL_MESSAGE_LIMIT,
+  freeLimitMessage,
+  freeWindowStartIso,
+  guestLimitMessage,
+  hasActiveProAccess,
+} from "./usage-policy";
+
 /**
- * Initial Mabojolu access rules.
+ * Mabojolu access rules.
  *
  * Guest users may explore Mabojolu before creating an account. Once the guest
  * allowance is exhausted, the same anonymous identity must be upgraded so its
  * conversations remain attached to the user.
  *
- * Registered free users receive a renewable allowance. Paid-plan detection will
- * be connected after the billing migration and Stripe flow are complete.
+ * Registered free users receive twenty successful responses per four-hour
+ * rolling window. Active or trialing Pro accounts bypass the free allowance.
  */
-const GUEST_TOTAL_MESSAGE_LIMIT =
-  5;
-
-const FREE_WINDOW_MESSAGE_LIMIT =
-  20;
-
-const FREE_WINDOW_HOURS =
-  8;
-
 const HOUR_MS =
   60 * 60 * 1_000;
 
@@ -36,6 +37,16 @@ const HOUR_MS =
  */
 const activeGenerations =
   new Map<string, number>();
+
+export interface UsageLimitOptions {
+  /**
+   * Browser-owned inference has no external provider generation cost, so it may
+   * skip the global provider-spend ceiling while still enforcing identity,
+   * quota, maintenance, and concurrency rules.
+   */
+  enforceProviderCostCeiling?:
+    boolean;
+}
 
 export interface LimitDecision {
   allowed: boolean;
@@ -55,6 +66,10 @@ export interface LimitDecision {
  */
 export async function checkUsageLimits(
   session: Session,
+
+  options:
+    UsageLimitOptions =
+      {},
 ): Promise<LimitDecision> {
   const env =
     serverEnv();
@@ -168,122 +183,134 @@ export async function checkUsageLimits(
             "forbidden",
             {
               message:
-                "You've used your 5 free questions. Create a free Mabojolu account to continue this conversation, save your chats, and access them on any device.",
+                guestLimitMessage(),
             },
           ),
         };
       }
     } else {
-      /**
-       * Registered free allowance.
-       *
-       * This rolling window allows the user to resume naturally without the
-       * allowance resetting at midnight in an arbitrary timezone.
-       */
-      const freeWindowStart =
-        new Date(
-          Date.now() -
-            FREE_WINDOW_HOURS *
-              HOUR_MS,
-        ).toISOString();
+      const billingAccount =
+        await database
+          .getBillingAccount(
+            userId,
+          );
 
-      const freeWindowCompletedResponses =
-        await database.countRecentMessages(
-          userId,
-          freeWindowStart,
+      const hasPro =
+        hasActiveProAccess(
+          billingAccount,
         );
 
       if (
-        freeWindowCompletedResponses >=
-        FREE_WINDOW_MESSAGE_LIMIT
+        !hasPro
       ) {
-        await database.recordSafetyEvent(
-          {
+        /**
+         * Registered free allowance.
+         *
+         * Twenty completed assistant responses are available in a four-hour
+         * rolling window. Failed or interrupted generations do not consume the
+         * allowance because countRecentMessages counts completed assistant
+         * responses only.
+         */
+        const freeWindowStart =
+          freeWindowStartIso();
+
+        const freeWindowCompletedResponses =
+          await database.countRecentMessages(
             userId,
+            freeWindowStart,
+          );
 
-            conversationId:
-              null,
-
-            kind:
-              "free_message_limit_reached",
-
-            severity:
-              "info",
-
-            detail:
-              `Registered free user received ${freeWindowCompletedResponses} successful responses in ${FREE_WINDOW_HOURS} hours, limit ${FREE_WINDOW_MESSAGE_LIMIT}.`,
-          },
-        );
-
-        return {
-          allowed: false,
-
-          error: chatError(
-            "rate_limited",
+        if (
+          freeWindowCompletedResponses >=
+          FREE_WINDOW_MESSAGE_LIMIT
+        ) {
+          await database.recordSafetyEvent(
             {
-              message:
-                "You have used your current free Mabojolu allowance. Please return in a few hours to continue.",
+              userId,
 
-              retryAfterSeconds:
-                FREE_WINDOW_HOURS *
-                60 *
-                60,
+              conversationId:
+                null,
+
+              kind:
+                "free_message_limit_reached",
+
+              severity:
+                "info",
+
+              detail:
+                `Registered free user received ${freeWindowCompletedResponses} successful responses in ${FREE_WINDOW_HOURS} hours, limit ${FREE_WINDOW_MESSAGE_LIMIT}.`,
             },
-          ),
-        };
-      }
+          );
 
-      /**
-       * Preserve the existing configurable 24-hour ceiling as an additional
-       * financial safeguard. This can be higher than the free-window allowance
-       * and remains independently configurable through the environment.
-       */
-      const dailyWindowStart =
-        new Date(
-          Date.now() -
-            24 *
-              HOUR_MS,
-        ).toISOString();
+          return {
+            allowed: false,
 
-      const dailyCompletedResponses =
-        await database.countRecentMessages(
-          userId,
-          dailyWindowStart,
-        );
+            error: chatError(
+              "rate_limited",
+              {
+                message:
+                  freeLimitMessage(),
 
-      if (
-        dailyCompletedResponses >=
-        env.MABOJOLU_DAILY_MESSAGE_LIMIT
-      ) {
-        await database.recordSafetyEvent(
-          {
+                retryAfterSeconds:
+                  FREE_WINDOW_HOURS *
+                  60 *
+                  60,
+              },
+            ),
+          };
+        }
+
+        /**
+         * Preserve the configurable 24-hour ceiling as an additional free-tier
+         * abuse safeguard. Pro bypasses this personal free-tier ceiling.
+         */
+        const dailyWindowStart =
+          new Date(
+            Date.now() -
+              24 *
+                HOUR_MS,
+          ).toISOString();
+
+        const dailyCompletedResponses =
+          await database.countRecentMessages(
             userId,
+            dailyWindowStart,
+          );
 
-            conversationId:
-              null,
-
-            kind:
-              "daily_message_limit_reached",
-
-            severity:
-              "info",
-
-            detail:
-              `Received ${dailyCompletedResponses} successful responses in 24 hours, limit ${env.MABOJOLU_DAILY_MESSAGE_LIMIT}.`,
-          },
-        );
-
-        return {
-          allowed: false,
-
-          error: chatError(
-            "rate_limited",
+        if (
+          dailyCompletedResponses >=
+          env.MABOJOLU_DAILY_MESSAGE_LIMIT
+        ) {
+          await database.recordSafetyEvent(
             {
-              message:
-                "You have reached your daily Mabojolu message limit. Please try again later.",
+              userId,
+
+              conversationId:
+                null,
+
+              kind:
+                "daily_message_limit_reached",
+
+              severity:
+                "info",
+
+              detail:
+                `Received ${dailyCompletedResponses} successful responses in 24 hours, limit ${env.MABOJOLU_DAILY_MESSAGE_LIMIT}.`,
             },
-          ),
-        };
+          );
+
+          return {
+            allowed: false,
+
+            error: chatError(
+              "rate_limited",
+              {
+                message:
+                  "You have reached your daily Mabojolu message limit. Please try again later.",
+              },
+            ),
+          };
+        }
       }
     }
   }
@@ -295,8 +322,11 @@ export async function checkUsageLimits(
    * Anthropic account from accidental runaway spending. Zero disables it.
    */
   if (
+    options
+      .enforceProviderCostCeiling !==
+      false &&
     env.MABOJOLU_DAILY_COST_LIMIT_USD >
-    0
+      0
   ) {
     const metrics =
       await database.getAdminMetrics();
