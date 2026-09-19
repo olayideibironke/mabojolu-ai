@@ -31,6 +31,10 @@ import {
 } from "./runtime";
 
 import {
+  AdaptiveValidatedSymbolicPredicateApplicabilityModel,
+} from "./adaptive-validated-predicate-search";
+
+import {
   ValidatedSymbolicPredicateApplicabilityModel,
 } from "./validated-predicate-search";
 
@@ -542,6 +546,187 @@ function validatedModel():
   return model;
 }
 
+
+function driftedAdaptiveModel():
+  AdaptiveValidatedSymbolicPredicateApplicabilityModel {
+  const model =
+    new AdaptiveValidatedSymbolicPredicateApplicabilityModel();
+
+  recordFit(
+    model,
+  );
+
+  for (
+    const input of [
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "2" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          true,
+      },
+    ]
+  ) {
+    model.record({
+      principleId:
+        "principle-repeat-monotonic-progress-once",
+
+      signature:
+        signature(
+          input.history,
+          input.distinct,
+        ),
+
+      useful:
+        input.useful,
+    });
+  }
+
+  for (
+    const input of [
+      {
+        history:
+          "1" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "2" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "3+" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "3+" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "2" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          false,
+      },
+    ]
+  ) {
+    model.record({
+      principleId:
+        "principle-repeat-monotonic-progress-once",
+
+      signature:
+        signature(
+          input.history,
+          input.distinct,
+        ),
+
+      useful:
+        input.useful,
+    });
+  }
+
+  return model;
+}
+
 function olderSemanticPreference():
   PrincipleApplicabilityModel {
   const model =
@@ -987,6 +1172,85 @@ describe(
             predicateValue:
               true,
           },
+        });
+      },
+    );
+
+    it(
+      "lets a fresh challenger replace the champion after concept drift and change runtime selection",
+      () => {
+        const model =
+          driftedAdaptiveModel();
+
+        expect(
+          model
+            .getAdaptiveValidationSummary(
+              "principle-repeat-monotonic-progress-once",
+            ),
+        ).toMatchObject({
+          championGeneration:
+            2,
+
+          activeGeneration:
+            3,
+
+          replacementCount:
+            1,
+
+          lastDecision:
+            "challenger-promoted",
+
+          lastIncumbentReserveAccuracy:
+            0,
+
+          lastChallengerReserveAccuracy:
+            1,
+        });
+
+        const result =
+          new CognitiveRuntime(
+            new HeldOutValidationWorld(),
+            {
+              abstractPrinciplePortfolio:
+                activePortfolio(),
+
+              principleApplicabilityModel:
+                olderSemanticPreference(),
+
+              validatedSymbolicPredicateApplicabilityModel:
+                model,
+
+              maxCycles:
+                10,
+
+              now:
+                makeClock(
+                  24,
+                ),
+            },
+          ).run();
+
+        expect(
+          result.solved,
+        ).toBe(true);
+
+        expect(
+          result.cycles,
+        ).toBe(6);
+
+        expect(
+          result
+            .abstractPrinciplePortfolio
+            ?.selections[0],
+        ).toMatchObject({
+          action:
+            "TRY-GOAL",
+
+          principleKind:
+            "deferred-goal-retry-after-progress",
+
+          applicabilitySource:
+            "learned",
         });
       },
     );
