@@ -34,6 +34,11 @@ export interface UseChatResult {
     attachments?: ChatImageAttachment[],
   ) => void;
 
+  startFreshConversation: (
+    content: string,
+    attachments?: ChatImageAttachment[],
+  ) => void;
+
   stop: () => void;
   retry: () => void;
 
@@ -556,6 +561,103 @@ export function useChat(
     ],
   );
 
+  const startFreshConversation = useCallback(
+    (
+      content: string,
+      attachments:
+        ChatImageAttachment[] = [],
+    ) => {
+      const trimmed =
+        content.trim();
+
+      if (
+        (trimmed.length === 0 &&
+          attachments.length === 0) ||
+        isStreaming
+      ) {
+        return;
+      }
+
+      controllerRef.current?.abort();
+
+      controllerRef.current =
+        null;
+
+      generationRef.current +=
+        1;
+
+      idempotencyKeyRef.current =
+        null;
+
+      conversationIdRef.current =
+        null;
+
+      const timestamp =
+        nowIso();
+
+      const userMessage:
+        ChatMessage = {
+        id: createId(),
+        role: "user",
+
+        content:
+          trimmed.length > 0
+            ? trimmed
+            : "Please describe the attached image.",
+
+        status: "complete",
+        createdAt:
+          timestamp,
+
+        ...(attachments.length > 0
+          ? {
+              attachments:
+                attachments.map(
+                  (
+                    attachment,
+                  ) => ({
+                    ...attachment,
+                  }),
+                ),
+            }
+          : {}),
+      };
+
+      const assistantMessage:
+        ChatMessage = {
+        id: createId(),
+        role: "assistant",
+        content: "",
+        status: "pending",
+        createdAt:
+          timestamp,
+      };
+
+      const next = [
+        userMessage,
+        assistantMessage,
+      ];
+
+      setMessages(
+        next,
+      );
+
+      setStatusLabel(
+        null,
+      );
+
+      run(
+        next,
+        assistantMessage.id,
+        createId(),
+      );
+    },
+    [
+      isStreaming,
+      run,
+    ],
+  );
+
   const stop = useCallback(() => {
     controllerRef.current?.abort();
   }, []);
@@ -937,6 +1039,7 @@ export function useChat(
     isStreaming,
     statusLabel,
     send,
+    startFreshConversation,
     stop,
     retry,
     regenerate,
