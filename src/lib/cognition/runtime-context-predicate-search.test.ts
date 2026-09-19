@@ -308,9 +308,8 @@ function activePortfolio():
 type PreludeMode =
   | "direct"
   | "same-one"
-  | "setup-one"
   | "same-two"
-  | "setup-two-distinct";
+  | "same-one-setup-two-distinct";
 
 interface CalibrationConfig {
   id:
@@ -348,6 +347,9 @@ class PredicateCalibrationWorld
     false;
 
   private setupTwo =
+    false;
+
+  private setupThree =
     false;
 
   private progress =
@@ -413,6 +415,9 @@ class PredicateCalibrationWorld
       setupTwo:
         this.setupTwo,
 
+      setupThree:
+        this.setupThree,
+
       done:
         this.done,
     };
@@ -447,8 +452,14 @@ class PredicateCalibrationWorld
       ) {
         this.setupOne =
           true;
-      } else {
+      } else if (
+        this.preludeCount ===
+          2
+      ) {
         this.setupTwo =
+          true;
+      } else {
+        this.setupThree =
           true;
       }
 
@@ -563,18 +574,6 @@ class PredicateCalibrationWorld
     if (
       this.config
         .mode ===
-        "setup-one"
-    ) {
-      return this.preludeCount <
-        1
-        ? this.config
-            .setupActionOne
-        : undefined;
-    }
-
-    if (
-      this.config
-        .mode ===
         "same-two"
     ) {
       return this.preludeCount <
@@ -589,11 +588,19 @@ class PredicateCalibrationWorld
         0
     ) {
       return this.config
+        .progressAction;
+    }
+
+    if (
+      this.preludeCount ===
+        1
+    ) {
+      return this.config
         .setupActionOne;
     }
 
     return this.preludeCount ===
-      1
+      2
       ? this.config
           .setupActionTwo
       : undefined;
@@ -883,10 +890,10 @@ function calibrationConfigs():
 
     {
       id:
-        "two-two-useful",
+        "three-three-useful-a",
 
       mode:
-        "setup-one",
+        "same-one-setup-two-distinct",
 
       progressAction:
         "PULSE",
@@ -895,7 +902,7 @@ function calibrationConfigs():
         "ARM",
 
       setupActionTwo:
-        "UNUSED-E",
+        "STAGE",
 
       progressKey:
         "signal",
@@ -906,10 +913,10 @@ function calibrationConfigs():
 
     {
       id:
-        "three-three-useful",
+        "three-three-useful-b",
 
       mode:
-        "setup-two-distinct",
+        "same-one-setup-two-distinct",
 
       progressAction:
         "FILL",
@@ -918,7 +925,7 @@ function calibrationConfigs():
         "PRIME",
 
       setupActionTwo:
-        "STAGE",
+        "READY",
 
       progressKey:
         "volume",
@@ -938,10 +945,10 @@ function calibrationConfigs():
         "RAISE",
 
       setupActionOne:
-        "UNUSED-F",
+        "UNUSED-E",
 
       setupActionTwo:
-        "UNUSED-G",
+        "UNUSED-F",
 
       progressKey:
         "meter",
@@ -961,10 +968,10 @@ function calibrationConfigs():
         "LIFT",
 
       setupActionOne:
-        "UNUSED-H",
+        "UNUSED-G",
 
       setupActionTwo:
-        "UNUSED-I",
+        "UNUSED-H",
 
       progressKey:
         "altitude",
@@ -1058,6 +1065,22 @@ describe(
 
         const principleId =
           "principle-repeat-monotonic-progress-once";
+
+        const learnedRelation =
+          relational.rankRelations(
+            principleId,
+          )[0];
+
+        expect(
+          learnedRelation,
+        ).toBeDefined();
+
+        expect(
+          learnedRelation
+            ?.gainOverBestAtomic,
+        ).toBeGreaterThan(
+          0,
+        );
 
         const best =
           predicate.rankPrograms(
