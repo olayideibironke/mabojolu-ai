@@ -283,6 +283,36 @@ describe(
             .spec
             .difficulty,
         );
+
+        expect(
+          first
+            .spec
+            .actionPresentationOrder,
+        ).toEqual([
+          0,
+          2,
+          1,
+        ]);
+
+        expect(
+          second
+            ?.spec
+            .actionPresentationOrder,
+        ).toEqual([
+          0,
+          1,
+          2,
+        ]);
+
+        expect(
+          second
+            ?.spec
+            .actionRoleOrder,
+        ).toEqual(
+          first
+            .spec
+            .actionRoleOrder,
+        );
       },
     );
 
