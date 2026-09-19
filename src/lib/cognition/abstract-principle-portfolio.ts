@@ -293,10 +293,6 @@ export class AbstractPrinciplePortfolioController {
             input.changedKeys
               .length >
               0,
-
-          observedAt:
-            new Date()
-              .toISOString(),
         });
 
       this.pendingSelection =
