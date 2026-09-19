@@ -578,9 +578,6 @@ export class MonotonicProgressPrincipleController {
       return undefined;
     }
 
-    this.repeatConsumed =
-      true;
-
     return {
       action:
         this.candidateAction,
@@ -594,5 +591,18 @@ export class MonotonicProgressPrincipleController {
       applicability:
         0.95,
     };
+  }
+
+  consumeRecommendation(
+    action:
+      string,
+  ): void {
+    if (
+      this.candidateAction ===
+      action
+    ) {
+      this.repeatConsumed =
+        true;
+    }
   }
 }
