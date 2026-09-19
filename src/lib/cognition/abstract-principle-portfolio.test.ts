@@ -767,6 +767,156 @@ describe(
     );
 
     it(
+      "does not reward a deferred-goal principle for an irrelevant state change",
+      () => {
+        const portfolio =
+          trainedPortfolio();
+
+        const model =
+          new PrincipleApplicabilityModel();
+
+        const controller =
+          portfolio.createController({
+            applicabilityModel:
+              model,
+          });
+
+        controller.observeTransition({
+          action:
+            "TRY-GOAL",
+
+          accepted:
+            true,
+
+          before: {
+            mode:
+              "cold",
+
+            done:
+              false,
+          },
+
+          after: {
+            mode:
+              "cold",
+
+            done:
+              false,
+          },
+
+          changedKeys: [],
+
+          goalSatisfied:
+            false,
+        });
+
+        controller.observeTransition({
+          action:
+            "PREPARE",
+
+          accepted:
+            true,
+
+          before: {
+            mode:
+              "cold",
+
+            done:
+              false,
+          },
+
+          after: {
+            mode:
+              "ready",
+
+            done:
+              false,
+          },
+
+          changedKeys: [
+            "mode",
+          ],
+
+          goalSatisfied:
+            false,
+        });
+
+        expect(
+          controller.recommend([
+            "TRY-GOAL",
+            "PREPARE",
+          ])
+            ?.principleKind,
+        ).toBe(
+          "deferred-goal-retry-after-progress",
+        );
+
+        controller.observeTransition({
+          action:
+            "TRY-GOAL",
+
+          accepted:
+            true,
+
+          before: {
+            mode:
+              "ready",
+
+            done:
+              false,
+
+            side:
+              0,
+          },
+
+          after: {
+            mode:
+              "ready",
+
+            done:
+              false,
+
+            side:
+              1,
+          },
+
+          changedKeys: [
+            "side",
+          ],
+
+          goalSatisfied:
+            false,
+        });
+
+        const estimate =
+          model.estimate(
+            "principle-deferred-goal-retry-after-progress",
+            {
+              progressKind:
+                "nonnumeric",
+
+              candidateRelation:
+                "deferred-action",
+            },
+          );
+
+        expect(
+          estimate.failures,
+        ).toBe(1);
+
+        expect(
+          estimate.successes,
+        ).toBe(0);
+
+        expect(
+          estimate.applicability,
+        ).toBeCloseTo(
+          1 / 3,
+        );
+      },
+    );
+
+    it(
       "records an auditable selection history without mutating principle evidence",
       () => {
         const portfolio =
