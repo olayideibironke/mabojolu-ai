@@ -4,7 +4,7 @@ import { cookies } from "next/headers";
 
 import { getDatabase } from "@/lib/database";
 import type { Profile } from "@/lib/database/types";
-import { inspectServerEnv } from "@/lib/env";
+import { authRuntimeMode } from "@/lib/runtime-mode";
 
 /**
  * Server-side session resolution.
@@ -100,24 +100,17 @@ export function devUsers() {
  * guest access, redirect to sign-in, or return an unauthorized API response.
  */
 export async function getSession(): Promise<Session | null> {
-  const envResult =
-    inspectServerEnv();
+  const authMode =
+    authRuntimeMode();
 
-  if (!envResult.ok) {
-    return null;
-  }
-
-  const env =
-    envResult.env;
-
-  if (env.AUTH_MODE === "dev") {
+  if (authMode === "dev") {
     /*
      * Defence in depth. Environment validation already rejects dev
      * authentication in production, but this second check prevents accidental
      * exposure even if that validation is bypassed.
      */
     if (
-      env.NODE_ENV ===
+      process.env.NODE_ENV ===
       "production"
     ) {
       console.error(
