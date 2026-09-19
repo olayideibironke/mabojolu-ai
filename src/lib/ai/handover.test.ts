@@ -109,6 +109,42 @@ describe(
     );
 
     it(
+      "uses Mabojolu's configured budget when it is smaller than the model window",
+      () => {
+        const pressure =
+          handoverPressure({
+            messages: [
+              message(
+                "u1",
+                "user",
+                "x".repeat(
+                  330_000,
+                ),
+              ),
+            ],
+
+            modelId:
+              "mabojolu-core",
+
+            contextTokenBudget:
+              120_000,
+          });
+
+        expect(
+          pressure.level,
+        ).toBe(
+          "prepare",
+        );
+
+        expect(
+          pressure.estimatedUsableTokens,
+        ).toBe(
+          120_000,
+        );
+      },
+    );
+
+    it(
       "marks substantially fuller conversations urgent",
       () => {
         const content =
