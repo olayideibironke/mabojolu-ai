@@ -154,7 +154,10 @@ export function detectBrowserComputeCapabilities(
     (
       typeof navigator !==
         "undefined" &&
-      "gpu" in navigator
+      Reflect.get(
+        navigator,
+        "gpu",
+      ) != null
     );
 
   const detectedWebAssembly =
