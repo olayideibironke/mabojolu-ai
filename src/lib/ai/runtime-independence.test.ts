@@ -98,6 +98,50 @@ describe(
     );
 
     it(
+      "routes browser model delivery through the Mabojolu artifact control plane",
+      () => {
+        const client =
+          read(
+            "src/lib/ai/browser-chat-client.ts",
+          );
+
+        const worker =
+          read(
+            "src/lib/ai/mabojolu-webllm-worker.ts",
+          );
+
+        const registry =
+          read(
+            "src/lib/ai/browser-artifacts.ts",
+          );
+
+        expect(
+          client,
+        ).toContain(
+          "NEXT_PUBLIC_MABOJOLU_ARTIFACT_MANIFEST_URL",
+        );
+
+        expect(
+          worker,
+        ).toContain(
+          "resolveMabojoluArtifactSources",
+        );
+
+        expect(
+          registry,
+        ).toContain(
+          "MABOJOLU_ARTIFACT_SCHEMA_VERSION",
+        );
+
+        expect(
+          registry,
+        ).toContain(
+          'onFailure:\n              "error"',
+        );
+      },
+    );
+
+    it(
       "removes the legacy public worker that imported WebLLM from esm.run",
       () => {
         expect(
