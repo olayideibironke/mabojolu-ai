@@ -153,12 +153,14 @@ predicate search:
 8. compare against the verified v0.7 relation learner trained on exactly the
    same application outcomes.
 
-The controlled runtime calibration makes repeats useful for structural contexts
-whose history-length and distinct-action counts differ by at most one, while a
-two-step gap fails. The held-out context is 3+/2, a successful concrete pair not
-seen during calibration. The v0.7 ordering grammar can only place that case into
-a mixed greater-than bucket. The v0.8 search can synthesize the predicate
-abs(historyLength - distinctActionsSeen) <= 1 and reuse the broader rule.
+The controlled runtime calibration uses six renamed applications:
+1/1 and 2/1 are useful, 3+/3+ is useful twice, and 3+/1 fails twice. This makes
+the basic v0.7 equality/ordering relation genuinely learnable, but its held-out
+class remains mixed. The held-out context is 3+/2, a successful concrete pair
+not seen during calibration. For the learned basic relation, that held-out class
+contains one success and two failures, while the v0.8 search can synthesize
+abs(historyLength - distinctActionsSeen) <= 1 and project the same held-out
+context into a four-success, zero-failure class.
 
 The first symbolic grammar remains intentionally bounded and inspectable:
 equality, ordering, signed-difference equality for small constants, and
