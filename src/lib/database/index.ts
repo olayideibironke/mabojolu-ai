@@ -7,7 +7,7 @@ import "server-only";
 import "./supabase-billing";
 import "./supabase-plugins";
 
-import { inspectServerEnv } from "@/lib/env";
+import { persistenceRuntimeMode } from "@/lib/runtime-mode";
 
 import { LocalDatabaseAdapter } from "./local-adapter";
 import { SupabaseDatabaseAdapter } from "./supabase-adapter";
@@ -29,18 +29,8 @@ export function getDatabase(): DatabaseAdapter {
     return cached;
   }
 
-  const envResult =
-    inspectServerEnv();
-
-  /*
-   * An invalid local environment falls back to local persistence rather than
-   * crashing unrelated pages. Production environment validation prevents local
-   * persistence from being selected there.
-   */
   const persistence =
-    envResult.ok
-      ? envResult.env.PERSISTENCE
-      : "local";
+    persistenceRuntimeMode();
 
   const database: DatabaseAdapter =
     persistence === "supabase"
