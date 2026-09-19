@@ -23,6 +23,10 @@ import type {
 } from "./context-predicate-search";
 
 import type {
+  ValidatedSymbolicPredicateApplicabilityModel,
+} from "./validated-predicate-search";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
 } from "./context-feature-learning";
 
@@ -262,6 +266,13 @@ export interface CognitiveRuntimeOptions {
    */
   symbolicPredicateApplicabilityModel?:
     SymbolicPredicateApplicabilityModel;
+
+  /**
+   * Symbolic predicate learner whose fitted program is blocked from action
+   * selection until it passes a sequestered held-out validation phase.
+   */
+  validatedSymbolicPredicateApplicabilityModel?:
+    ValidatedSymbolicPredicateApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -551,6 +562,10 @@ export class CognitiveRuntime {
           symbolicPredicateApplicabilityModel:
             options
               .symbolicPredicateApplicabilityModel,
+
+          validatedSymbolicPredicateApplicabilityModel:
+            options
+              .validatedSymbolicPredicateApplicabilityModel,
         });
 
     this.abstractPrincipleController =
