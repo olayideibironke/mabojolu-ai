@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   getPluginProvider,
+  isGooglePluginProvider,
   type PluginProviderId,
 } from "./registry";
 import { serverEnv } from "@/lib/env";
@@ -50,8 +51,9 @@ export function pluginOAuthConfig(
   }
 
   const credentials =
-    providerId ===
-      "google"
+    isGooglePluginProvider(
+      providerId,
+    )
       ? {
           clientId:
             env.GOOGLE_OAUTH_CLIENT_ID,
