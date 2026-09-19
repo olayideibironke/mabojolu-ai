@@ -42,7 +42,7 @@ const MODEL_CHANGE_EVENT =
   "mabojolu-model-preference-change";
 
 const DEFAULT_MODEL_ID: MabojoluModelId =
-  "mabojolu-local";
+  "mabojolu-fast";
 
 let inMemoryModelPreference: MabojoluModelId =
   DEFAULT_MODEL_ID;
