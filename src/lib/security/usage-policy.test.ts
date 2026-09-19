@@ -12,6 +12,7 @@ import {
   freeWindowStartIso,
   guestLimitMessage,
   hasActiveProAccess,
+  registeredFreeWindowStartIso,
 } from "./usage-policy";
 
 import type {
@@ -95,6 +96,34 @@ describe(
 
         expect(
           freeWindowStartIso(
+            now,
+          ),
+        ).toBe(
+          "2026-09-19T12:00:00.000Z",
+        );
+      },
+    );
+
+    it(
+      "starts a newly registered user's free window at trusted account confirmation",
+      () => {
+        const now =
+          Date.parse(
+            "2026-09-19T16:00:00.000Z",
+          );
+
+        expect(
+          registeredFreeWindowStartIso(
+            "2026-09-19T15:55:00.000Z",
+            now,
+          ),
+        ).toBe(
+          "2026-09-19T15:55:00.000Z",
+        );
+
+        expect(
+          registeredFreeWindowStartIso(
+            "2026-09-19T08:00:00.000Z",
             now,
           ),
         ).toBe(
