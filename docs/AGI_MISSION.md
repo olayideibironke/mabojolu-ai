@@ -104,6 +104,9 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - skill revision and retirement under contradictory evidence;
 - structural skill transfer under renamed actions and state variables;
 - composition of separately learned skills into novel multi-skill solutions;
+- evidence-based competence modeling;
+- autonomous curriculum selection from a safe challenge catalog with measured
+  held-out improvement;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -113,26 +116,31 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is autonomous curriculum selection
-and explicit competence modeling:
+The current central intelligence milestone is autonomous challenge generation
+with isolated evaluation:
 
-1. maintain evidence-based estimates of competence for distinct task families;
-2. distinguish uncertainty from demonstrated mastery;
-3. select learning challenges near a productive difficulty frontier;
-4. keep advanced challenges locked until prerequisite competence has repeated
-   supporting evidence;
-5. use novelty, uncertainty, learning progress, and task cost when choosing what
-   to practice next;
-6. record the outcome of self-selected practice back into the competence model;
-7. verify that the resulting experience improves held-out task performance.
+1. detect a competence gap from evidence rather than from a manually selected
+   next exercise;
+2. generate a fresh synthetic practice task from an approved safe task family;
+3. adapt generated difficulty as competence changes;
+4. keep hidden environment structure behind the CognitiveEnvironment interface;
+5. accept training outcomes only for challenges Mabojolu actually generated;
+6. prevent duplicate, mutated, or evaluation-partition tasks from contaminating
+   the training competence model;
+7. maintain a separate held-out evaluation partition and reject exact task
+   leakage from practice;
+8. verify that autonomously generated practice improves performance on a
+   renamed held-out task that the generator never receives.
 
-The stronger scientific question is no longer only whether experience can be
-reused. It is whether Mabojolu can identify what it needs to learn next, direct
-its own practice toward that gap, and produce measurable improvement afterward.
+The stronger scientific question is now whether Mabojolu can turn a measured
+capability gap into its own useful learning experience and then demonstrate that
+the resulting competence transfers outside the generated practice instances.
 
-A later milestone should move beyond choosing from a supplied challenge catalog
-toward generating new safe synthetic learning challenges from known capability
-gaps, while keeping evaluation isolated from training data.
+This remains controlled synthetic learning. A later milestone should broaden
+challenge families, generate richer causal structures, preserve strict train /
+evaluation separation, and test whether learning progress transfers across
+qualitatively different task families rather than only renamed instances of one
+relational structure.
 
 ## Safety and audit principle
 
