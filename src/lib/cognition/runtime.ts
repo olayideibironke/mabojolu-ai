@@ -22,6 +22,10 @@ import {
 } from "./planner";
 
 import {
+  ScientificDiscoveryPlanner,
+} from "./scientific-discovery";
+
+import {
   createCognitiveState,
   reduceCognitiveState,
 } from "./state";
@@ -55,6 +59,7 @@ type ActionChoiceStrategy =
   | "world-model-plan"
   | "structural-transfer"
   | "transfer"
+  | "scientific-discovery-setup"
   | "hypothesis-experiment"
   | "exploration"
   | "conditional"
@@ -96,6 +101,15 @@ export interface CognitiveRuntimeOptions {
    */
   structuralTransfer?:
     StructuralTransferLibrary;
+
+  /**
+   * Optional persistent hypothesis engine.
+   *
+   * Reusing the same engine across runtime instances allows scientific
+   * hypotheses and their evidence to survive episode boundaries.
+   */
+  hypothesisEngine?:
+    AutonomousCausalHypothesisEngine;
 }
 
 export interface CognitiveRunResult {
@@ -177,8 +191,12 @@ export class CognitiveRuntime {
     WorldModelPlanner |
     undefined;
 
-  private readonly hypothesisEngine =
-    new AutonomousCausalHypothesisEngine();
+  private readonly hypothesisEngine:
+    AutonomousCausalHypothesisEngine;
+
+  private readonly scientificDiscoveryPlanner:
+    ScientificDiscoveryPlanner |
+    undefined;
 
   private readonly structuralTransfer:
     StructuralTransferLibrary |
@@ -215,6 +233,10 @@ export class CognitiveRuntime {
     this.worldModel =
       options.worldModel;
 
+    this.hypothesisEngine =
+      options.hypothesisEngine ??
+      new AutonomousCausalHypothesisEngine();
+
     this.structuralTransfer =
       options.structuralTransfer;
 
@@ -222,6 +244,14 @@ export class CognitiveRuntime {
       this.worldModel
         ? new WorldModelPlanner(
             this.worldModel,
+          )
+        : undefined;
+
+    this.scientificDiscoveryPlanner =
+      this.worldModel
+        ? new ScientificDiscoveryPlanner(
+            this.worldModel,
+            this.hypothesisEngine,
           )
         : undefined;
 
@@ -669,6 +699,18 @@ export class CognitiveRuntime {
     snapshot:
       EnvironmentSnapshot,
   ): ActionChoice | undefined {
+    const discovery =
+      this.nextScientificDiscoveryAction(
+        availableActions,
+        snapshot,
+      );
+
+    if (
+      discovery
+    ) {
+      return discovery;
+    }
+
     const modeled =
       this.nextWorldModelAction(
         availableActions,
@@ -818,6 +860,71 @@ export class CognitiveRuntime {
 
       strategy:
         "state-exploration",
+    };
+  }
+
+  private nextScientificDiscoveryAction(
+    availableActions:
+      readonly string[],
+
+    snapshot:
+      EnvironmentSnapshot,
+  ): ActionChoice | undefined {
+    const plan =
+      this.scientificDiscoveryPlanner
+        ?.plan({
+          currentState:
+            snapshot,
+
+          availableActions,
+        });
+
+    if (
+      !plan
+    ) {
+      return undefined;
+    }
+
+    const setupStep =
+      plan.setupSteps[0];
+
+    if (
+      setupStep
+    ) {
+      return {
+        action:
+          setupStep.action,
+
+        strategy:
+          "scientific-discovery-setup",
+
+        expectedEffects: [
+          "Move toward an evidence-bounded state where autonomous causal hypotheses make different predictions.",
+          ...setupStep.effects.map(
+            (effect) =>
+              `${effect.key}: ${String(
+                effect.before,
+              )} -> ${String(
+                effect.after,
+              )}`,
+          ),
+        ],
+      };
+    }
+
+    return {
+      action:
+        plan.probeAction,
+
+      strategy:
+        "hypothesis-experiment",
+
+      expectedEffects: [
+        "Execute the decisive probe after autonomously reaching a state where competing causal hypotheses disagree; expected information gain " +
+        plan.informationGain
+          .toFixed(3) +
+        ".",
+      ],
     };
   }
 
@@ -1053,6 +1160,9 @@ export class CognitiveRuntime {
       case "transfer":
         return "transfer";
 
+      case "scientific-discovery-setup":
+        return "scientific-discovery-setup";
+
       case "hypothesis-experiment":
         return "hypothesis-experiment";
 
@@ -1079,6 +1189,11 @@ export class CognitiveRuntime {
       case "transfer":
         return [
           "Prior successful experience suggests this action contributes to the goal.",
+        ];
+
+      case "scientific-discovery-setup":
+        return [
+          "This action moves the environment toward a state selected for a discriminating causal experiment.",
         ];
 
       case "hypothesis-experiment":
