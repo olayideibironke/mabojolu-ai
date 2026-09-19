@@ -870,6 +870,10 @@ export class CognitiveRuntime {
                 (change) =>
                   change.key,
               ),
+
+            goalSatisfied:
+              this.environment
+                .isGoalSatisfied(),
           });
       } else {
         this.abstractPrincipleController
