@@ -101,6 +101,9 @@ export function handoverPressure(input: {
 
   modelId:
     string;
+
+  contextTokenBudget?:
+    number;
 }):
   HandoverPressure {
   const model =
@@ -133,12 +136,26 @@ export function handoverPressure(input: {
     };
   }
 
+  const modelUsableTokens =
+    model.contextWindowTokens -
+    model.maxOutputTokens -
+    3_072;
+
+  const configuredBudget =
+    input.contextTokenBudget &&
+    Number.isFinite(
+      input.contextTokenBudget,
+    )
+      ? input.contextTokenBudget
+      : Number.POSITIVE_INFINITY;
+
   const estimatedUsableTokens =
     Math.max(
       MINIMUM_USABLE_CONTEXT,
-      model.contextWindowTokens -
-        model.maxOutputTokens -
-        3_072,
+      Math.min(
+        modelUsableTokens,
+        configuredBudget,
+      ),
     );
 
   const utilization =
@@ -205,6 +222,50 @@ function compact(
   );
 }
 
+function continuitySignalScore(
+  message:
+    ChatMessage,
+):
+  number {
+  const content =
+    message.content
+      .toLowerCase();
+
+  const signals = [
+    "must",
+    "do not",
+    "don't",
+    "never",
+    "always",
+    "we decided",
+    "agreed",
+    "locked",
+    "verified",
+    "completed",
+    "current status",
+    "next step",
+    "important",
+    "constraint",
+    "requirement",
+    "path:",
+    "branch",
+    "commit",
+  ];
+
+  return signals.reduce(
+    (
+      score,
+      signal,
+    ) =>
+      content.includes(
+        signal,
+      )
+        ? score + 1
+        : score,
+    0,
+  );
+}
+
 function displayRole(
   role:
     ChatMessage[
@@ -264,6 +325,47 @@ export function buildHandoverPacket(input: {
       -12,
     );
 
+  const recentIds =
+    new Set(
+      recent.map(
+        (
+          message,
+        ) =>
+          message.id,
+      ),
+    );
+
+  const continuityHighlights =
+    eligible
+      .filter(
+        (
+          message,
+        ) =>
+          !recentIds.has(
+            message.id,
+          ) &&
+          continuitySignalScore(
+            message,
+          ) >
+            0,
+      )
+      .sort(
+        (
+          left,
+          right,
+        ) =>
+          continuitySignalScore(
+            right,
+          ) -
+          continuitySignalScore(
+            left,
+          ),
+      )
+      .slice(
+        0,
+        8,
+      );
+
   const lines: string[] = [
     "# MABOJOLU CONTINUITY HANDOVER",
     "",
@@ -301,6 +403,32 @@ export function buildHandoverPacket(input: {
         2_400,
       ),
     );
+  }
+
+  if (
+    continuityHighlights.length >
+      0
+  ) {
+    lines.push(
+      "",
+      "## Earlier constraints and decisions",
+    );
+
+    for (
+      const message of
+        continuityHighlights
+    ) {
+      lines.push(
+        "",
+        `### ${displayRole(
+          message.role,
+        )}`,
+        compact(
+          message.content,
+          900,
+        ),
+      );
+    }
   }
 
   lines.push(
