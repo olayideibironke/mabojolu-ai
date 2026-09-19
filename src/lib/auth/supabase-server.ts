@@ -7,7 +7,7 @@ import {
 } from "@supabase/supabase-js";
 import { cookies } from "next/headers";
 
-import { inspectServerEnv } from "@/lib/env";
+
 
 /**
  * Server-side Supabase clients.
@@ -28,40 +28,22 @@ import { inspectServerEnv } from "@/lib/env";
  * above turns an accidental client import into a build error.
  */
 
-/**
- * Select the browser-safe Supabase key.
- *
- * New projects use `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`. The legacy anon key
- * remains an accepted fallback while older environments are migrated.
- */
-function getPublicSupabaseKey(
-  env: Extract<
-    ReturnType<typeof inspectServerEnv>,
-    { ok: true }
-  >["env"],
-): string | null {
+function getPublicSupabaseKey(): string | null {
   return (
-    env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
+    process.env
+      .NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+    process.env
+      .NEXT_PUBLIC_SUPABASE_ANON_KEY ??
     null
   );
 }
 
-/**
- * Select the privileged server-only Supabase key.
- *
- * New projects use `SUPABASE_SECRET_KEY`. The legacy service-role key remains
- * an accepted fallback for existing deployments.
- */
-function getPrivilegedSupabaseKey(
-  env: Extract<
-    ReturnType<typeof inspectServerEnv>,
-    { ok: true }
-  >["env"],
-): string | null {
+function getPrivilegedSupabaseKey(): string | null {
   return (
-    env.SUPABASE_SECRET_KEY ??
-    env.SUPABASE_SERVICE_ROLE_KEY ??
+    process.env
+      .SUPABASE_SECRET_KEY ??
+    process.env
+      .SUPABASE_SERVICE_ROLE_KEY ??
     null
   );
 }
@@ -73,18 +55,11 @@ function getPrivilegedSupabaseKey(
  * callers to use their existing fallback instead of crashing.
  */
 export async function createServerSupabaseClient(): Promise<SupabaseClient | null> {
-  const envResult = inspectServerEnv();
-
-  if (!envResult.ok) {
-    return null;
-  }
-
   const url =
-    envResult.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
 
-  const key = getPublicSupabaseKey(
-    envResult.env,
-  );
+  const key =
+    getPublicSupabaseKey();
 
   if (!url || !key) {
     return null;
@@ -135,19 +110,11 @@ export async function createServerSupabaseClient(): Promise<SupabaseClient | nul
  * in user, use `createServerSupabaseClient` so RLS remains active.
  */
 export function createServiceRoleClient(): SupabaseClient | null {
-  const envResult = inspectServerEnv();
-
-  if (!envResult.ok) {
-    return null;
-  }
-
   const url =
-    envResult.env.NEXT_PUBLIC_SUPABASE_URL;
+    process.env.NEXT_PUBLIC_SUPABASE_URL;
 
   const key =
-    getPrivilegedSupabaseKey(
-      envResult.env,
-    );
+    getPrivilegedSupabaseKey();
 
   if (!url || !key) {
     return null;
