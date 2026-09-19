@@ -7,7 +7,7 @@ import {
   devUsers,
   setDevSession,
 } from "@/lib/auth/session";
-import { inspectServerEnv } from "@/lib/env";
+import { authRuntimeMode } from "@/lib/runtime-mode";
 
 /**
  * Development sign-in.
@@ -25,12 +25,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 function devModeAvailable(): boolean {
-  const envResult = inspectServerEnv();
-
   return (
-    envResult.ok &&
-    envResult.env.AUTH_MODE === "dev" &&
-    envResult.env.NODE_ENV !== "production"
+    authRuntimeMode() ===
+      "dev" &&
+    process.env.NODE_ENV !==
+      "production"
   );
 }
 
