@@ -317,6 +317,56 @@ describe(
     );
 
     it(
+      "rejects evaluation-partition outcomes from the training competence model",
+      () => {
+        const generator =
+          new AutonomousChallengeGenerator(
+            new CompetenceModel(),
+            new EvaluationIsolationGuard(),
+            [
+              WEAK_BLUEPRINT,
+            ],
+          );
+
+        const generated =
+          generator.generateNextPractice();
+
+        expect(
+          generated,
+        ).toBeDefined();
+
+        if (
+          !generated
+        ) {
+          return;
+        }
+
+        expect(
+          () =>
+            generator.recordPracticeOutcome({
+              challenge: {
+                ...generated.spec,
+
+                partition:
+                  "evaluation",
+              },
+
+              success:
+                true,
+
+              cycles:
+                3,
+
+              observedAt:
+                "2026-09-19T20:00:00.000Z",
+            }),
+        ).toThrow(
+          "Only practice challenge outcomes",
+        );
+      },
+    );
+
+    it(
       "rejects an outcome for a practice task that it did not generate",
       () => {
         const generator =
