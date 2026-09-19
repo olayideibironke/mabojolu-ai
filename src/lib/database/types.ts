@@ -82,6 +82,67 @@ export interface UsageEventInput {
   finishReason: string;
 }
 
+export type PluginProviderId =
+  | "google"
+  | "microsoft"
+  | "github";
+
+export interface PluginConnection {
+  userId:
+    string;
+
+  provider:
+    PluginProviderId;
+
+  accountLabel:
+    string;
+
+  accessTokenEncrypted:
+    string;
+
+  refreshTokenEncrypted:
+    string |
+    null;
+
+  expiresAt:
+    string |
+    null;
+
+  scopes:
+    string[];
+
+  createdAt:
+    string;
+
+  updatedAt:
+    string;
+}
+
+export interface UpsertPluginConnectionInput {
+  userId:
+    string;
+
+  provider:
+    PluginProviderId;
+
+  accountLabel:
+    string;
+
+  accessTokenEncrypted:
+    string;
+
+  refreshTokenEncrypted?:
+    string |
+    null;
+
+  expiresAt?:
+    string |
+    null;
+
+  scopes:
+    string[];
+}
+
 export interface SafetyEventInput {
   userId: string | null;
   conversationId: string | null;
@@ -575,6 +636,26 @@ export interface DatabaseAdapter {
   deleteAttachment(
     attachmentId: string,
     userId: string,
+  ): Promise<boolean>;
+
+  // --- Plugins -------------------------------------------------------------
+
+  getPluginConnection(
+    userId: string,
+    provider: PluginProviderId,
+  ): Promise<PluginConnection | null>;
+
+  listPluginConnections(
+    userId: string,
+  ): Promise<PluginConnection[]>;
+
+  upsertPluginConnection(
+    input: UpsertPluginConnectionInput,
+  ): Promise<PluginConnection>;
+
+  deletePluginConnection(
+    userId: string,
+    provider: PluginProviderId,
   ): Promise<boolean>;
 
   // --- Administration ------------------------------------------------------
