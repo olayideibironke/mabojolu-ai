@@ -100,6 +100,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - multi-step scientific discovery;
 - hierarchical goal reasoning;
 - backward causal goal decomposition;
+- autonomous reusable skill formation from repeated successful experience;
+- skill revision and retirement under contradictory evidence;
+- structural skill transfer under renamed actions and state variables;
+- composition of separately learned skills into novel multi-skill solutions;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -109,20 +113,26 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The next central intelligence milestone after the current compute/artifact
-checkpoint should focus on autonomous skill formation and continual skill reuse:
+The current central intelligence milestone is autonomous curriculum selection
+and explicit competence modeling:
 
-1. detect repeated successful action structures across episodes;
-2. compress them into explicit reusable skills;
-3. infer skill preconditions and predicted effects;
-4. retrieve and compose skills in unfamiliar environments;
-5. revise or retire skills when evidence contradicts them;
-6. measure whether skill acquisition reduces learning time on held-out tasks;
-7. test transfer under renamed variables, actions, and changed surface details.
+1. maintain evidence-based estimates of competence for distinct task families;
+2. distinguish uncertainty from demonstrated mastery;
+3. select learning challenges near a productive difficulty frontier;
+4. keep advanced challenges locked until prerequisite competence has repeated
+   supporting evidence;
+5. use novelty, uncertainty, learning progress, and task cost when choosing what
+   to practice next;
+6. record the outcome of self-selected practice back into the competence model;
+7. verify that the resulting experience improves held-out task performance.
 
-The stronger scientific question is not whether Mabojolu can replay a sequence.
-It is whether experience produces reusable competence that accelerates solving
-new tasks.
+The stronger scientific question is no longer only whether experience can be
+reused. It is whether Mabojolu can identify what it needs to learn next, direct
+its own practice toward that gap, and produce measurable improvement afterward.
+
+A later milestone should move beyond choosing from a supplied challenge catalog
+toward generating new safe synthetic learning challenges from known capability
+gaps, while keeping evaluation isolated from training data.
 
 ## Safety and audit principle
 
