@@ -6,6 +6,7 @@ import {
 import {
   diffSnapshots,
   snapshotSignature,
+  type EnvironmentScalar,
   type EnvironmentSnapshot,
 } from "./environment";
 
@@ -539,6 +540,75 @@ export class AutonomousCausalHypothesisEngine {
     readonly AutonomousCausalHypothesis[] {
     return this.hypotheses.map(
       cloneHypothesis,
+    );
+  }
+
+  getObservedValues():
+    Readonly<
+      Record<
+        string,
+        EnvironmentScalar[]
+      >
+    > {
+    const values:
+      Record<
+        string,
+        EnvironmentScalar[]
+      > = {};
+
+    for (
+      const observation of
+        this.observations
+    ) {
+      for (
+        const snapshot of [
+          observation.before,
+          observation.after,
+        ]
+      ) {
+        for (
+          const [
+            key,
+            value,
+          ] of Object.entries(
+            snapshot,
+          )
+        ) {
+          const existing =
+            values[key] ??
+            [];
+
+          if (
+            !existing.some(
+              (candidate) =>
+                Object.is(
+                  candidate,
+                  value,
+                ),
+            )
+          ) {
+            existing.push(
+              value,
+            );
+          }
+
+          values[key] =
+            existing;
+        }
+      }
+    }
+
+    return Object.fromEntries(
+      Object.entries(
+        values,
+      ).map(
+        ([key, entries]) => [
+          key,
+          [
+            ...entries,
+          ],
+        ],
+      ),
     );
   }
 
