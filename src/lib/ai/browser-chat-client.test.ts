@@ -142,6 +142,31 @@ describe(
     );
 
     it(
+      "falls back to Ollama when the current prompt cannot fit the browser context without truncation",
+      () => {
+        enableWebGpu();
+
+        expect(
+          shouldUseBrowserChat({
+            ...BASE_BODY,
+
+            messages: [
+              {
+                ...BASE_BODY
+                  .messages[0],
+
+                content:
+                  "oversized ".repeat(
+                    4000,
+                  ),
+              },
+            ],
+          }),
+        ).toBe(false);
+      },
+    );
+
+    it(
       "temporarily falls back to Ollama after a browser-compute failure",
       () => {
         enableWebGpu();
