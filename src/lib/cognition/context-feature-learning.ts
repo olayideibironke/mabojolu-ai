@@ -63,6 +63,8 @@ const FEATURE_NAMES:
     "candidateMatchesLastAction",
     "candidateMatchesLastProductiveAction",
     "candidateNoEffectAttempts",
+    "distinctActionsSeen",
+    "historyLength",
     "lastChangeArity",
     "lastValueShapes",
     "stepsSinceCandidateAttempt",
