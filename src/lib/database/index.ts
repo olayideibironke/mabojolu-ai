@@ -5,6 +5,7 @@ import "server-only";
  * database factory creates an adapter instance.
  */
 import "./supabase-billing";
+import "./supabase-plugins";
 
 import { inspectServerEnv } from "@/lib/env";
 
