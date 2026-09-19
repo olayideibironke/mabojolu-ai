@@ -89,12 +89,10 @@ function selectionScore(input: {
 }
 
 /**
- * Mabojolu G competing abstraction portfolio v0.1.
+ * Persistent evidence store for multiple higher-order principles.
  *
- * The portfolio learns multiple higher-order principles from the same episode
- * stream and keeps their evidence independent. At target runtime, each active
- * principle may propose an action only after its own applicability evidence is
- * observed. Selection is based on applicability × learned confidence.
+ * It intentionally contains no target-episode binding state. Every runtime
+ * creates a fresh AbstractPrinciplePortfolioController from this evidence.
  */
 export class AbstractPrinciplePortfolio {
   readonly deferred:
@@ -102,15 +100,6 @@ export class AbstractPrinciplePortfolio {
 
   readonly monotonic:
     MonotonicProgressPrincipleLibrary;
-
-  private readonly deferredController:
-    AbstractPrincipleController;
-
-  private readonly monotonicController:
-    MonotonicProgressPrincipleController;
-
-  private readonly selections:
-    PrincipleSelection[] = [];
 
   constructor(input?: {
     deferred?:
@@ -126,16 +115,6 @@ export class AbstractPrinciplePortfolio {
     this.monotonic =
       input?.monotonic ??
       new MonotonicProgressPrincipleLibrary();
-
-    this.deferredController =
-      new AbstractPrincipleController(
-        this.deferred,
-      );
-
-    this.monotonicController =
-      new MonotonicProgressPrincipleController(
-        this.monotonic,
-      );
   }
 
   learnFromEpisode(
@@ -150,6 +129,90 @@ export class AbstractPrinciplePortfolio {
     this.monotonic
       .learnFromEpisode(
         episode,
+      );
+  }
+
+  createController():
+    AbstractPrinciplePortfolioController {
+    return new AbstractPrinciplePortfolioController(
+      this,
+    );
+  }
+
+  getPrinciples():
+    PortfolioPrinciple[] {
+    const principles:
+      PortfolioPrinciple[] =
+      [];
+
+    const deferred =
+      this.deferred
+        .getPrinciple();
+
+    const monotonic =
+      this.monotonic
+        .getPrinciple();
+
+    if (
+      deferred
+    ) {
+      principles.push(
+        clonePrinciple(
+          deferred,
+        ),
+      );
+    }
+
+    if (
+      monotonic
+    ) {
+      principles.push(
+        clonePrinciple(
+          monotonic,
+        ),
+      );
+    }
+
+    return principles.sort(
+      (
+        left,
+        right,
+      ) =>
+        left.id.localeCompare(
+          right.id,
+        ),
+    );
+  }
+}
+
+/**
+ * Per-episode contextual selector.
+ *
+ * Applicability observations and selection history are local to one runtime.
+ * Learned principle evidence stays in the persistent portfolio.
+ */
+export class AbstractPrinciplePortfolioController {
+  private readonly deferredController:
+    AbstractPrincipleController;
+
+  private readonly monotonicController:
+    MonotonicProgressPrincipleController;
+
+  private readonly selections:
+    PrincipleSelection[] = [];
+
+  constructor(
+    private readonly portfolio:
+      AbstractPrinciplePortfolio,
+  ) {
+    this.deferredController =
+      new AbstractPrincipleController(
+        portfolio.deferred,
+      );
+
+    this.monotonicController =
+      new MonotonicProgressPrincipleController(
+        portfolio.monotonic,
       );
   }
 
@@ -213,7 +276,8 @@ export class AbstractPrinciplePortfolio {
       deferred
     ) {
       const principle =
-        this.deferred
+        this.portfolio
+          .deferred
           .getPrinciple();
 
       if (
@@ -247,7 +311,8 @@ export class AbstractPrinciplePortfolio {
       monotonic
     ) {
       const principle =
-        this.monotonic
+        this.portfolio
+          .monotonic
           .getPrinciple();
 
       if (
@@ -350,50 +415,10 @@ export class AbstractPrinciplePortfolio {
 
   getSnapshot():
     AbstractPrinciplePortfolioSnapshot {
-    const principles:
-      PortfolioPrinciple[] =
-      [];
-
-    const deferred =
-      this.deferred
-        .getPrinciple();
-
-    const monotonic =
-      this.monotonic
-        .getPrinciple();
-
-    if (
-      deferred
-    ) {
-      principles.push(
-        clonePrinciple(
-          deferred,
-        ),
-      );
-    }
-
-    if (
-      monotonic
-    ) {
-      principles.push(
-        clonePrinciple(
-          monotonic,
-        ),
-      );
-    }
-
-    principles.sort(
-      (
-        left,
-        right,
-      ) =>
-        left.id.localeCompare(
-          right.id,
-        ),
-    );
-
     return {
-      principles,
+      principles:
+        this.portfolio
+          .getPrinciples(),
 
       selections:
         this.selections.map(
