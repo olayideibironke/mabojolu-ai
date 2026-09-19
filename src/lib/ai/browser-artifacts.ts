@@ -417,46 +417,42 @@ export function parseMabojoluArtifactManifest(
 
 function selectedUpstreamRecords():
   ModelRecord[] {
-  const records =
-    MABOJOLU_BROWSER_MODEL_IDS
-      .map(
-        (modelId) =>
+  return MABOJOLU_BROWSER_MODEL_IDS
+    .map(
+      (modelId) => {
+        const record =
           prebuiltAppConfig
             .model_list
             .find(
-              (record) =>
-                record.model_id ===
+              (candidate) =>
+                candidate
+                  .model_id ===
                 modelId,
-            ),
-      );
+            );
 
-  if (
-    records.some(
-      (record) =>
-        !record,
-    )
-  ) {
-    throw new Error(
-      "The pinned WebLLM runtime no longer contains every Mabojolu browser model.",
+        if (
+          !record
+        ) {
+          throw new Error(
+            "The pinned WebLLM runtime no longer contains every Mabojolu browser model.",
+          );
+        }
+
+        return {
+          ...record,
+
+          ...(record
+              .overrides
+            ? {
+                overrides: {
+                  ...record
+                    .overrides,
+                },
+              }
+            : {}),
+        };
+      },
     );
-  }
-
-  return records.map(
-    (record) => ({
-      ...record as
-        ModelRecord,
-
-      ...(record
-          ?.overrides
-        ? {
-            overrides: {
-              ...record
-                .overrides,
-            },
-          }
-        : {}),
-    }),
-  );
 }
 
 export function upstreamMabojoluAppConfig():
