@@ -218,6 +218,102 @@ function safeFamilyId(
     "challenge";
 }
 
+
+type ActionIndex =
+  | 0
+  | 1
+  | 2;
+
+function actionIndexForRole(
+  blueprint:
+    GatedSequenceChallengeBlueprint,
+
+  role:
+    0 | 1 | 2,
+):
+  ActionIndex {
+  const index =
+    blueprint
+      .practiceActionRoleOrder
+      .indexOf(
+        role,
+      );
+
+  if (
+    index !==
+      0 &&
+    index !==
+      1 &&
+    index !==
+      2
+  ) {
+    throw new Error(
+      "Challenge blueprint role mapping is invalid.",
+    );
+  }
+
+  return index;
+}
+
+function presentationOrderForDifficulty(
+  blueprint:
+    GatedSequenceChallengeBlueprint,
+
+  difficulty:
+    number,
+):
+  readonly [
+    ActionIndex,
+    ActionIndex,
+    ActionIndex,
+  ] {
+  const setupOne =
+    actionIndexForRole(
+      blueprint,
+      0,
+    );
+
+  const setupTwo =
+    actionIndexForRole(
+      blueprint,
+      1,
+    );
+
+  const goal =
+    actionIndexForRole(
+      blueprint,
+      2,
+    );
+
+  if (
+    difficulty <
+      0.4
+  ) {
+    return [
+      setupOne,
+      setupTwo,
+      goal,
+    ];
+  }
+
+  if (
+    difficulty <
+      0.6
+  ) {
+    return [
+      0,
+      1,
+      2,
+    ];
+  }
+
+  return [
+    goal,
+    setupTwo,
+    setupOne,
+  ];
+}
+
 /**
  * Mabojolu G autonomous safe challenge generator v0.1.
  *
@@ -449,6 +545,14 @@ export class AutonomousChallengeGenerator {
         blueprint
           .practiceActionRoleOrder[2],
       ],
+
+      actionPresentationOrder:
+        presentationOrderForDifficulty(
+          blueprint,
+          recommendation
+            .task
+            .difficulty,
+        ),
     };
 
     this.isolation
