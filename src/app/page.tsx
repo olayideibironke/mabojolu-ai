@@ -3,6 +3,7 @@ import { ChatShell } from "@/components/chat/chat-shell";
 import { getSession } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database";
 import { inspectServerEnv } from "@/lib/env";
+import { authRuntimeMode } from "@/lib/runtime-mode";
 
 /**
  * Mabojolu chat home.
@@ -26,8 +27,7 @@ export default async function HomePage() {
 
   const shouldBootstrapGuest =
     session === null &&
-    envResult.ok &&
-    envResult.env.AUTH_MODE ===
+    authRuntimeMode() ===
       "supabase";
 
   return (
