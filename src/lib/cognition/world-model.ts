@@ -32,25 +32,49 @@ export interface CausalEffect {
     undefined;
 }
 
+export type CausalRuleScope =
+  | "exact"
+  | "generalized";
+
+export interface CausalVariation {
+  /**
+   * State variable observed to vary while the same causal effect remained
+   * stable.
+   */
+  key: string;
+
+  /**
+   * World Model v0.2 does not extrapolate beyond values actually observed.
+   */
+  observedValues:
+    EnvironmentScalar[];
+}
+
 export interface CausalRule {
   id: string;
 
   action: string;
 
+  scope:
+    CausalRuleScope;
+
   /**
-   * Observable state under which this rule was learned.
+   * Conditions that remained stable across the evidence supporting this rule.
    *
-   * World Model v0.1 intentionally keeps the complete observed state rather
-   * than pretending it already knows which variables are true prerequisites.
+   * Exact rules contain the complete observed state.
+   *
+   * Generalized rules retain only conditions that have not yet been shown to
+   * be irrelevant.
    */
   conditions:
     EnvironmentSnapshot;
 
   /**
-   * Observable changes produced by the action.
-   *
-   * An empty array represents a learned no-effect rule.
+   * Variables demonstrated to vary while preserving the same effect.
    */
+  variations:
+    CausalVariation[];
+
   effects:
     CausalEffect[];
 
@@ -63,6 +87,12 @@ export interface CausalRule {
   confidence:
     number;
 
+  /**
+   * Exact evidence from which this rule was derived.
+   */
+  sourceRuleIds:
+    string[];
+
   firstObservedAt:
     string;
 
@@ -73,8 +103,14 @@ export interface CausalRule {
 export interface WorldModelPrediction {
   action: string;
 
+  scope:
+    CausalRuleScope;
+
   conditions:
     EnvironmentSnapshot;
+
+  variations:
+    CausalVariation[];
 
   effects:
     CausalEffect[];
@@ -85,6 +121,12 @@ export interface WorldModelPrediction {
   basisRuleId:
     string;
 }
+
+const MIN_GENERALIZATION_STATES =
+  3;
+
+const GENERALIZATION_CONFIDENCE_FACTOR =
+  0.9;
 
 function cloneSnapshot(
   snapshot:
@@ -104,6 +146,21 @@ function cloneEffect(
   };
 }
 
+function cloneVariation(
+  variation:
+    CausalVariation,
+): CausalVariation {
+  return {
+    key:
+      variation.key,
+
+    observedValues: [
+      ...variation
+        .observedValues,
+    ],
+  };
+}
+
 function cloneRule(
   rule:
     CausalRule,
@@ -116,10 +173,20 @@ function cloneRule(
         rule.conditions,
       ),
 
+    variations:
+      rule.variations.map(
+        cloneVariation,
+      ),
+
     effects:
       rule.effects.map(
         cloneEffect,
       ),
+
+    sourceRuleIds: [
+      ...rule
+        .sourceRuleIds,
+    ],
   };
 }
 
@@ -141,6 +208,23 @@ function effectsFromChanges(
   );
 }
 
+function encodeEffectValue(
+  value:
+    EnvironmentScalar |
+    undefined,
+): string {
+  if (
+    value === undefined
+  ) {
+    return "undefined";
+  }
+
+  return JSON.stringify([
+    "value",
+    value,
+  ]);
+}
+
 function effectSignature(
   effects:
     CausalEffect[],
@@ -149,8 +233,12 @@ function effectSignature(
     effects.map(
       (effect) => [
         effect.key,
-        effect.before,
-        effect.after,
+        encodeEffectValue(
+          effect.before,
+        ),
+        encodeEffectValue(
+          effect.after,
+        ),
       ],
     ),
   );
@@ -182,9 +270,6 @@ function confidenceFor(
 ): number {
   /*
    * Laplace-style smoothing prevents one observation from becoming certainty.
-   *
-   * 1 support, 0 contradictions -> 0.667
-   * 2 support, 0 contradictions -> 0.75
    */
   return (
     supportCount + 1
@@ -195,25 +280,369 @@ function confidenceFor(
   );
 }
 
+function generalizedConfidenceFor(
+  supportCount:
+    number,
+
+  contradictionCount:
+    number,
+): number {
+  /*
+   * Generalized claims remain less certain than equally supported exact
+   * observations because abstraction introduces additional inference.
+   */
+  return (
+    confidenceFor(
+      supportCount,
+      contradictionCount,
+    ) *
+    GENERALIZATION_CONFIDENCE_FACTOR
+  );
+}
+
+function scalarIncluded(
+  values:
+    readonly EnvironmentScalar[],
+
+  candidate:
+    EnvironmentScalar |
+    undefined,
+): boolean {
+  if (
+    candidate === undefined
+  ) {
+    return false;
+  }
+
+  return values.some(
+    (value) =>
+      Object.is(
+        value,
+        candidate,
+      ),
+  );
+}
+
+function uniqueScalars(
+  values:
+    EnvironmentScalar[],
+): EnvironmentScalar[] {
+  const unique:
+    EnvironmentScalar[] = [];
+
+  for (
+    const value of values
+  ) {
+    if (
+      !scalarIncluded(
+        unique,
+        value,
+      )
+    ) {
+      unique.push(
+        value,
+      );
+    }
+  }
+
+  return unique;
+}
+
+function sortedKeys(
+  snapshot:
+    EnvironmentSnapshot,
+): string[] {
+  return Object.keys(
+    snapshot,
+  ).sort();
+}
+
+function sameStateShape(
+  snapshots:
+    EnvironmentSnapshot[],
+): boolean {
+  if (
+    snapshots.length === 0
+  ) {
+    return false;
+  }
+
+  const first =
+    JSON.stringify(
+      sortedKeys(
+        snapshots[0],
+      ),
+    );
+
+  return snapshots.every(
+    (snapshot) =>
+      JSON.stringify(
+        sortedKeys(
+          snapshot,
+        ),
+      ) === first,
+  );
+}
+
+function deriveCommonConditions(
+  snapshots:
+    EnvironmentSnapshot[],
+): EnvironmentSnapshot {
+  const first =
+    snapshots[0];
+
+  if (
+    !first
+  ) {
+    return {};
+  }
+
+  const conditions:
+    EnvironmentSnapshot = {};
+
+  for (
+    const key of
+      sortedKeys(
+        first,
+      )
+  ) {
+    const value =
+      first[key];
+
+    const remainsConstant =
+      snapshots.every(
+        (snapshot) =>
+          Object.is(
+            snapshot[key],
+            value,
+          ),
+      );
+
+    if (
+      remainsConstant
+    ) {
+      conditions[key] =
+        value;
+    }
+  }
+
+  return conditions;
+}
+
+function deriveVariations(
+  snapshots:
+    EnvironmentSnapshot[],
+
+  conditions:
+    EnvironmentSnapshot,
+): CausalVariation[] {
+  const first =
+    snapshots[0];
+
+  if (
+    !first
+  ) {
+    return [];
+  }
+
+  return sortedKeys(
+    first,
+  )
+    .filter(
+      (key) =>
+        !(key in
+          conditions),
+    )
+    .map(
+      (key) => ({
+        key,
+
+        observedValues:
+          uniqueScalars(
+            snapshots.map(
+              (snapshot) =>
+                snapshot[key],
+            ),
+          ),
+      }),
+    );
+}
+
+function conditionsMatch(
+  conditions:
+    EnvironmentSnapshot,
+
+  state:
+    EnvironmentSnapshot,
+): boolean {
+  return Object.entries(
+    conditions,
+  ).every(
+    ([key, value]) =>
+      Object.is(
+        state[key],
+        value,
+      ),
+  );
+}
+
+function effectsCanApply(
+  effects:
+    CausalEffect[],
+
+  state:
+    EnvironmentSnapshot,
+): boolean {
+  return effects.every(
+    (effect) =>
+      Object.is(
+        state[
+          effect.key
+        ],
+        effect.before,
+      ),
+  );
+}
+
+function generalizedStateMatches(
+  rule:
+    CausalRule,
+
+  state:
+    EnvironmentSnapshot,
+): boolean {
+  if (
+    rule.scope !==
+    "generalized"
+  ) {
+    return false;
+  }
+
+  const modeledKeys =
+    [
+      ...Object.keys(
+        rule.conditions,
+      ),
+
+      ...rule.variations.map(
+        (variation) =>
+          variation.key,
+      ),
+    ].sort();
+
+  /*
+   * Unknown state variables are not silently treated as irrelevant.
+   */
+  if (
+    JSON.stringify(
+      modeledKeys,
+    ) !==
+    JSON.stringify(
+      sortedKeys(
+        state,
+      ),
+    )
+  ) {
+    return false;
+  }
+
+  if (
+    !conditionsMatch(
+      rule.conditions,
+      state,
+    )
+  ) {
+    return false;
+  }
+
+  for (
+    const variation of
+      rule.variations
+  ) {
+    if (
+      !scalarIncluded(
+        variation
+          .observedValues,
+        state[
+          variation.key
+        ],
+      )
+    ) {
+      return false;
+    }
+  }
+
+  return effectsCanApply(
+    rule.effects,
+    state,
+  );
+}
+
+function ruleSort(
+  left:
+    CausalRule,
+
+  right:
+    CausalRule,
+): number {
+  if (
+    right.confidence !==
+    left.confidence
+  ) {
+    return (
+      right.confidence -
+      left.confidence
+    );
+  }
+
+  if (
+    right.supportCount !==
+    left.supportCount
+  ) {
+    return (
+      right.supportCount -
+      left.supportCount
+    );
+  }
+
+  return (
+    right.id.localeCompare(
+      left.id,
+    )
+  );
+}
+
 /**
- * Mabojolu G World Model v0.1.
+ * Mabojolu G World Model v0.2.
  *
- * The model learns explicit:
+ * Exact causal knowledge:
  *
- * observable state + action -> observable consequence
+ * complete observed state + action -> observed consequence
  *
- * relationships.
+ * Generalized causal knowledge:
  *
- * It does not store hidden reasoning and does not infer unobserved causal
- * structure. Generalization across partially matching states belongs to a
- * later world-model version after we have evidence that such generalization is
- * justified.
+ * stable conditions + demonstrated variations + action -> observed consequence
+ *
+ * Generalization is deliberately conservative:
+ *
+ * - at least three distinct states must support the same effect;
+ * - only variables actually observed to vary are relaxed;
+ * - only observed values of relaxed variables are accepted;
+ * - unseen state variables invalidate the generalization;
+ * - exact evidence always outranks generalized inference;
+ * - contradictory observations reduce generalized confidence.
  */
 export class WorldModel {
-  private readonly rules:
+  private readonly exactRules:
     CausalRule[] = [];
 
-  private sequence = 0;
+  private generalizedRules:
+    CausalRule[] = [];
+
+  private exactSequence = 0;
+
+  private generalizationSequence =
+    0;
 
   observeTransition(
     observation:
@@ -244,7 +673,7 @@ export class WorldModel {
       );
 
     const matchingConditionRules =
-      this.rules.filter(
+      this.exactRules.filter(
         (rule) =>
           rule.action ===
             observation.action &&
@@ -263,10 +692,6 @@ export class WorldModel {
           ),
       );
 
-    /*
-     * Any different observed consequence under exactly the same observable
-     * state contradicts previously learned alternatives.
-     */
     for (
       const rule of
         matchingConditionRules
@@ -301,7 +726,9 @@ export class WorldModel {
         observation.observedAt;
     }
 
-    if (existing) {
+    if (
+      existing
+    ) {
       existing.supportCount +=
         1;
 
@@ -315,22 +742,33 @@ export class WorldModel {
       existing.lastObservedAt =
         observation.observedAt;
 
+      this.rebuildGeneralizations();
+
       return cloneRule(
         existing,
       );
     }
 
-    this.sequence += 1;
+    this.exactSequence +=
+      1;
+
+    const id =
+      "causal-rule-" +
+      this.exactSequence;
 
     const rule:
       CausalRule = {
-      id:
-        `causal-rule-${this.sequence}`,
+      id,
 
       action:
         observation.action,
 
+      scope:
+        "exact",
+
       conditions,
+
+      variations: [],
 
       effects,
 
@@ -345,6 +783,10 @@ export class WorldModel {
           0,
         ),
 
+      sourceRuleIds: [
+        id,
+      ],
+
       firstObservedAt:
         observation.observedAt,
 
@@ -352,9 +794,11 @@ export class WorldModel {
         observation.observedAt,
     };
 
-    this.rules.push(
+    this.exactRules.push(
       rule,
     );
+
+    this.rebuildGeneralizations();
 
     return cloneRule(
       rule,
@@ -374,8 +818,11 @@ export class WorldModel {
         currentState,
       );
 
-    const candidates =
-      this.rules
+    /*
+     * Direct evidence always outranks abstraction.
+     */
+    const exactCandidates =
+      this.exactRules
         .filter(
           (rule) =>
             rule.action ===
@@ -386,71 +833,296 @@ export class WorldModel {
               signature,
         )
         .sort(
-          (
-            left,
-            right,
-          ) => {
-            if (
-              right.confidence !==
-              left.confidence
-            ) {
-              return (
-                right.confidence -
-                left.confidence
-              );
-            }
-
-            if (
-              right.supportCount !==
-              left.supportCount
-            ) {
-              return (
-                right.supportCount -
-                left.supportCount
-              );
-            }
-
-            return (
-              right.id.localeCompare(
-                left.id,
-              )
-            );
-          },
+          ruleSort,
         );
 
-    const best =
-      candidates[0];
+    const exact =
+      exactCandidates[0];
 
-    if (!best) {
+    if (
+      exact
+    ) {
+      return this.toPrediction(
+        exact,
+      );
+    }
+
+    const generalized =
+      this.generalizedRules
+        .filter(
+          (rule) =>
+            rule.action ===
+              action &&
+            generalizedStateMatches(
+              rule,
+              currentState,
+            ),
+        )
+        .sort(
+          ruleSort,
+        )[0];
+
+    if (
+      !generalized
+    ) {
       return undefined;
     }
 
-    return {
-      action:
-        best.action,
-
-      conditions:
-        cloneSnapshot(
-          best.conditions,
-        ),
-
-      effects:
-        best.effects.map(
-          cloneEffect,
-        ),
-
-      confidence:
-        best.confidence,
-
-      basisRuleId:
-        best.id,
-    };
+    return this.toPrediction(
+      generalized,
+    );
   }
 
   getRules():
     readonly CausalRule[] {
-    return this.rules.map(
+    return [
+      ...this.exactRules,
+      ...this.generalizedRules,
+    ].map(
       cloneRule,
     );
+  }
+
+  private toPrediction(
+    rule:
+      CausalRule,
+  ): WorldModelPrediction {
+    return {
+      action:
+        rule.action,
+
+      scope:
+        rule.scope,
+
+      conditions:
+        cloneSnapshot(
+          rule.conditions,
+        ),
+
+      variations:
+        rule.variations.map(
+          cloneVariation,
+        ),
+
+      effects:
+        rule.effects.map(
+          cloneEffect,
+        ),
+
+      confidence:
+        rule.confidence,
+
+      basisRuleId:
+        rule.id,
+    };
+  }
+
+  private rebuildGeneralizations():
+    void {
+    this.generalizedRules =
+      [];
+
+    const groups =
+      new Map<
+        string,
+        CausalRule[]
+      >();
+
+    for (
+      const rule of
+        this.exactRules
+    ) {
+      const key =
+        JSON.stringify([
+          rule.action,
+          effectSignature(
+            rule.effects,
+          ),
+        ]);
+
+      const existing =
+        groups.get(
+          key,
+        ) ?? [];
+
+      existing.push(
+        rule,
+      );
+
+      groups.set(
+        key,
+        existing,
+      );
+    }
+
+    for (
+      const sourceRules of
+        groups.values()
+    ) {
+      if (
+        sourceRules.length <
+        MIN_GENERALIZATION_STATES
+      ) {
+        continue;
+      }
+
+      const snapshots =
+        sourceRules.map(
+          (rule) =>
+            rule.conditions,
+        );
+
+      if (
+        !sameStateShape(
+          snapshots,
+        )
+      ) {
+        continue;
+      }
+
+      const conditions =
+        deriveCommonConditions(
+          snapshots,
+        );
+
+      const variations =
+        deriveVariations(
+          snapshots,
+          conditions,
+        );
+
+      if (
+        variations.length ===
+        0
+      ) {
+        continue;
+      }
+
+      const representative =
+        sourceRules[0];
+
+      if (
+        !representative
+      ) {
+        continue;
+      }
+
+      const supportCount =
+        sourceRules.reduce(
+          (
+            total,
+            rule,
+          ) =>
+            total +
+            rule.supportCount,
+          0,
+        );
+
+      const provisional:
+        CausalRule = {
+        id:
+          "provisional",
+
+        action:
+          representative
+            .action,
+
+        scope:
+          "generalized",
+
+        conditions,
+
+        variations,
+
+        effects:
+          representative
+            .effects.map(
+              cloneEffect,
+            ),
+
+        supportCount,
+
+        contradictionCount:
+          0,
+
+        confidence:
+          0,
+
+        sourceRuleIds:
+          sourceRules.map(
+            (rule) =>
+              rule.id,
+          ),
+
+        firstObservedAt:
+          sourceRules
+            .map(
+              (rule) =>
+                rule
+                  .firstObservedAt,
+            )
+            .sort()[0],
+
+        lastObservedAt:
+          sourceRules
+            .map(
+              (rule) =>
+                rule
+                  .lastObservedAt,
+            )
+            .sort()
+            .reverse()[0],
+      };
+
+      const contradictionCount =
+        this.exactRules
+          .filter(
+            (rule) =>
+              rule.action ===
+                provisional.action &&
+              !sameEffects(
+                rule.effects,
+                provisional
+                  .effects,
+              ) &&
+              generalizedStateMatches(
+                provisional,
+                rule.conditions,
+              ),
+          )
+          .reduce(
+            (
+              total,
+              rule,
+            ) =>
+              total +
+              rule.supportCount,
+            0,
+          );
+
+      this.generalizationSequence +=
+        1;
+
+      const generalized:
+        CausalRule = {
+        ...provisional,
+
+        id:
+          "causal-generalization-" +
+          this.generalizationSequence,
+
+        contradictionCount,
+
+        confidence:
+          generalizedConfidenceFor(
+            supportCount,
+            contradictionCount,
+          ),
+      };
+
+      this.generalizedRules.push(
+        generalized,
+      );
+    }
   }
 }
