@@ -7,6 +7,10 @@ import {
   useState,
 } from "react";
 
+import {
+  shouldUseBrowserChat,
+  streamBrowserChat,
+} from "@/lib/ai/browser-chat-client";
 import { streamChat } from "@/lib/ai/client-stream";
 import {
   createId,
@@ -228,26 +232,36 @@ export function useChat(
             prepareRequestMessage,
           );
 
-      void streamChat(
-        {
-          ...(conversationIdRef.current
-            ? {
-                conversationId:
-                  conversationIdRef.current,
-              }
-            : {}),
+      const requestBody = {
+        ...(conversationIdRef.current
+          ? {
+              conversationId:
+                conversationIdRef.current,
+            }
+          : {}),
 
-          messages: requestMessages,
+        messages:
+          requestMessages,
 
-          ...(modelIdRef.current
-            ? {
-                modelId:
-                  modelIdRef.current,
-              }
-            : {}),
+        ...(modelIdRef.current
+          ? {
+              modelId:
+                modelIdRef.current,
+            }
+          : {}),
 
-          idempotencyKey,
-        },
+        idempotencyKey,
+      };
+
+      const transport =
+        shouldUseBrowserChat(
+          requestBody,
+        )
+          ? streamBrowserChat
+          : streamChat;
+
+      void transport(
+        requestBody,
         controller.signal,
         {
           onStart: ({
