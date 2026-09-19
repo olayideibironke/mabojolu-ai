@@ -1,4 +1,9 @@
 import {
+  AutonomousCausalHypothesisEngine,
+  type AutonomousCausalHypothesis,
+} from "./autonomous-hypothesis";
+
+import {
   diffSnapshots,
   snapshotSignature,
   type CognitiveEnvironment,
@@ -50,6 +55,7 @@ type ActionChoiceStrategy =
   | "world-model-plan"
   | "structural-transfer"
   | "transfer"
+  | "hypothesis-experiment"
   | "exploration"
   | "conditional"
   | "state-exploration";
@@ -102,6 +108,9 @@ export interface CognitiveRunResult {
 
   recalledPlan?:
     RecalledPlan;
+
+  generatedHypotheses:
+    AutonomousCausalHypothesis[];
 
   state:
     CognitiveState;
@@ -167,6 +176,9 @@ export class CognitiveRuntime {
   private readonly planner:
     WorldModelPlanner |
     undefined;
+
+  private readonly hypothesisEngine =
+    new AutonomousCausalHypothesisEngine();
 
   private readonly structuralTransfer:
     StructuralTransferLibrary |
@@ -534,6 +546,28 @@ export class CognitiveRuntime {
                 .accepted,
           });
 
+      this.hypothesisEngine
+        .observeTransition({
+          observationId:
+            observation.id,
+
+          action,
+
+          before,
+
+          after,
+
+          accepted:
+            environmentResult
+              .accepted,
+
+          observedAt:
+            observation
+              .observedAt,
+        });
+
+      this.syncAutonomousHypotheses();
+
       this.learnFromTransition(
         action,
         before,
@@ -673,6 +707,18 @@ export class CognitiveRuntime {
         strategy:
           "transfer",
       };
+    }
+
+    const hypothesisExperiment =
+      this.nextAutonomousHypothesisAction(
+        availableActions,
+        snapshot,
+      );
+
+    if (
+      hypothesisExperiment
+    ) {
+      return hypothesisExperiment;
     }
 
     const signature =
@@ -841,6 +887,45 @@ export class CognitiveRuntime {
     };
   }
 
+  private nextAutonomousHypothesisAction(
+    availableActions:
+      readonly string[],
+
+    snapshot:
+      EnvironmentSnapshot,
+  ): ActionChoice | undefined {
+    const recommendation =
+      this.hypothesisEngine
+        .recommendExperiment({
+          currentState:
+            snapshot,
+
+          availableActions,
+        });
+
+    if (
+      !recommendation
+    ) {
+      return undefined;
+    }
+
+    return {
+      action:
+        recommendation.action,
+
+      strategy:
+        "hypothesis-experiment",
+
+      expectedEffects: [
+        "Autonomously generated causal hypotheses disagree in this state; this action was selected for information gain " +
+        recommendation
+          .informationGain
+          .toFixed(3) +
+        ".",
+      ],
+    };
+  }
+
   private initializeStructuralTransfer(
     initialState:
       EnvironmentSnapshot,
@@ -968,6 +1053,9 @@ export class CognitiveRuntime {
       case "transfer":
         return "transfer";
 
+      case "hypothesis-experiment":
+        return "hypothesis-experiment";
+
       default:
         return "experiment";
     }
@@ -991,6 +1079,11 @@ export class CognitiveRuntime {
       case "transfer":
         return [
           "Prior successful experience suggests this action contributes to the goal.",
+        ];
+
+      case "hypothesis-experiment":
+        return [
+          "This action was selected to discriminate between autonomously generated causal hypotheses.",
         ];
 
       default:
@@ -1168,6 +1261,55 @@ export class CognitiveRuntime {
 
     void before;
     void after;
+  }
+
+  private syncAutonomousHypotheses():
+    void {
+    for (
+      const hypothesis of
+        this.hypothesisEngine
+          .getHypotheses()
+    ) {
+      this.apply({
+        type:
+          "hypothesis.updated",
+
+        hypothesis: {
+          id:
+            hypothesis.id,
+
+          statement:
+            hypothesis
+              .statement,
+
+          confidence:
+            hypothesis
+              .confidence,
+
+          status:
+            hypothesis
+              .status,
+
+          evidenceFor: [
+            ...hypothesis
+              .evidenceForIds,
+          ],
+
+          evidenceAgainst: [
+            ...hypothesis
+              .evidenceAgainstIds,
+          ],
+
+          createdAt:
+            hypothesis
+              .createdAt,
+
+          updatedAt:
+            hypothesis
+              .updatedAt,
+        },
+      });
+    }
   }
 
   private recordStructuralTransferCorrection(
@@ -1700,6 +1842,39 @@ export class CognitiveRuntime {
             },
           }
         : {}),
+
+      generatedHypotheses:
+        this.hypothesisEngine
+          .getHypotheses()
+          .map(
+            (hypothesis) => ({
+              ...hypothesis,
+
+              conditions: {
+                ...hypothesis
+                  .conditions,
+              },
+
+              effects:
+                hypothesis
+                  .effects
+                  .map(
+                    (effect) => ({
+                      ...effect,
+                    }),
+                  ),
+
+              evidenceForIds: [
+                ...hypothesis
+                  .evidenceForIds,
+              ],
+
+              evidenceAgainstIds: [
+                ...hypothesis
+                  .evidenceAgainstIds,
+              ],
+            }),
+          ),
 
       state:
         this.state,
