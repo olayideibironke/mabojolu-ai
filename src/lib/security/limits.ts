@@ -10,8 +10,8 @@ import {
   FREE_WINDOW_MESSAGE_LIMIT,
   GUEST_TOTAL_MESSAGE_LIMIT,
   freeLimitMessage,
-  freeWindowStartIso,
   guestLimitMessage,
+  registeredFreeWindowStartIso,
   hasActiveProAccess,
 } from "./usage-policy";
 
@@ -212,7 +212,9 @@ export async function checkUsageLimits(
          * responses only.
          */
         const freeWindowStart =
-          freeWindowStartIso();
+          registeredFreeWindowStartIso(
+            session.registeredAt,
+          );
 
         const freeWindowCompletedResponses =
           await database.countRecentMessages(
