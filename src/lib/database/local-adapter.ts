@@ -23,11 +23,14 @@ import type {
   BillingUsageReservation,
   CreateConversationInput,
   DatabaseAdapter,
+  PluginConnection,
+  PluginProviderId,
   Profile,
   ReserveBillingUsageInput,
   SafetyEventInput,
   SettleBillingUsageInput,
   UpdateBillingSubscriptionInput,
+  UpsertPluginConnectionInput,
   UsageEventInput,
 } from "./types";
 
@@ -112,6 +115,7 @@ interface Database {
   billingAccounts: BillingAccount[];
   billingReservations: BillingUsageReservation[];
   billingCreditEvents: StoredBillingCreditEvent[];
+  pluginConnections: PluginConnection[];
   nextSequence: number;
 }
 
@@ -127,6 +131,7 @@ function emptyDatabase(): Database {
     billingAccounts: [],
     billingReservations: [],
     billingCreditEvents: [],
+    pluginConnections: [],
     nextSequence: 1,
   };
 }
@@ -209,6 +214,7 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
       parsed.billingAccounts ??= [];
       parsed.billingReservations ??= [];
       parsed.billingCreditEvents ??= [];
+      parsed.pluginConnections ??= [];
 
       this.cache = parsed;
     } catch {
@@ -1723,6 +1729,13 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
         db.billingCreditEvents.filter(
           (event) =>
             event.userId !==
+            userId,
+        );
+
+      db.pluginConnections =
+        db.pluginConnections.filter(
+          (connection) =>
+            connection.userId !==
             userId,
         );
 
