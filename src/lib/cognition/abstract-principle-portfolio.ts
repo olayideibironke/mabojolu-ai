@@ -2,6 +2,11 @@ import type {
   EnvironmentSnapshot,
 } from "./environment";
 
+import type {
+  LearnedContextFeatureApplicabilityModel,
+  LearnedContextProjection,
+} from "./context-feature-learning";
+
 import {
   StructuralContextSignatureEncoder,
   type InducedContextApplicabilityModel,
@@ -56,7 +61,9 @@ export interface PrincipleSelection {
     "model-prior" |
     "learned" |
     "induced-prior" |
-    "induced-learned";
+    "induced-learned" |
+    "feature-prior" |
+    "feature-learned";
 
   applicabilityEvidenceCount:
     number;
@@ -66,6 +73,9 @@ export interface PrincipleSelection {
 
   inducedContextSignature?:
     InducedContextSignature;
+
+  learnedContextProjection?:
+    LearnedContextProjection;
 }
 
 export interface AbstractPrinciplePortfolioSnapshot {
@@ -165,6 +175,9 @@ export class AbstractPrinciplePortfolio {
 
     inducedContextApplicabilityModel?:
       InducedContextApplicabilityModel;
+
+    learnedContextFeatureApplicabilityModel?:
+      LearnedContextFeatureApplicabilityModel;
   }):
     AbstractPrinciplePortfolioController {
     return new AbstractPrinciplePortfolioController(
@@ -172,6 +185,8 @@ export class AbstractPrinciplePortfolio {
       input?.applicabilityModel,
       input
         ?.inducedContextApplicabilityModel,
+      input
+        ?.learnedContextFeatureApplicabilityModel,
     );
   }
 
@@ -264,6 +279,9 @@ export class AbstractPrinciplePortfolioController {
 
     private readonly inducedContextApplicabilityModel?:
       InducedContextApplicabilityModel,
+
+    private readonly learnedContextFeatureApplicabilityModel?:
+      LearnedContextFeatureApplicabilityModel,
   ) {
     this.deferredController =
       new AbstractPrincipleController(
@@ -344,6 +362,28 @@ export class AbstractPrinciplePortfolioController {
           .inducedContextSignature
       ) {
         this.inducedContextApplicabilityModel
+          .record({
+            principleId:
+              this.pendingSelection
+                .selection
+                .principleId,
+
+            signature:
+              this.pendingSelection
+                .selection
+                .inducedContextSignature,
+
+            useful,
+          });
+      }
+
+      if (
+        this.learnedContextFeatureApplicabilityModel &&
+        this.pendingSelection
+          .selection
+          .inducedContextSignature
+      ) {
+        this.learnedContextFeatureApplicabilityModel
           .record({
             principleId:
               this.pendingSelection
