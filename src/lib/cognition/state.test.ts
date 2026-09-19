@@ -351,6 +351,94 @@ describe(
       },
     );
 
+
+    it(
+      "clears the active-goal pointer when the active goal becomes terminal or blocked",
+      () => {
+        let state =
+          createCognitiveState(
+            "2026-09-19T03:00:00.000Z",
+          );
+
+        state =
+          reduceCognitiveState(
+            state,
+            {
+              type:
+                "goal.updated",
+
+              goal: {
+                id: "goal-1",
+
+                description:
+                  "Complete the subgoal.",
+
+                priority: 100,
+
+                status:
+                  "pending",
+
+                successCriteria: [
+                  "Subgoal complete.",
+                ],
+
+                constraints: [],
+
+                createdAt:
+                  "2026-09-19T03:00:01.000Z",
+
+                updatedAt:
+                  "2026-09-19T03:00:01.000Z",
+              },
+            },
+          );
+
+        state =
+          reduceCognitiveState(
+            state,
+            {
+              type:
+                "goal.activated",
+
+              goalId:
+                "goal-1",
+
+              occurredAt:
+                "2026-09-19T03:00:02.000Z",
+            },
+          );
+
+        expect(
+          state.activeGoalId,
+        ).toBe(
+          "goal-1",
+        );
+
+        state =
+          reduceCognitiveState(
+            state,
+            {
+              type:
+                "goal.updated",
+
+              goal: {
+                ...state.goals[0],
+
+                status:
+                  "completed",
+
+                updatedAt:
+                  "2026-09-19T03:00:03.000Z",
+              },
+            },
+          );
+
+        expect(
+          state.activeGoalId,
+        ).toBeUndefined();
+      },
+    );
+
     it(
       "requires outcomes to reference a known action",
       () => {
