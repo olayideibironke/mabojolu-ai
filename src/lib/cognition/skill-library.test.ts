@@ -218,6 +218,44 @@ describe(
     );
 
     it(
+      "does not form reusable competence from an unsolved episode",
+      () => {
+        const library =
+          new AutonomousSkillLibrary();
+
+        const learned =
+          library.learnFromEpisode({
+            episodeId:
+              "failed-episode",
+
+            environmentId:
+              "failed-world",
+
+            solved:
+              false,
+
+            goalConditions,
+
+            transitions:
+              successfulEpisode(
+                "alpha",
+              ),
+
+            observedAt:
+              "2026-09-19T16:00:00.000Z",
+          });
+
+        expect(
+          learned,
+        ).toBeUndefined();
+
+        expect(
+          library.getSkills(),
+        ).toHaveLength(0);
+      },
+    );
+
+    it(
       "generalizes away an observable context value that varied across supporting episodes",
       () => {
         const library =
