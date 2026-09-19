@@ -117,8 +117,6 @@ function workerInstance():
 function browserRouteAvailable():
   boolean {
   if (
-    typeof window ===
-      "undefined" ||
     typeof Worker ===
       "undefined"
   ) {
