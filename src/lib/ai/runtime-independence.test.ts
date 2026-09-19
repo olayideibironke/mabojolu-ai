@@ -135,8 +135,8 @@ describe(
 
         expect(
           registry,
-        ).toContain(
-          'onFailure:\n              "error"',
+        ).toMatch(
+          /onFailure:\s*"error"/,
         );
       },
     );
