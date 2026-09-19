@@ -46,6 +46,16 @@ export interface Session {
    * True only for a temporary Supabase anonymous account.
    */
   isAnonymous: boolean;
+
+  /**
+   * Trusted server-side boundary for the registered free allowance.
+   *
+   * Supabase supplies email_confirmed_at. Guest activity before this timestamp
+   * does not consume the fresh registered-account allowance.
+   */
+  registeredAt?:
+    string |
+    null;
 }
 
 /** Cookie holding the local development identity. */
@@ -168,6 +178,8 @@ async function getDevSession(): Promise<Session | null> {
     profile,
     kind,
     isAnonymous: false,
+    registeredAt:
+      profile.createdAt,
   };
 }
 
@@ -213,6 +225,14 @@ async function getSupabaseSession(): Promise<Session | null> {
 
   const isAnonymous =
     user.is_anonymous === true;
+
+  const registeredAt =
+    isAnonymous
+      ? null
+      : user.email_confirmed_at ??
+        user.confirmed_at ??
+        user.created_at ??
+        null;
 
   const realEmail =
     user.email?.trim() ?? "";
@@ -280,6 +300,7 @@ async function getSupabaseSession(): Promise<Session | null> {
     profile,
     kind,
     isAnonymous,
+    registeredAt,
   };
 }
 
