@@ -4,10 +4,10 @@ import {
   type AbstractPrinciple,
 } from "./abstract-principle";
 
-import {
+import type {
   AbstractPrinciplePortfolio,
   AbstractPrinciplePortfolioController,
-  type AbstractPrinciplePortfolioSnapshot,
+  AbstractPrinciplePortfolioSnapshot,
 } from "./abstract-principle-portfolio";
 
 import {
