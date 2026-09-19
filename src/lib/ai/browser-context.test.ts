@@ -139,6 +139,57 @@ describe(
     );
 
     it(
+      "does not keep an assistant reply when its paired user turn no longer fits",
+      () => {
+        const oversizedUser =
+          "question ".repeat(
+            1800,
+          );
+
+        const result =
+          buildBrowserContext({
+            systemPrompt:
+              "You are Mabojolu.",
+
+            messages: [
+              message(
+                "u1",
+                "user",
+                oversizedUser,
+              ),
+
+              message(
+                "a1",
+                "assistant",
+                "A short answer that must not survive without its user turn.",
+              ),
+
+              message(
+                "u2",
+                "user",
+                "Current request",
+              ),
+            ],
+
+            maxOutputTokens:
+              1024,
+          });
+
+        expect(
+          result
+            .messages
+            .map(
+              (entry) =>
+                entry.content,
+            ),
+        ).toEqual([
+          "You are Mabojolu.",
+          "Current request",
+        ]);
+      },
+    );
+
+    it(
       "returns fits false rather than truncating an oversized current prompt",
       () => {
         const oversized =
