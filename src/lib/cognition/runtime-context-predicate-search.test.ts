@@ -1285,7 +1285,9 @@ describe(
           expect(
             serialized,
           ).not.toContain(
-            sourceSymbol,
+            JSON.stringify(
+              sourceSymbol,
+            ),
           );
         }
       },
