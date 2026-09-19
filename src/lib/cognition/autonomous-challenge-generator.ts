@@ -252,7 +252,8 @@ function actionIndexForRole(
     );
   }
 
-  return index;
+  return index as
+    ActionIndex;
 }
 
 function presentationOrderForDifficulty(
