@@ -81,6 +81,9 @@ export interface AbstractPrincipleRecommendation {
 
   confidence:
     number;
+
+  applicability:
+    number;
 }
 
 interface PrincipleSupport {
@@ -537,9 +540,6 @@ export class AbstractPrincipleController {
       return undefined;
     }
 
-    this.progressSinceDeferral =
-      false;
-
     return {
       action,
 
@@ -548,6 +548,9 @@ export class AbstractPrincipleController {
 
       confidence:
         principle.confidence,
+
+      applicability:
+        0.7,
     };
   }
 }
