@@ -18,6 +18,7 @@ interface ResolvedModel {
 
 const FAST_MODEL_IDS = new Set([
   "mabojolu-fast",
+  "mabojolu-browser-fast",
   "qwen3.5:2b-q4_k_m",
   "mabojolu fast",
 ]);
@@ -44,9 +45,17 @@ function resolveModel(
 
   if (FAST_MODEL_IDS.has(normalized)) {
     return {
-      label: "Mabojolu Fast",
+      label:
+        normalized ===
+        "mabojolu-browser-fast"
+          ? "Mabojolu Fast · On-device"
+          : "Mabojolu Fast",
+
       description:
-        "Generated with the fastest local response model.",
+        normalized ===
+        "mabojolu-browser-fast"
+          ? "Generated on this device with browser WebGPU inference."
+          : "Generated with the fastest local response model.",
     };
   }
 
