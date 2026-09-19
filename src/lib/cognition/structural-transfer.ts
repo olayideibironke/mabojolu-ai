@@ -1,4 +1,9 @@
 import {
+  ActiveExperimentDesigner,
+  type ExperimentHypothesis,
+} from "./active-experiment";
+
+import {
   diffSnapshots,
   type EnvironmentSnapshot,
 } from "./environment";
@@ -67,6 +72,7 @@ export interface StructuralTransferRecommendation {
   action: string;
 
   expectedRole:
+    | "probe"
     | "setup"
     | "goal";
 
@@ -74,6 +80,9 @@ export interface StructuralTransferRecommendation {
     string;
 
   confidence:
+    number;
+
+  informationGain?:
     number;
 }
 
@@ -91,6 +100,9 @@ export interface StructuralTransferSessionState {
     string;
 
   setupActionCount:
+    number;
+
+  hypothesisCount:
     number;
 
   goalCandidate?:
@@ -230,11 +242,132 @@ function transitionSetsGoal(
   );
 }
 
+function createRoleHypotheses(
+  availableActions:
+    readonly string[],
+): ExperimentHypothesis[] {
+  if (
+    availableActions.length ===
+    0
+  ) {
+    return [];
+  }
+
+  const confidence =
+    1 /
+    availableActions.length;
+
+  return availableActions.map(
+    (goalAction) => ({
+      id:
+        "goal-role:" +
+        goalAction,
+
+      confidence,
+
+      predictions:
+        Object.fromEntries(
+          availableActions.map(
+            (action) => [
+              action,
+              action ===
+                goalAction
+                ? "no-effect"
+                : "setup-change",
+            ],
+          ),
+        ),
+    }),
+  );
+}
+
+function goalActionFromHypothesis(
+  hypothesis:
+    ExperimentHypothesis,
+): string | undefined {
+  const candidate =
+    Object.entries(
+      hypothesis.predictions,
+    ).find(
+      ([, outcome]) =>
+        outcome ===
+        "no-effect",
+    );
+
+  return candidate?.[0];
+}
+
+function structuralOutcome(
+  before:
+    EnvironmentSnapshot,
+
+  after:
+    EnvironmentSnapshot,
+
+  goalKey:
+    string,
+): string {
+  const changes =
+    diffSnapshots(
+      before,
+      after,
+    );
+
+  if (
+    changes.length ===
+    0
+  ) {
+    return "no-effect";
+  }
+
+  const goalChanged =
+    changes.some(
+      (change) =>
+        change.key ===
+          goalKey &&
+        change.before ===
+          false &&
+        change.after ===
+          true,
+    );
+
+  if (
+    goalChanged
+  ) {
+    return "goal-change";
+  }
+
+  if (
+    changes.length ===
+    1
+  ) {
+    const change =
+      changes[0];
+
+    if (
+      change.key !==
+        goalKey &&
+      change.before ===
+        false &&
+      change.after ===
+        true
+    ) {
+      return "setup-change";
+    }
+  }
+
+  return "other";
+}
+
 /**
  * A live analogy between one learned structural template and a target world.
  *
  * It intentionally does not know the source world's variable names or action
  * labels. It can only infer target roles from target observations.
+ *
+ * Before a goal role is known, the session maintains explicit competing role
+ * hypotheses and asks ActiveExperimentDesigner which target action is expected
+ * to reduce uncertainty the most.
  */
 export class StructuralTransferSession {
   private readonly setupActionToKey =
@@ -242,6 +375,12 @@ export class StructuralTransferSession {
       string,
       string
     >();
+
+  private readonly experimentDesigner =
+    new ActiveExperimentDesigner();
+
+  private roleHypotheses:
+    ExperimentHypothesis[];
 
   private goalCandidate:
     string |
@@ -260,7 +399,15 @@ export class StructuralTransferSession {
 
     private readonly goalKey:
       string,
-  ) {}
+
+    availableActions:
+      readonly string[],
+  ) {
+    this.roleHypotheses =
+      createRoleHypotheses(
+        availableActions,
+      );
+  }
 
   recommend(
     availableActions:
@@ -269,10 +416,74 @@ export class StructuralTransferSession {
     StructuralTransferRecommendation |
     undefined {
     if (
-      !this.active ||
-      !this.goalCandidate
+      !this.active
     ) {
       return undefined;
+    }
+
+    if (
+      !this.goalCandidate
+    ) {
+      const candidateActions =
+        availableActions.filter(
+          (action) =>
+            !this.setupActionToKey
+              .has(
+                action,
+              ),
+        );
+
+      const experiment =
+        this.experimentDesigner
+          .selectExperiment({
+            hypotheses:
+              this.roleHypotheses,
+
+            availableActions:
+              candidateActions,
+          });
+
+      if (
+        experiment
+      ) {
+        return {
+          action:
+            experiment.action,
+
+          expectedRole:
+            "probe",
+
+          sourceTemplateId:
+            this.template.id,
+
+          confidence:
+            this.template
+              .confidence,
+
+          informationGain:
+            experiment
+              .informationGain,
+        };
+      }
+
+      if (
+        this.roleHypotheses
+          .length ===
+        1
+      ) {
+        this.goalCandidate =
+          goalActionFromHypothesis(
+            this.roleHypotheses[
+              0
+            ],
+          );
+      }
+
+      if (
+        !this.goalCandidate
+      ) {
+        return undefined;
+      }
     }
 
     if (
@@ -374,6 +585,54 @@ export class StructuralTransferSession {
         input.before,
         input.after,
       );
+
+    if (
+      !this.goalCandidate &&
+      this.roleHypotheses
+        .length >
+        1
+    ) {
+      const update =
+        this.experimentDesigner
+          .updateHypotheses({
+            hypotheses:
+              this.roleHypotheses,
+
+            action:
+              input.action,
+
+            observedOutcome:
+              structuralOutcome(
+                input.before,
+                input.after,
+                this.goalKey,
+              ),
+          });
+
+      if (
+        update.contradiction
+      ) {
+        return this.invalidate(
+          "Target evidence matched none of the active structural-role hypotheses.",
+        );
+      }
+
+      this.roleHypotheses =
+        update.hypotheses;
+
+      if (
+        this.roleHypotheses
+          .length ===
+        1
+      ) {
+        this.goalCandidate =
+          goalActionFromHypothesis(
+            this.roleHypotheses[
+              0
+            ],
+          );
+      }
+    }
 
     if (
       changes.length ===
@@ -561,6 +820,10 @@ export class StructuralTransferSession {
         this.setupActionToKey
           .size,
 
+      hypothesisCount:
+        this.roleHypotheses
+          .length,
+
       ...(this.goalCandidate
         ? {
             goalCandidate:
@@ -598,7 +861,7 @@ export class StructuralTransferSession {
 }
 
 /**
- * Mabojolu G Structural Transfer Library v0.1.
+ * Mabojolu G Structural Transfer Library v0.2.
  *
  * This library stores role structure rather than source symbols. A template
  * learned from "power/latch/vaultOpen + A/B/C" can therefore be tested against
@@ -941,6 +1204,7 @@ export class StructuralTransferLibrary {
       return new StructuralTransferSession(
         template,
         goal.key,
+        input.availableActions,
       );
     }
 
