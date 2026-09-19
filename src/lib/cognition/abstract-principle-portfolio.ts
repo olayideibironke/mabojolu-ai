@@ -306,15 +306,11 @@ export class AbstractPrinciplePortfolioController {
         .action ===
         input.action
     ) {
-      const relation =
+      const useful =
         this.pendingSelection
           .selection
-          .applicabilityContext
-          .candidateRelation;
-
-      const useful =
-        relation ===
-          "productive-repeat"
+          .principleKind ===
+          "repeat-monotonic-progress-once"
           ? input.accepted &&
             transitionProgressKind ===
               "numeric"
