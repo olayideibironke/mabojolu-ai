@@ -934,6 +934,9 @@ export class AutonomousSkillLibrary {
 
     evidenceId:
       string;
+
+    observedAt:
+      string;
   }):
     SkillExecutionUpdate |
     undefined {
@@ -1027,7 +1030,7 @@ export class AutonomousSkillLibrary {
       stored
         .skill
         .updatedAt =
-        input.evidenceId;
+        input.observedAt;
     }
 
     return {
