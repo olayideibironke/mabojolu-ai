@@ -125,6 +125,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   dimension explains principle usefulness;
 - autonomous relational context synthesis that extrapolates learned equality or
   ordering structure to value combinations withheld during calibration;
+- complexity-regularized symbolic predicate search with explicit simplicity
+  bias, contradictory-evidence testing, and transfer beyond basic relations;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -134,45 +136,48 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is complexity-regularized symbolic
-predicate search:
+The current central intelligence milestone is held-out predicate validation and
+anti-overfitting:
 
-1. retain the verified atomic, exact-pair, and basic relational learners;
-2. search a broader auditable predicate-program grammar over compatible
-   structural count dimensions;
-3. include both simple comparisons and derived transformations such as signed
-   difference and absolute difference;
-4. score candidate programs by empirical information gain while charging an
-   explicit penalty for extra operations;
-5. admit a program only when its regularized score still exceeds the best
-   supplied atomic feature on the same evidence;
-6. prefer a simpler predicate when a more complex representation explains the
-   evidence equally well;
-7. transfer the selected program to a held-out structural value combination
-   never seen during calibration;
-8. compare against the verified v0.7 relation learner trained on exactly the
-   same application outcomes.
+1. fit symbolic predicate programs on one evidence partition only;
+2. freeze the selected program before any validation evidence is observed;
+3. route the next evidence partition into a sequestered validation set that
+   cannot change which program was selected;
+4. infer the frozen program's prediction orientation from fit evidence only;
+5. require held-out accuracy to exceed both a minimum threshold and the
+   majority-class validation baseline;
+6. reject fitted programs that fail held-out validation rather than allowing
+   them to influence action selection;
+7. keep validation outcomes out of post-approval applicability counts so the
+   holdout is not silently converted into training evidence;
+8. expose the fit count, validation count, frozen program id, validation
+   accuracy, baseline accuracy, and validation status in the audit trail;
+9. verify in the cognitive runtime that a fitted-but-unvalidated rule cannot
+   override older evidence, while the same rule can do so only after approval.
 
-The controlled runtime calibration uses six renamed applications:
-1/1 and 2/1 are useful, 3+/3+ is useful twice, and 3+/1 fails twice. This makes
-the basic v0.7 equality/ordering relation genuinely learnable, but its held-out
-class remains mixed. The held-out context is 3+/2, a successful concrete pair
-not seen during calibration. For the learned basic relation, that held-out class
-contains one success and two failures, while the v0.8 search can synthesize
-abs(historyLength - distinctActionsSeen) <= 1 and project the same held-out
-context into a four-success, zero-failure class.
+The first controlled validation protocol is deliberately one-shot per principle.
+The first six qualifying application outcomes form the fit set. The next three
+form the holdout. Once the fit set closes, the winning v0.8 program is frozen.
+Validation may approve or reject that exact program but cannot search for a new
+one.
 
-The first symbolic grammar remains intentionally bounded and inspectable:
-equality, ordering, signed-difference equality for small constants, and
-absolute-difference thresholds. Program complexity is penalized explicitly, so
-an equivalent simple equality rule must beat the more complex
-difference-equals-zero form.
+The controlled positive case fits the same structural predicate demonstrated in
+v0.8, then validates it on unseen combinations with both positive and negative
+outcomes. A separate falsification test gives the frozen program contradictory
+holdout labels and requires rejection.
 
-Even if verified, this is symbolic program search inside an engineered grammar,
-not open-ended representation invention. Stronger work must expand or learn the
-operator vocabulary, evaluate held-out predictive performance rather than only
-in-sample information gain, resist spurious programs under noisy or adversarial
-evidence, and control search complexity as the grammar grows.
+The runtime test adds an older semantic applicability model that prefers the
+wrong deferred-goal abstraction. While the symbolic program is still validating,
+that older evidence remains in control. After the frozen program passes held-out
+validation, the validated predicate becomes the highest-trust applicability
+layer and can override the older model on an unseen target context.
+
+Even if verified, this remains a controlled one-shot validation protocol. It
+does not yet solve adaptive validation reuse, concept drift, continual model
+replacement, multiple-testing correction across a growing grammar, or external
+benchmark leakage. Stronger work should add challenger/champion replacement,
+fresh validation reserves, calibration under distribution shift, and explicit
+controls against repeatedly tuning to the same holdout.
 
 ## Safety and audit principle
 
