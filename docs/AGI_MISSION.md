@@ -121,6 +121,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   applicability across renamed actions and state variables;
 - learned structural context feature relevance and compression that ignores
   evidenced nuisance dimensions beyond exact full-feature matching;
+- autonomous pairwise structural feature composition when no supplied atomic
+  dimension explains principle usefulness;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -130,40 +132,41 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is autonomous structural context
-feature composition:
+The current central intelligence milestone is autonomous relational context
+feature synthesis:
 
-1. retain the symbol-independent structural feature vocabulary and the verified
-   v0.5 atomic relevance learner;
-2. construct candidate higher-order context features from combinations of
-   structural dimensions rather than only selecting one supplied dimension;
-3. score every candidate against real success and failure outcomes;
-4. require a generated feature to reduce uncertainty beyond the best atomic
-   feature on the same evidence;
-5. refuse unnecessary composition when an atomic dimension already explains the
-   evidence equally well;
-6. persist the discovered higher-order feature independently per principle;
-7. use the composed feature to resolve an abstraction conflict that the atomic
-   learner cannot resolve;
-8. verify transfer in a renamed held-out task using the same calibration
-   outcomes for both the atomic and composed learners.
+1. retain the verified atomic and exact-pair context learners;
+2. generate candidate relations over compatible count-like structural
+   dimensions instead of memorizing only their concrete value pairs;
+3. evaluate equality and ordering relations against real success/failure
+   evidence;
+4. require a synthesized relation to reduce outcome uncertainty beyond the best
+   supplied atomic feature;
+5. store the relation itself as the learned context representation rather than
+   source values, action labels, or state-variable names;
+6. apply the learned relation to a value combination never observed during
+   calibration;
+7. compare the relational learner against the verified v0.6 exact pair composer
+   trained on exactly the same application outcomes;
+8. preserve per-principle evidence and fresh per-episode target bindings.
 
-The first controlled feature-construction grammar is deliberately narrow:
-unordered pairs of existing structural dimensions. Candidate pairs are ranked by
-empirical information gain, and a pair is accepted only when its gain exceeds
-the best atomic information gain.
+The controlled calibration contains useful repeats when history length and the
+number of distinct observed actions are equal, and failed repeats for several
+unequal combinations. Calibration covers equal 1/1 and 2/2 cases but deliberately
+withholds the equal 3+/3+ combination. Exact pair composition can fit the
+training tuples but has no matching positive evidence for that held-out pair.
+A synthesized equality relation can project all equal-valued cases onto the same
+relational state and therefore extrapolate to 3+/3+.
 
-The falsification dataset uses an XOR-style relationship: every individual
-dimension is uninformative, but a two-dimension interaction predicts whether the
-principle application succeeds. Eight renamed calibration episodes provide
-balanced positive and negative evidence. The held-out conflict then compares the
-verified v0.5 atomic learner with the v0.6 composed-feature learner.
+The first relation grammar remains intentionally small and auditable: equality,
+less-than, and greater-than over count-like structural dimensions. A candidate
+must improve on the best atomic feature before it is admitted.
 
-Even if verified, this is autonomous feature construction inside an engineered
-pairwise grammar, not open-ended latent representation discovery. Stronger work
-must generate richer transformations or representations rather than only pairs,
-control combinatorial growth, resist spurious compositions under noise, and
-show that invented features remain useful across broader unfamiliar domains.
+Even if verified, this is relational representation synthesis inside an
+engineered operator vocabulary, not open-ended latent representation discovery.
+Later work must invent or search richer operators, test noisy and contradictory
+relations, regularize search complexity, and transfer synthesized relations
+across broader domains whose useful structure is not known in advance.
 
 ## Safety and audit principle
 
