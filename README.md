@@ -88,16 +88,25 @@ external inference by default. `src/lib/ai/browser-compute.ts` defines the
 browser-owned execution contract, while the browser chat transport and module
 worker connect eligible Fast text chats to real WebGPU inference.
 
-Browser Inference Integration v0.1 is browser-first for new Fast text chats on
-WebGPU-capable devices. The model runs in a module worker on the user's device;
-the server handles only authentication and conversation persistence. Image
-requests, Regular mode, Quality mode, and browsers without WebGPU continue to
-use the configured local Ollama server.
+Browser inference is browser-first for new Fast text chats on WebGPU-capable
+devices. Mabojolu profiles coarse device resources before generation: constrained
+and standard devices use the 1B browser model, while stronger devices may try the
+3B model first and automatically downgrade to 1B if allocation fails before any
+text is emitted. Long conversations are trimmed as coherent recent turns within
+the browser model's context window; Mabojolu never truncates the current user
+request just to force it into the on-device model.
+
+A browser-compute circuit breaker temporarily routes retries to local Ollama
+after a complete on-device failure, so a device does not repeatedly hit the same
+failing path. The server still handles authentication, quotas, and conversation
+persistence, including the verified 10 guest / 20 registered / 4-hour free
+access policy.
 
 The worker currently loads the pinned WebLLM 0.2.85 runtime from esm.run rather
 than shipping the WebLLM package inside the Mabojolu bundle. Model assets are
-downloaded by the browser and may take significant time on first use. A future
-self-hosted runtime/assets milestone can remove that CDN dependency as well.
+downloaded by the browser and may take significant time on first use. Eliminating
+that remaining runtime/CDN dependency requires bundling or self-hosting the
+WebLLM runtime and model artifacts in a separately verified milestone.
 
 ---
 
