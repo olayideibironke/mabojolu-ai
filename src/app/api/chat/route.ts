@@ -18,6 +18,7 @@ import { generateConversationTitle } from "@/lib/ai/title";
 import { getSession } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database";
 import { inspectServerEnv } from "@/lib/env";
+import { buildWorkspacePluginContext } from "@/lib/plugins/runtime";
 import {
   beginGeneration,
   checkUsageLimits,
@@ -461,6 +462,27 @@ export async function POST(
         },
       );
 
+    let pluginWorkspaceContext:
+      string |
+      undefined;
+
+    try {
+      pluginWorkspaceContext =
+        await buildWorkspacePluginContext({
+          session,
+
+          latestUserContent:
+            normalizedLastContent,
+        });
+    } catch (cause) {
+      console.warn(
+        "[mabojolu] plugin workspace context unavailable",
+        cause instanceof Error
+          ? cause.message
+          : "unknown",
+      );
+    }
+
     const generation =
       startGeneration({
         messages,
@@ -473,6 +495,9 @@ export async function POST(
 
         idempotencyKey:
           body.idempotencyKey,
+
+        additionalSystemContext:
+          pluginWorkspaceContext,
       });
 
     const requestHasImages =
