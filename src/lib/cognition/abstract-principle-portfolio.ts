@@ -13,6 +13,11 @@ import type {
 } from "./context-feature-relation";
 
 import type {
+  SymbolicPredicateApplicabilityModel,
+  SymbolicPredicateProjection,
+} from "./context-predicate-search";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
   LearnedContextProjection,
 } from "./context-feature-learning";
@@ -77,7 +82,9 @@ export interface PrincipleSelection {
     "composed-prior" |
     "composed-learned" |
     "relational-prior" |
-    "relational-learned";
+    "relational-learned" |
+    "predicate-prior" |
+    "predicate-learned";
 
   applicabilityEvidenceCount:
     number;
@@ -96,6 +103,9 @@ export interface PrincipleSelection {
 
   relationalContextProjection?:
     RelationalContextProjection;
+
+  symbolicPredicateProjection?:
+    SymbolicPredicateProjection;
 }
 
 export interface AbstractPrinciplePortfolioSnapshot {
@@ -204,6 +214,9 @@ export class AbstractPrinciplePortfolio {
 
     relationalContextFeatureApplicabilityModel?:
       RelationalContextFeatureApplicabilityModel;
+
+    symbolicPredicateApplicabilityModel?:
+      SymbolicPredicateApplicabilityModel;
   }):
     AbstractPrinciplePortfolioController {
     return new AbstractPrinciplePortfolioController(
@@ -217,6 +230,8 @@ export class AbstractPrinciplePortfolio {
         ?.composedContextFeatureApplicabilityModel,
       input
         ?.relationalContextFeatureApplicabilityModel,
+      input
+        ?.symbolicPredicateApplicabilityModel,
     );
   }
 
@@ -318,6 +333,9 @@ export class AbstractPrinciplePortfolioController {
 
     private readonly relationalContextFeatureApplicabilityModel?:
       RelationalContextFeatureApplicabilityModel,
+
+    private readonly symbolicPredicateApplicabilityModel?:
+      SymbolicPredicateApplicabilityModel,
   ) {
     this.deferredController =
       new AbstractPrincipleController(
@@ -464,6 +482,28 @@ export class AbstractPrinciplePortfolioController {
           .inducedContextSignature
       ) {
         this.relationalContextFeatureApplicabilityModel
+          .record({
+            principleId:
+              this.pendingSelection
+                .selection
+                .principleId,
+
+            signature:
+              this.pendingSelection
+                .selection
+                .inducedContextSignature,
+
+            useful,
+          });
+      }
+
+      if (
+        this.symbolicPredicateApplicabilityModel &&
+        this.pendingSelection
+          .selection
+          .inducedContextSignature
+      ) {
+        this.symbolicPredicateApplicabilityModel
           .record({
             principleId:
               this.pendingSelection
@@ -1081,7 +1121,8 @@ export class AbstractPrinciplePortfolioController {
       this.inducedContextApplicabilityModel ||
       this.learnedContextFeatureApplicabilityModel ||
       this.composedContextFeatureApplicabilityModel ||
-      this.relationalContextFeatureApplicabilityModel
+      this.relationalContextFeatureApplicabilityModel ||
+      this.symbolicPredicateApplicabilityModel
     ) {
       this.pendingSelection = {
         selection: {
