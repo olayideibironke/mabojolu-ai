@@ -18,11 +18,16 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { IconButton } from "@/components/ui/button";
 import { MenuIcon } from "@/components/ui/icons";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import {
+  buildHandoverPacket,
+  handoverPressure,
+} from "@/lib/ai/handover";
 import { useChat } from "@/hooks/use-chat";
 import { useConversations } from "@/hooks/use-conversations";
 import type { ChatImageAttachment } from "@/types/chat";
 
 import { Composer } from "./composer";
+import { HandoverPrompt } from "./handover-prompt";
 import { ConversationMap } from "./conversation-map";
 import { EmptyState } from "./empty-state";
 import { Message } from "./message";
@@ -180,6 +185,21 @@ export function ChatShell({
     isSidebarOpen,
     setIsSidebarOpen,
   ] = useState(false);
+
+  const [
+    isDesktopSidebarCollapsed,
+    setIsDesktopSidebarCollapsed,
+  ] = useState(false);
+
+  const [
+    handoverRequestKey,
+    setHandoverRequestKey,
+  ] = useState(0);
+
+  const [
+    pendingHandover,
+    setPendingHandover,
+  ] = useState<string | null>(null);
 
   const [
     isSettingsOpen,
@@ -700,6 +720,132 @@ export function ChatShell({
     isSignedIn &&
     !isGuest;
 
+  const activeConversationTitle =
+    useMemo(
+      () =>
+        history.conversations
+          .find(
+            (
+              conversation,
+            ) =>
+              conversation.id ===
+              activeConversationId,
+          )
+          ?.title,
+      [
+        activeConversationId,
+        history.conversations,
+      ],
+    );
+
+  const contextPressure =
+    useMemo(
+      () =>
+        handoverPressure({
+          messages,
+          modelId:
+            selectedModelId,
+        }),
+      [
+        messages,
+        selectedModelId,
+      ],
+    );
+
+  const handoverPacket =
+    useMemo(
+      () =>
+        buildHandoverPacket({
+          messages,
+          conversationTitle:
+            activeConversationTitle,
+          conversationId:
+            activeConversationId,
+        }),
+      [
+        activeConversationId,
+        activeConversationTitle,
+        messages,
+      ],
+    );
+
+  const continueInNewChatWithHandover =
+    useCallback(
+      (
+        packet:
+          string,
+      ) => {
+        reset();
+
+        setActiveConversationId(
+          null,
+        );
+
+        setActiveMessageId(
+          null,
+        );
+
+        setIsSidebarOpen(
+          false,
+        );
+
+        setConversationEpoch(
+          (
+            value,
+          ) =>
+            value + 1,
+        );
+
+        setPendingHandover(
+          packet,
+        );
+
+        const url =
+          new URL(
+            window.location.href,
+          );
+
+        url.searchParams.delete(
+          "c",
+        );
+
+        window.history.replaceState(
+          null,
+          "",
+          url,
+        );
+      },
+      [reset],
+    );
+
+  useEffect(() => {
+    if (
+      !pendingHandover ||
+      isStreaming ||
+      messages.length >
+        0
+    ) {
+      return;
+    }
+
+    const packet =
+      pendingHandover;
+
+    setPendingHandover(
+      null,
+    );
+
+    send(
+      packet,
+      [],
+    );
+  }, [
+    isStreaming,
+    messages.length,
+    pendingHandover,
+    send,
+  ]);
+
   return (
     <div className="h-dvh overflow-hidden bg-surface-base text-text-primary">
       <a
@@ -713,9 +859,17 @@ export function ChatShell({
         isOpen={
           isSidebarOpen
         }
+        isCollapsed={
+          isDesktopSidebarCollapsed
+        }
         onClose={() =>
           setIsSidebarOpen(
             false,
+          )
+        }
+        onCollapse={() =>
+          setIsDesktopSidebarCollapsed(
+            true,
           )
         }
         conversations={
@@ -766,22 +920,52 @@ export function ChatShell({
             false,
           );
         }}
+        onPrepareHandover={
+          hasMessages
+            ? () => {
+                setHandoverRequestKey(
+                  (
+                    value,
+                  ) =>
+                    value + 1,
+                );
+
+                setIsSidebarOpen(
+                  false,
+                );
+              }
+            : undefined
+        }
         isAdmin={
           isAdmin
         }
       />
 
-      <div className="flex h-dvh flex-col lg:pl-[284px]">
+      <div
+        className={`flex h-dvh flex-col transition-[padding] duration-200 ${
+          isDesktopSidebarCollapsed
+            ? "lg:pl-0"
+            : "lg:pl-[284px]"
+        }`}
+      >
         <header className="flex h-16 shrink-0 items-center justify-between gap-3 border-b border-border-subtle bg-surface-base/90 px-4 backdrop-blur-xl sm:px-6">
           <div className="flex min-w-0 items-center gap-2">
             <IconButton
               label="Open navigation"
-              onClick={() =>
+              className={
+                isDesktopSidebarCollapsed
+                  ? ""
+                  : "lg:hidden"
+              }
+              onClick={() => {
                 setIsSidebarOpen(
                   true,
-                )
-              }
-              className="lg:hidden"
+                );
+
+                setIsDesktopSidebarCollapsed(
+                  false,
+                );
+              }}
             >
               <MenuIcon />
             </IconButton>
@@ -894,6 +1078,24 @@ export function ChatShell({
               </div>
             )}
           </div>
+
+          {hasMessages ? (
+            <HandoverPrompt
+              level={
+                contextPressure
+                  .level
+              }
+              packet={
+                handoverPacket
+              }
+              openRequestKey={
+                handoverRequestKey
+              }
+              onContinueInNewChat={
+                continueInNewChatWithHandover
+              }
+            />
+          ) : null}
 
           <Composer
             isStreaming={
