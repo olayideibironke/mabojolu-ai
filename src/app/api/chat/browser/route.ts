@@ -33,6 +33,10 @@ import {
 } from "@/lib/env";
 
 import {
+  checkUsageLimits,
+} from "@/lib/security/limits";
+
+import {
   getRateLimiter,
   rateLimitIdentity,
 } from "@/lib/security/rate-limit";
@@ -281,6 +285,26 @@ export async function POST(
         chatError(
           "provider_not_configured",
         ),
+      );
+    }
+
+    const usage =
+      await checkUsageLimits(
+        session,
+        {
+          enforceProviderCostCeiling:
+            false,
+        },
+      );
+
+    if (
+      !usage.allowed
+    ) {
+      return errorResponse(
+        usage.error ??
+          chatError(
+            "rate_limited",
+          ),
       );
     }
 
