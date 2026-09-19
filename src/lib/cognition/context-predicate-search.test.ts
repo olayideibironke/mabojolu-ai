@@ -277,6 +277,61 @@ describe(
     );
 
     it(
+      "retains the useful difference predicate under one contradictory outcome",
+      () => {
+        const model =
+          differenceModel();
+
+        model.record({
+          principleId:
+            "principle-a",
+
+          signature:
+            signature({
+              historyLength:
+                "2",
+
+              distinctActionsSeen:
+                "1",
+            }),
+
+          useful:
+            false,
+        });
+
+        const best =
+          model.rankPrograms(
+            "principle-a",
+          )[0];
+
+        expect(
+          best,
+        ).toMatchObject({
+          left:
+            "historyLength",
+
+          right:
+            "distinctActionsSeen",
+
+          operator:
+            "difference-equals",
+
+          parameter:
+            1,
+        });
+
+        expect(
+          best
+            ?.regularizedScore,
+        ).toBeGreaterThan(
+          best
+            ?.bestAtomicInformationGain ??
+            0,
+        );
+      },
+    );
+
+    it(
       "transfers the discovered predicate to an unseen three-plus over two context",
       () => {
         const model =
