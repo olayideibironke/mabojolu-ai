@@ -19,6 +19,10 @@ import type {
 } from "./context-feature-relation";
 
 import type {
+  SymbolicPredicateApplicabilityModel,
+} from "./context-predicate-search";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
 } from "./context-feature-learning";
 
@@ -251,6 +255,13 @@ export interface CognitiveRuntimeOptions {
    */
   relationalContextFeatureApplicabilityModel?:
     RelationalContextFeatureApplicabilityModel;
+
+  /**
+   * Cross-episode symbolic predicate search with explicit complexity
+   * regularization over count-like structural context dimensions.
+   */
+  symbolicPredicateApplicabilityModel?:
+    SymbolicPredicateApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -536,6 +547,10 @@ export class CognitiveRuntime {
           relationalContextFeatureApplicabilityModel:
             options
               .relationalContextFeatureApplicabilityModel,
+
+          symbolicPredicateApplicabilityModel:
+            options
+              .symbolicPredicateApplicabilityModel,
         });
 
     this.abstractPrincipleController =
