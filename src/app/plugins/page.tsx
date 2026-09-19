@@ -212,6 +212,12 @@ export default async function PluginsPage(input: {
                     )}
                   </div>
 
+                  {definition.permissionNote ? (
+                    <p className="mt-4 text-xs leading-5 text-text-muted">
+                      {definition.permissionNote}
+                    </p>
+                  ) : null}
+
                   <div className="mt-auto pt-6">
                     {connection ? (
                       <>
