@@ -223,7 +223,8 @@ export interface CognitiveRunResult {
  * 4. Compose multiple learned skills when no single skill reaches the goal.
  * 5. Test a learned skill's relational structure under renamed target symbols.
  * 6. Use broader structural transfer or same-environment episodic transfer.
- * 7. Run causal-hypothesis experiments and evidence-driven exploration.
+ * 7. Apply an active higher-order principle learned across distinct task families.
+ * 8. Run causal-hypothesis experiments and evidence-driven exploration.
  *
  * Every real transition is fed back into the world model, so incorrect
  * predictions become contradiction evidence rather than permanent assumptions.
