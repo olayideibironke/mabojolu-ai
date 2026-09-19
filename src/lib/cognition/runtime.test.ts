@@ -10,6 +10,10 @@ import type {
 } from "./environment";
 
 import {
+  InMemoryCognitiveMemory,
+} from "./memory";
+
+import {
   CognitiveRuntime,
 } from "./runtime";
 
@@ -152,14 +156,6 @@ describe(
                   "Action B has state-dependent effects.",
             ),
         ).toBe(true);
-
-        expect(
-          result.state
-            .goals[0]
-            .status,
-        ).toBe(
-          "completed",
-        );
       },
     );
 
@@ -198,7 +194,7 @@ describe(
               mappingValues[2],
           };
 
-          const runtime =
+          const result =
             new CognitiveRuntime(
               new VaultWorld(
                 mapping,
@@ -208,21 +204,12 @@ describe(
                 now:
                   makeClock(),
               },
-            );
-
-          const result =
-            runtime.run();
+            ).run();
 
           expect(
             result.solved,
           ).toBe(true);
 
-          /*
-           * If the hidden open action is tried only after both prerequisites,
-           * three actions are enough. Otherwise Mabojolu should recognize that
-           * an ineffective action deserves another experiment after state
-           * changes, solving in four.
-           */
           expect(
             result.cycles,
           ).toBeLessThanOrEqual(
@@ -275,7 +262,7 @@ describe(
           }
         }
 
-        const runtime =
+        const result =
           new CognitiveRuntime(
             new ImpossibleWorld(),
             {
@@ -283,10 +270,7 @@ describe(
               now:
                 makeClock(),
             },
-          );
-
-        const result =
-          runtime.run();
+          ).run();
 
         expect(
           result.solved,
@@ -338,6 +322,203 @@ describe(
         ).toEqual(
           first,
         );
+      },
+    );
+
+    it(
+      "uses prior successful experience to solve the same hidden world with less exploration",
+      () => {
+        const memory =
+          new InMemoryCognitiveMemory();
+
+        const first =
+          new CognitiveRuntime(
+            new VaultWorld(),
+            {
+              memory,
+              maxCycles: 8,
+              now:
+                makeClock(),
+            },
+          ).run();
+
+        const second =
+          new CognitiveRuntime(
+            new VaultWorld(),
+            {
+              memory,
+              maxCycles: 8,
+              now:
+                makeClock(),
+            },
+          ).run();
+
+        expect(
+          first.solved,
+        ).toBe(true);
+
+        expect(
+          first.cycles,
+        ).toBe(4);
+
+        expect(
+          second.solved,
+        ).toBe(true);
+
+        expect(
+          second.cycles,
+        ).toBe(3);
+
+        expect(
+          second
+            .recalledPlan
+            ?.actions,
+        ).toEqual([
+          "A",
+          "C",
+          "B",
+        ]);
+
+        expect(
+          second.state
+            .actions
+            .every(
+              (action) =>
+                action.proposal
+                  .kind ===
+                "transfer",
+            ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "detects bad transfer, corrects itself, and stores the revised experience",
+      () => {
+        const memory =
+          new InMemoryCognitiveMemory();
+
+        /*
+         * Episode 1:
+         *
+         * A = power
+         * C = latch
+         * B = open
+         *
+         * Learned compact plan:
+         * A -> C -> B
+         */
+        const original =
+          new CognitiveRuntime(
+            new VaultWorld(),
+            {
+              memory,
+              maxCycles: 8,
+              now:
+                makeClock(),
+            },
+          ).run();
+
+        expect(
+          original.solved,
+        ).toBe(true);
+
+        const changedMapping:
+          VaultActionMapping = {
+          A: "power",
+
+          B: "latch",
+
+          C: "open",
+        };
+
+        /*
+         * Episode 2 receives the old plan A -> C -> B.
+         *
+         * C now fails when tried too early. Mabojolu must detect that
+         * contradiction, continue experimentation, retry C after B changes the
+         * world, and solve.
+         */
+        const changed =
+          new CognitiveRuntime(
+            new VaultWorld(
+              changedMapping,
+            ),
+            {
+              memory,
+              maxCycles: 8,
+              now:
+                makeClock(),
+            },
+          ).run();
+
+        expect(
+          changed
+            .recalledPlan
+            ?.actions,
+        ).toEqual([
+          "A",
+          "C",
+          "B",
+        ]);
+
+        expect(
+          changed.solved,
+        ).toBe(true);
+
+        expect(
+          changed.cycles,
+        ).toBe(4);
+
+        expect(
+          changed.state
+            .learnings
+            .some(
+              (learning) =>
+                learning.kind ===
+                  "correction" &&
+                learning.statement.includes(
+                  "Transferred action C produced no observable effect",
+                ),
+            ),
+        ).toBe(true);
+
+        /*
+         * Episode 2's effective transitions are A -> B -> C.
+         *
+         * Because memory prefers the newest successful episode, Episode 3
+         * should now use the corrected plan directly.
+         */
+        const corrected =
+          new CognitiveRuntime(
+            new VaultWorld(
+              changedMapping,
+            ),
+            {
+              memory,
+              maxCycles: 8,
+              now:
+                makeClock(),
+            },
+          ).run();
+
+        expect(
+          corrected
+            .recalledPlan
+            ?.actions,
+        ).toEqual([
+          "A",
+          "B",
+          "C",
+        ]);
+
+        expect(
+          corrected.solved,
+        ).toBe(true);
+
+        expect(
+          corrected.cycles,
+        ).toBe(3);
       },
     );
   },

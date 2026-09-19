@@ -6,6 +6,12 @@ import {
   type SnapshotChange,
 } from "./environment";
 
+import type {
+  CognitiveMemory,
+  EpisodeTransition,
+  RecalledPlan,
+} from "./memory";
+
 import {
   createCognitiveState,
   reduceCognitiveState,
@@ -26,16 +32,30 @@ interface ActionAttempt {
   changedKeys: string[];
 }
 
+type ActionChoiceStrategy =
+  | "transfer"
+  | "exploration"
+  | "conditional"
+  | "state-exploration";
+
+interface ActionChoice {
+  action: string;
+
+  strategy:
+    ActionChoiceStrategy;
+}
+
 export interface CognitiveRuntimeOptions {
-  /**
-   * Maximum number of actions before the experiment stops.
-   */
   maxCycles?: number;
 
-  /**
-   * Injectable clock keeps experiments reproducible.
-   */
   now?: () => string;
+
+  /**
+   * Cross-episode experience store.
+   *
+   * The runtime remains fully usable without memory.
+   */
+  memory?: CognitiveMemory;
 }
 
 export interface CognitiveRunResult {
@@ -45,23 +65,20 @@ export interface CognitiveRunResult {
 
   actionHistory: string[];
 
+  recalledPlan?:
+    RecalledPlan;
+
   state: CognitiveState;
 }
 
 /**
- * First active Mabojolu G cognition loop.
+ * Mabojolu G active cognitive runtime.
  *
- * This version deliberately does not depend on an LLM.
+ * It combines within-episode experimentation with optional cross-episode
+ * experience transfer.
  *
- * The objective is to prove that the surrounding cognitive architecture can:
- *
- * observe
- * experiment
- * detect consequences
- * notice conditional behavior
- * update hypotheses
- * retain learning
- * change future behavior
+ * Memory is treated as fallible prior knowledge rather than unquestionable
+ * truth. A transferred action that stops working becomes new evidence.
  */
 export class CognitiveRuntime {
   private state:
@@ -83,11 +100,24 @@ export class CognitiveRuntime {
       string
     >();
 
+  private readonly episodeTransitions:
+    EpisodeTransition[] = [];
+
+  private recalledPlan:
+    RecalledPlan |
+    undefined;
+
+  private transferIndex = 0;
+
   private readonly maxCycles:
     number;
 
   private readonly clock:
     () => string;
+
+  private readonly memory:
+    CognitiveMemory |
+    undefined;
 
   constructor(
     private readonly environment:
@@ -106,6 +136,9 @@ export class CognitiveRuntime {
       (() =>
         new Date()
           .toISOString());
+
+    this.memory =
+      options.memory;
 
     const createdAt =
       this.now();
@@ -172,6 +205,24 @@ export class CognitiveRuntime {
 
     this.hasRun = true;
 
+    const initialActions =
+      this.environment
+        .getAvailableActions();
+
+    this.recalledPlan =
+      this.memory
+        ?.recallPlan({
+          environmentId:
+            this.environment.id,
+
+          goalDescription:
+            this.environment
+              .goalDescription,
+
+          availableActions:
+            initialActions,
+        });
+
     let snapshot =
       this.environment
         .observe();
@@ -187,7 +238,7 @@ export class CognitiveRuntime {
     ) {
       this.completeGoal();
 
-      return this.result(
+      return this.finishRun(
         true,
       );
     }
@@ -200,18 +251,23 @@ export class CognitiveRuntime {
         this.environment
           .getAvailableActions();
 
-      const action =
+      const choice =
         this.chooseAction(
           actions,
           snapshot,
         );
 
-      if (!action) {
+      if (!choice) {
         break;
       }
 
-      const before =
-        snapshot;
+      const {
+        action,
+      } = choice;
+
+      const before = {
+        ...snapshot,
+      };
 
       const beforeSignature =
         snapshotSignature(
@@ -241,14 +297,23 @@ export class CognitiveRuntime {
             ),
 
           kind:
-            "experiment",
+            choice.strategy ===
+            "transfer"
+              ? "transfer"
+              : "experiment",
 
           description:
             `Execute action ${action} and observe the environment.`,
 
-          expectedEffects: [
-            "The action may reveal information about the environment.",
-          ],
+          expectedEffects:
+            choice.strategy ===
+            "transfer"
+              ? [
+                  "Prior successful experience suggests this action contributes to the goal.",
+                ]
+              : [
+                  "The action may reveal information about the environment.",
+                ],
 
           risk: 0,
 
@@ -305,9 +370,10 @@ export class CognitiveRuntime {
           completed,
       });
 
-      const after =
-        this.environment
-          .observe();
+      const after = {
+        ...this.environment
+          .observe(),
+      };
 
       const changes =
         diffSnapshots(
@@ -361,6 +427,30 @@ export class CognitiveRuntime {
         observation,
       );
 
+      this.recordTransferCorrection(
+        choice,
+        changes,
+        observation,
+      );
+
+      this.episodeTransitions.push({
+        action,
+
+        before,
+
+        after,
+
+        changedKeys:
+          changes.map(
+            (change) =>
+              change.key,
+          ),
+
+        accepted:
+          environmentResult
+            .accepted,
+      });
+
       const attempts =
         this.attempts.get(
           action,
@@ -399,13 +489,13 @@ export class CognitiveRuntime {
       ) {
         this.completeGoal();
 
-        return this.result(
+        return this.finishRun(
           true,
         );
       }
     }
 
-    return this.result(
+    return this.finishRun(
       this.environment
         .isGoalSatisfied(),
     );
@@ -417,17 +507,27 @@ export class CognitiveRuntime {
 
     snapshot:
       EnvironmentSnapshot,
-  ): string | undefined {
+  ): ActionChoice | undefined {
+    const transferred =
+      this.nextTransferAction(
+        availableActions,
+      );
+
+    if (transferred) {
+      return {
+        action:
+          transferred,
+
+        strategy:
+          "transfer",
+      };
+    }
+
     const signature =
       snapshotSignature(
         snapshot,
       );
 
-    /*
-     * Stage 1:
-     *
-     * Explore every completely unknown action before repeating actions.
-     */
     const neverAttempted =
       availableActions.find(
         (action) =>
@@ -437,21 +537,15 @@ export class CognitiveRuntime {
       );
 
     if (neverAttempted) {
-      return neverAttempted;
+      return {
+        action:
+          neverAttempted,
+
+        strategy:
+          "exploration",
+      };
     }
 
-    /*
-     * Stage 2:
-     *
-     * An action that previously produced no observable effect may depend on
-     * hidden preconditions.
-     *
-     * If the environment has changed since that unsuccessful experiment,
-     * retrying it is informative.
-     *
-     * This is the first primitive form of hypothesis-driven experimentation in
-     * Mabojolu G.
-     */
     const conditionalCandidate =
       availableActions.find(
         (action) => {
@@ -486,32 +580,76 @@ export class CognitiveRuntime {
     if (
       conditionalCandidate
     ) {
-      return (
-        conditionalCandidate
-      );
+      return {
+        action:
+          conditionalCandidate,
+
+        strategy:
+          "conditional",
+      };
     }
 
-    /*
-     * Stage 3:
-     *
-     * Continue gathering information by trying actions in observable states in
-     * which they have not previously been tested.
-     */
-    return availableActions.find(
-      (action) => {
-        const attempts =
-          this.attempts.get(
-            action,
-          ) ?? [];
+    const stateCandidate =
+      availableActions.find(
+        (action) => {
+          const attempts =
+            this.attempts.get(
+              action,
+            ) ?? [];
 
-        return !attempts.some(
-          (attempt) =>
-            attempt
-              .stateSignature ===
-            signature,
-        );
-      },
-    );
+          return !attempts.some(
+            (attempt) =>
+              attempt
+                .stateSignature ===
+              signature,
+          );
+        },
+      );
+
+    if (!stateCandidate) {
+      return undefined;
+    }
+
+    return {
+      action:
+        stateCandidate,
+
+      strategy:
+        "state-exploration",
+    };
+  }
+
+  private nextTransferAction(
+    availableActions:
+      readonly string[],
+  ): string | undefined {
+    if (!this.recalledPlan) {
+      return undefined;
+    }
+
+    while (
+      this.transferIndex <
+      this.recalledPlan
+        .actions.length
+    ) {
+      const candidate =
+        this.recalledPlan
+          .actions[
+            this.transferIndex
+          ];
+
+      this.transferIndex += 1;
+
+      if (
+        availableActions.includes(
+          candidate,
+        )
+      ) {
+        return candidate;
+      }
+    }
+
+    return undefined;
   }
 
   private learnFromTransition(
@@ -676,15 +814,55 @@ export class CognitiveRuntime {
       });
     }
 
-    /*
-     * The parameters are intentionally retained here even though the first
-     * learning implementation currently derives its statements from `changes`.
-     *
-     * Future versions will compare full before/after state to infer explicit
-     * preconditions.
-     */
     void before;
     void after;
+  }
+
+  private recordTransferCorrection(
+    choice:
+      ActionChoice,
+
+    changes:
+      SnapshotChange[],
+
+    observation:
+      Observation,
+  ): void {
+    if (
+      choice.strategy !==
+        "transfer" ||
+      changes.length > 0
+    ) {
+      return;
+    }
+
+    this.apply({
+      type:
+        "learning.recorded",
+
+      learning: {
+        id:
+          this.nextId(
+            "learning",
+          ),
+
+        kind:
+          "correction",
+
+        statement:
+          `Transferred action ${choice.action} produced no observable effect in this episode, so prior knowledge must be re-tested.`,
+
+        confidence:
+          0.95,
+
+        derivedFromIds: [
+          observation.id,
+        ],
+
+        createdAt:
+          this.now(),
+      },
+    });
   }
 
   private recordNoEffectHypothesis(
@@ -971,6 +1149,35 @@ export class CognitiveRuntime {
     });
   }
 
+  private finishRun(
+    solved: boolean,
+  ): CognitiveRunResult {
+    this.memory
+      ?.recordEpisode({
+        environmentId:
+          this.environment.id,
+
+        goalDescription:
+          this.environment
+            .goalDescription,
+
+        solved,
+
+        cycles:
+          this.state.cycle,
+
+        transitions:
+          this.episodeTransitions,
+
+        completedAt:
+          this.now(),
+      });
+
+    return this.result(
+      solved,
+    );
+  }
+
   private result(
     solved: boolean,
   ): CognitiveRunResult {
@@ -986,6 +1193,19 @@ export class CognitiveRuntime {
             action.proposal
               .description,
         ),
+
+      ...(this.recalledPlan
+        ? {
+            recalledPlan: {
+              ...this.recalledPlan,
+
+              actions: [
+                ...this.recalledPlan
+                  .actions,
+              ],
+            },
+          }
+        : {}),
 
       state:
         this.state,
