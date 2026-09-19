@@ -14,6 +14,10 @@ import type {
   PrincipleApplicabilityModel,
 } from "./principle-applicability-model";
 
+import type {
+  InducedContextApplicabilityModel,
+} from "./principle-context-signature";
+
 import {
   AutonomousCausalHypothesisEngine,
   type AutonomousCausalHypothesis,
@@ -207,6 +211,13 @@ export interface CognitiveRuntimeOptions {
    */
   principleApplicabilityModel?:
     PrincipleApplicabilityModel;
+
+  /**
+   * Applicability learner keyed by symbol-independent structural signatures
+   * induced from raw transition evidence.
+   */
+  inducedContextApplicabilityModel?:
+    InducedContextApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -476,6 +487,10 @@ export class CognitiveRuntime {
           applicabilityModel:
             options
               .principleApplicabilityModel,
+
+          inducedContextApplicabilityModel:
+            options
+              .inducedContextApplicabilityModel,
         });
 
     this.abstractPrincipleController =
