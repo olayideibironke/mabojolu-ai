@@ -797,7 +797,9 @@ describe(
           activePortfolio();
 
         const exact =
-          new InducedContextApplicabilityModel();
+          new InducedContextApplicabilityModel(
+            "full",
+          );
 
         const feature =
           new LearnedContextFeatureApplicabilityModel();
@@ -928,9 +930,15 @@ describe(
         }
 
         expect(
-          heldOutSignature.key,
+          JSON.stringify(
+            heldOutSignature
+              .features,
+          ),
         ).not.toBe(
-          calibrationSignature.key,
+          JSON.stringify(
+            calibrationSignature
+              .features,
+          ),
         );
 
         const calibrationProjection =
@@ -985,7 +993,9 @@ describe(
           activePortfolio();
 
         const exact =
-          new InducedContextApplicabilityModel();
+          new InducedContextApplicabilityModel(
+            "full",
+          );
 
         const feature =
           new LearnedContextFeatureApplicabilityModel();
