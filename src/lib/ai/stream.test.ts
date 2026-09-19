@@ -85,7 +85,10 @@ describe("createChatStream", () => {
 
     const events = await readEvents(response);
 
-    expect(events).toContainEqual({ type: "status", label: "Thinking" });
+    expect(events).toContainEqual({
+      type: "status",
+      label: "Thinking",
+    });
   });
 
   it("persists the accumulated text with its finish reason", async () => {
@@ -101,7 +104,10 @@ describe("createChatStream", () => {
         {
           type: "finish",
           finishReason: "end_turn",
-          usage: { inputTokens: 10, outputTokens: 4 },
+          usage: {
+            inputTokens: 10,
+            outputTokens: 4,
+          },
         },
       ),
       onSettled,
@@ -112,8 +118,12 @@ describe("createChatStream", () => {
     expect(onSettled).toHaveBeenCalledOnce();
     expect(onSettled).toHaveBeenCalledWith({
       text: "Saved text",
+      sources: [],
       finishReason: "end_turn",
-      usage: { inputTokens: 10, outputTokens: 4 },
+      usage: {
+        inputTokens: 10,
+        outputTokens: 4,
+      },
     });
   });
 
@@ -127,8 +137,14 @@ describe("createChatStream", () => {
       model: "mabojolu-mock",
       signal: new AbortController().signal,
       chunks: chunks(
-        { type: "text", text: "Half a thought" },
-        { type: "finish", finishReason: "aborted" },
+        {
+          type: "text",
+          text: "Half a thought",
+        },
+        {
+          type: "finish",
+          finishReason: "aborted",
+        },
       ),
       onSettled,
     });
@@ -136,18 +152,30 @@ describe("createChatStream", () => {
     const events = await readEvents(response);
 
     expect(onSettled).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "Half a thought", finishReason: "aborted" }),
+      expect.objectContaining({
+        text: "Half a thought",
+        finishReason: "aborted",
+      }),
     );
-    expect(events.at(-1)).toEqual({ type: "done", finishReason: "aborted" });
+
+    expect(events.at(-1)).toEqual({
+      type: "done",
+      finishReason: "aborted",
+    });
   });
 
   it("treats a thrown AbortError as an interruption, not an error", async () => {
     const onSettled = vi.fn();
 
     async function* aborting(): AsyncIterable<GenerationChunk> {
-      yield { type: "text", text: "Started" };
+      yield {
+        type: "text",
+        text: "Started",
+      };
+
       const abort = new Error("aborted");
       abort.name = "AbortError";
+
       throw abort;
     }
 
@@ -162,18 +190,32 @@ describe("createChatStream", () => {
     const events = await readEvents(response);
 
     expect(onSettled).toHaveBeenCalledWith(
-      expect.objectContaining({ finishReason: "aborted" }),
+      expect.objectContaining({
+        finishReason: "aborted",
+      }),
     );
+
     // The user must not be shown an error for their own stop action.
-    expect(events.some((event) => event.type === "error")).toBe(false);
+    expect(
+      events.some(
+        (event) =>
+          event.type === "error",
+      ),
+    ).toBe(false);
   });
 
   it("reports a mid-stream failure as an error event and keeps partial text", async () => {
     const onSettled = vi.fn();
 
     async function* failing(): AsyncIterable<GenerationChunk> {
-      yield { type: "text", text: "Partial answer" };
-      throw chatError("provider_unavailable");
+      yield {
+        type: "text",
+        text: "Partial answer",
+      };
+
+      throw chatError(
+        "provider_unavailable",
+      );
     }
 
     const response = createChatStream({
@@ -184,17 +226,36 @@ describe("createChatStream", () => {
       onSettled,
     });
 
-    const events = await readEvents(response);
-    const last = events.at(-1);
+    const events =
+      await readEvents(response);
 
-    expect(last?.type).toBe("error");
-    if (last?.type === "error") {
-      expect(last.error.code).toBe("provider_unavailable");
-      expect(last.error.retryable).toBe(true);
+    const last =
+      events.at(-1);
+
+    expect(last?.type).toBe(
+      "error",
+    );
+
+    if (
+      last?.type === "error"
+    ) {
+      expect(
+        last.error.code,
+      ).toBe(
+        "provider_unavailable",
+      );
+
+      expect(
+        last.error.retryable,
+      ).toBe(true);
     }
+
     // The text already shown is preserved rather than thrown away.
     expect(onSettled).toHaveBeenCalledWith(
-      expect.objectContaining({ text: "Partial answer", finishReason: "error" }),
+      expect.objectContaining({
+        text: "Partial answer",
+        finishReason: "error",
+      }),
     );
   });
 
@@ -206,14 +267,19 @@ describe("createChatStream", () => {
       messageId: "reply-8",
       model: "mabojolu-mock",
       signal: new AbortController().signal,
-      chunks: chunks({ type: "text", text: "No finish chunk" }),
+      chunks: chunks({
+        type: "text",
+        text: "No finish chunk",
+      }),
       onSettled,
     });
 
     await readEvents(response);
 
     expect(onSettled).toHaveBeenCalledWith(
-      expect.objectContaining({ finishReason: "end_turn" }),
+      expect.objectContaining({
+        finishReason: "end_turn",
+      }),
     );
   });
 
@@ -226,15 +292,23 @@ describe("createChatStream", () => {
       model: "mabojolu-mock",
       signal: new AbortController().signal,
       chunks: chunks(
-        { type: "finish", finishReason: "end_turn" },
-        { type: "finish", finishReason: "end_turn" },
+        {
+          type: "finish",
+          finishReason: "end_turn",
+        },
+        {
+          type: "finish",
+          finishReason: "end_turn",
+        },
       ),
       onSettled,
     });
 
     await readEvents(response);
 
-    expect(onSettled).toHaveBeenCalledOnce();
+    expect(
+      onSettled,
+    ).toHaveBeenCalledOnce();
   });
 
   it("still settles when the client disconnects mid-stream", async () => {
@@ -249,12 +323,37 @@ describe("createChatStream", () => {
     const onSettled = vi.fn();
 
     async function* slow(): AsyncIterable<GenerationChunk> {
-      yield { type: "text", text: "first" };
+      yield {
+        type: "text",
+        text: "first",
+      };
+
       // Give the cancel below a chance to land between chunks.
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      yield { type: "text", text: "second" };
-      await new Promise((resolve) => setTimeout(resolve, 10));
-      yield { type: "finish", finishReason: "end_turn" };
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            10,
+          ),
+      );
+
+      yield {
+        type: "text",
+        text: "second",
+      };
+
+      await new Promise(
+        (resolve) =>
+          setTimeout(
+            resolve,
+            10,
+          ),
+      );
+
+      yield {
+        type: "finish",
+        finishReason: "end_turn",
+      };
     }
 
     const response = createChatStream({
@@ -265,16 +364,29 @@ describe("createChatStream", () => {
       onSettled,
     });
 
-    const reader = response.body!.getReader();
-    await reader.read(); // start event
-    await reader.cancel(); // client goes away
+    const reader =
+      response.body!.getReader();
+
+    await reader.read();
+    await reader.cancel();
 
     // Let the generator observe the cancellation and settle.
-    await new Promise((resolve) => setTimeout(resolve, 60));
+    await new Promise(
+      (resolve) =>
+        setTimeout(
+          resolve,
+          60,
+        ),
+    );
 
-    expect(onSettled).toHaveBeenCalledOnce();
+    expect(
+      onSettled,
+    ).toHaveBeenCalledOnce();
+
     expect(onSettled).toHaveBeenCalledWith(
-      expect.objectContaining({ finishReason: "aborted" }),
+      expect.objectContaining({
+        finishReason: "aborted",
+      }),
     );
   });
 
@@ -285,34 +397,70 @@ describe("createChatStream", () => {
       model: "mabojolu-mock",
       signal: new AbortController().signal,
       chunks: chunks(
-        { type: "text", text: "Answer" },
-        { type: "finish", finishReason: "end_turn" },
+        {
+          type: "text",
+          text: "Answer",
+        },
+        {
+          type: "finish",
+          finishReason: "end_turn",
+        },
       ),
       onSettled: () => {
-        throw new Error("database unavailable");
+        throw new Error(
+          "database unavailable",
+        );
       },
     });
 
-    const events = await readEvents(response);
+    const events =
+      await readEvents(response);
 
-    expect(events.at(-1)).toMatchObject({ type: "done" });
+    expect(
+      events.at(-1),
+    ).toMatchObject({
+      type: "done",
+    });
   });
 });
 
 describe("errorResponse", () => {
   it("returns the mapped status and a Retry-After header when known", () => {
     const response = errorResponse(
-      chatError("rate_limited", { retryAfterSeconds: 42 }),
+      chatError(
+        "rate_limited",
+        {
+          retryAfterSeconds: 42,
+        },
+      ),
     );
 
-    expect(response.status).toBe(429);
-    expect(response.headers.get("Retry-After")).toBe("42");
+    expect(
+      response.status,
+    ).toBe(429);
+
+    expect(
+      response.headers.get(
+        "Retry-After",
+      ),
+    ).toBe("42");
   });
 
   it("omits Retry-After when no delay is known", () => {
-    const response = errorResponse(chatError("invalid_request"));
+    const response = errorResponse(
+      chatError(
+        "invalid_request",
+      ),
+    );
 
-    expect(response.status).toBe(400);
-    expect(response.headers.get("Retry-After")).toBeNull();
+    expect(
+      response.status,
+    ).toBe(400);
+
+    expect(
+      response.headers.get(
+        "Retry-After",
+      ),
+    ).toBeNull();
   });
 });

@@ -99,30 +99,6 @@ export function EmailPasswordAuth() {
     isSignUp &&
     isAnonymous;
 
-  /*
-   * Keep the visible tab aligned with links such as:
-   * /sign-in?mode=sign-up
-   */
-  useEffect(() => {
-    if (
-      isSubmitting ||
-      mode ===
-        "forgot-password"
-    ) {
-      return;
-    }
-
-    setMode(
-      modeFromQuery(
-        requestedMode,
-      ),
-    );
-  }, [
-    isSubmitting,
-    mode,
-    requestedMode,
-  ]);
-
   useEffect(() => {
     let isActive = true;
 
