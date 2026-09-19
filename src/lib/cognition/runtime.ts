@@ -11,6 +11,10 @@ import type {
 } from "./abstract-principle-portfolio";
 
 import type {
+  LearnedContextFeatureApplicabilityModel,
+} from "./context-feature-learning";
+
+import type {
   PrincipleApplicabilityModel,
 } from "./principle-applicability-model";
 
@@ -218,6 +222,13 @@ export interface CognitiveRuntimeOptions {
    */
   inducedContextApplicabilityModel?:
     InducedContextApplicabilityModel;
+
+  /**
+   * Cross-episode learner that discovers which induced structural context
+   * dimensions predict principle usefulness.
+   */
+  learnedContextFeatureApplicabilityModel?:
+    LearnedContextFeatureApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -491,6 +502,10 @@ export class CognitiveRuntime {
           inducedContextApplicabilityModel:
             options
               .inducedContextApplicabilityModel,
+
+          learnedContextFeatureApplicabilityModel:
+            options
+              .learnedContextFeatureApplicabilityModel,
         });
 
     this.abstractPrincipleController =
