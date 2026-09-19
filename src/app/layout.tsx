@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import type { ReactNode } from "react";
 
 import { ThemeProvider } from "@/components/layout/theme-provider";
 import { themeInitScript } from "@/lib/utilities/theme";
@@ -52,7 +53,13 @@ export const viewport: Viewport = {
   ],
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+interface RootLayoutProps {
+  children: ReactNode;
+}
+
+export default function RootLayout({
+  children,
+}: Readonly<RootLayoutProps>) {
   return (
     <html
       lang="en"
@@ -70,6 +77,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           dangerouslySetInnerHTML={{ __html: themeInitScript }}
         />
       </head>
+
       <body className="min-h-full">
         <ThemeProvider>{children}</ThemeProvider>
       </body>
