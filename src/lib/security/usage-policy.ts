@@ -25,6 +25,42 @@ export function freeWindowStartIso(
   ).toISOString();
 }
 
+export function registeredFreeWindowStartIso(
+  registeredAt:
+    string |
+    null |
+    undefined,
+
+  nowMs:
+    number = Date.now(),
+): string {
+  const rollingStartMs =
+    nowMs -
+    FREE_WINDOW_HOURS *
+      HOUR_MS;
+
+  const registeredAtMs =
+    registeredAt
+      ? Date.parse(
+          registeredAt,
+        )
+      : Number.NaN;
+
+  const startMs =
+    Number.isFinite(
+      registeredAtMs,
+    )
+      ? Math.max(
+          rollingStartMs,
+          registeredAtMs,
+        )
+      : rollingStartMs;
+
+  return new Date(
+    startMs,
+  ).toISOString();
+}
+
 export function hasActiveProAccess(
   account:
     BillingAccount |
