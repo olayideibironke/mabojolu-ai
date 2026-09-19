@@ -20,6 +20,9 @@ import {
   decryptPluginSecret,
   encryptPluginSecret,
 } from "./crypto";
+import {
+  isGooglePluginProvider,
+} from "./registry";
 
 const MAX_ITEMS =
   5;
@@ -157,8 +160,9 @@ async function accessTokenFor(
     );
 
   const endpoint =
-    connection.provider ===
-      "google"
+    isGooglePluginProvider(
+      connection.provider,
+    )
       ? "https://oauth2.googleapis.com/token"
       : connection.provider ===
           "microsoft"
@@ -713,66 +717,67 @@ export async function buildWorkspacePluginContext(input: {
 
       if (
         connection.provider ===
-          "google"
+          "google-gmail" &&
+        wantsMail(
+          input.latestUserContent,
+        )
       ) {
-        if (
-          wantsMail(
-            input.latestUserContent,
-          )
-        ) {
-          const value =
-            section(
-              "Google Gmail",
-              await googleMailContext(
-                token,
-              ),
-            );
+        const value =
+          section(
+            "Google Gmail",
+            await googleMailContext(
+              token,
+            ),
+          );
 
-          if (value) {
-            sections.push(
-              value,
-            );
-          }
+        if (value) {
+          sections.push(
+            value,
+          );
         }
+      }
 
-        if (
-          wantsGoogleDrive(
-            input.latestUserContent,
-          )
-        ) {
-          const value =
-            section(
-              "Google Drive",
-              await googleDriveContext(
-                token,
-              ),
-            );
+      if (
+        connection.provider ===
+          "google-drive" &&
+        wantsGoogleDrive(
+          input.latestUserContent,
+        )
+      ) {
+        const value =
+          section(
+            "Google Drive files shared with Mabojolu",
+            await googleDriveContext(
+              token,
+            ),
+          );
 
-          if (value) {
-            sections.push(
-              value,
-            );
-          }
+        if (value) {
+          sections.push(
+            value,
+          );
         }
+      }
 
-        if (
-          wantsCalendar(
-            input.latestUserContent,
-          )
-        ) {
-          const value =
-            section(
-              "Google Calendar",
-              await googleCalendarContext(
-                token,
-              ),
-            );
+      if (
+        connection.provider ===
+          "google-calendar" &&
+        wantsCalendar(
+          input.latestUserContent,
+        )
+      ) {
+        const value =
+          section(
+            "Google Calendar",
+            await googleCalendarContext(
+              token,
+            ),
+          );
 
-          if (value) {
-            sections.push(
-              value,
-            );
-          }
+        if (value) {
+          sections.push(
+            value,
+          );
         }
       }
 
