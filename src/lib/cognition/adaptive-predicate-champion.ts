@@ -38,6 +38,9 @@ export interface AdaptivePredicateSummary {
   championProgramId?:
     string;
 
+  championPredictsUsefulWhenPredicateIs?:
+    boolean;
+
   replacementCount:
     number;
 
@@ -1490,6 +1493,10 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
               state.champion
                 .program
                 .id,
+
+            championPredictsUsefulWhenPredicateIs:
+              state.champion
+                .predictsUsefulWhenPredicateIs,
           }
         : {}),
 
