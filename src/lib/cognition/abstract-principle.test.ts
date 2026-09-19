@@ -26,6 +26,9 @@ function gatedEpisode(
 
     family,
 
+    familyKind:
+      "gated-sequence",
+
     solved:
       true,
 
@@ -171,6 +174,9 @@ function thresholdEpisode():
 
     family:
       "threshold-family",
+
+    familyKind:
+      "threshold-accumulation",
 
     solved:
       true,
@@ -356,6 +362,50 @@ describe(
     );
 
     it(
+      "does not activate when different family labels describe the same structural kind",
+      () => {
+        const library =
+          new CrossFamilyPrincipleLibrary();
+
+        library.learnFromEpisode(
+          gatedEpisode(
+            "gated-family-a",
+            "gated-one",
+          ),
+        );
+
+        const principle =
+          library.learnFromEpisode(
+            gatedEpisode(
+              "gated-family-b",
+              "gated-two",
+            ),
+          );
+
+        expect(
+          principle?.status,
+        ).toBe(
+          "candidate",
+        );
+
+        expect(
+          principle
+            ?.supportFamilies,
+        ).toEqual([
+          "gated-family-a",
+          "gated-family-b",
+        ]);
+
+        expect(
+          principle
+            ?.supportFamilyKinds,
+        ).toEqual([
+          "gated-sequence",
+        ]);
+      },
+    );
+
+    it(
       "does not activate from repeated evidence inside the same family",
       () => {
         const library =
@@ -426,6 +476,14 @@ describe(
         ).toEqual([
           "gated-family",
           "threshold-family",
+        ]);
+
+        expect(
+          principle
+            ?.supportFamilyKinds,
+        ).toEqual([
+          "gated-sequence",
+          "threshold-accumulation",
         ]);
 
         expect(
