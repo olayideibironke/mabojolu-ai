@@ -30,7 +30,7 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Fast",
     label: "Mabojolu Fast",
     description:
-      "Browser-first on compatible WebGPU devices, with local Ollama fallback.",
+      "Adaptive browser-first inference on compatible WebGPU devices, with automatic lighter-model recovery and local Ollama fallback.",
     bestFor:
       "Private on-device responses, short questions, quick explanations, simple drafting, and everyday assistance.",
   },
