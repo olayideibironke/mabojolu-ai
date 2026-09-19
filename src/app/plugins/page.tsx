@@ -11,7 +11,6 @@ import {
 } from "@/lib/plugins/config";
 import {
   PLUGIN_PROVIDERS,
-  type PluginProviderId,
 } from "@/lib/plugins/registry";
 
 function providerMessage(
