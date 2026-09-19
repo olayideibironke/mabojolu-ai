@@ -125,6 +125,46 @@ describe(
     );
 
     it(
+      "exposes actions in the generated presentation order without changing hidden roles",
+      () => {
+        const environment =
+          new SyntheticGatedSequenceEnvironment({
+            ...spec(),
+
+            actionPresentationOrder: [
+              0,
+              2,
+              1,
+            ],
+          });
+
+        expect(
+          environment.getAvailableActions(),
+        ).toEqual([
+          "A",
+          "C",
+          "B",
+        ]);
+
+        environment.act(
+          "A",
+        );
+
+        environment.act(
+          "C",
+        );
+
+        environment.act(
+          "B",
+        );
+
+        expect(
+          environment.isGoalSatisfied(),
+        ).toBe(true);
+      },
+    );
+
+    it(
       "allows prerequisite-sensitive no-effect actions without leaking why they failed",
       () => {
         const environment =
