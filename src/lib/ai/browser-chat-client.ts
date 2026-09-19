@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  buildBrowserContext,
+} from "./browser-context";
+
+import {
   profileBrowserDevice,
 } from "./browser-device-profile";
 
@@ -307,7 +311,22 @@ export function shouldUseBrowserChat(
     return false;
   }
 
-  return browserRouteAvailable();
+  if (
+    !browserRouteAvailable()
+  ) {
+    return false;
+  }
+
+  const profile =
+    profileBrowserDevice();
+
+  const context =
+    browserContext(
+      body,
+      profile.maxOutputTokens,
+    );
+
+  return context.fits;
 }
 
 async function responseError(
@@ -504,37 +523,22 @@ async function settlePersistence(input: {
   }
 }
 
-function browserMessages(
+function browserContext(
   body:
     BrowserChatBody,
+
+  maxOutputTokens:
+    number,
 ) {
-  return [
-    {
-      role:
-        "system" as const,
+  return buildBrowserContext({
+    systemPrompt:
+      SYSTEM_PROMPT,
 
-      content:
-        SYSTEM_PROMPT,
-    },
+    messages:
+      body.messages,
 
-    ...body.messages
-      .filter(
-        (message) =>
-          message.content
-            .trim()
-            .length >
-          0,
-      )
-      .map(
-        (message) => ({
-          role:
-            message.role,
-
-          content:
-            message.content,
-        }),
-      ),
-  ];
+    maxOutputTokens,
+  });
 }
 
 export async function streamBrowserChat(
@@ -647,6 +651,46 @@ export async function streamBrowserChat(
 
       message:
         "On-device inference is unavailable on this device. Retry to use Mabojolu's local server inference.",
+
+      retryable:
+        true,
+    });
+
+    return;
+  }
+
+  const context =
+    browserContext(
+      body,
+      deviceProfile
+        .maxOutputTokens,
+    );
+
+  if (
+    !context.fits
+  ) {
+    await settlePersistence({
+      conversationId:
+        start.conversationId,
+
+      assistantMessageId:
+        start.messageId,
+
+      content: "",
+
+      status:
+        "failed",
+
+      errorCode:
+        "browser_context_too_large",
+    });
+
+    callbacks.onError({
+      code:
+        "provider_unavailable",
+
+      message:
+        "This conversation is too large for the on-device model. Retry to use Mabojolu's local server inference without losing your prompt.",
 
       retryable:
         true,
@@ -886,9 +930,7 @@ export async function streamBrowserChat(
             .modelCandidates,
 
         messages:
-          browserMessages(
-            body,
-          ),
+          context.messages,
 
         maxOutputTokens:
           deviceProfile
