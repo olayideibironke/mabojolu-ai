@@ -88,7 +88,7 @@ async function generate(
 ) {
   const {
     requestId,
-    modelId,
+    modelCandidates,
     messages,
     maxOutputTokens,
   } = message;
@@ -96,120 +96,24 @@ async function generate(
   activeRequestId =
     requestId;
 
-  try {
-    await ensureEngine(
-      modelId,
-      requestId,
-    );
+  const candidates =
+    Array.isArray(
+      modelCandidates,
+    )
+      ? modelCandidates
+          .filter(
+            (candidate) =>
+              typeof candidate ===
+                "string" &&
+              candidate.length >
+                0,
+          )
+      : [];
 
-    if (
-      activeRequestId !==
-      requestId
-    ) {
-      return;
-    }
-
-    self.postMessage({
-      type:
-        "status",
-
-      requestId,
-
-      label:
-        "Thinking on this device...",
-    });
-
-    const stream =
-      await engine
-        .chat
-        .completions
-        .create({
-          messages,
-
-          stream:
-            true,
-
-          max_tokens:
-            maxOutputTokens,
-
-          temperature:
-            0.7,
-        });
-
-    let finishReason =
-      "end_turn";
-
-    for await (
-      const chunk of
-        stream
-    ) {
-      if (
-        activeRequestId !==
-        requestId
-      ) {
-        return;
-      }
-
-      const choice =
-        chunk
-          .choices?.[0];
-
-      const text =
-        choice
-          ?.delta
-          ?.content ??
-        "";
-
-      if (
-        text
-      ) {
-        self.postMessage({
-          type:
-            "delta",
-
-          requestId,
-
-          text,
-        });
-      }
-
-      if (
-        choice
-          ?.finish_reason ===
-        "length"
-      ) {
-        finishReason =
-          "max_tokens";
-      }
-    }
-
-    if (
-      activeRequestId ===
-      requestId
-    ) {
-      activeRequestId =
-        null;
-
-      self.postMessage({
-        type:
-          "done",
-
-        requestId,
-
-        finishReason,
-      });
-    }
-  } catch (
-    cause
+  if (
+    candidates.length ===
+      0
   ) {
-    if (
-      activeRequestId ===
-      requestId
-    ) {
-      activeRequestId =
-        null;
-    }
-
     self.postMessage({
       type:
         "error",
@@ -217,12 +121,212 @@ async function generate(
       requestId,
 
       message:
-        cause instanceof
-          Error
-          ? cause.message
-          : "On-device inference failed.",
+        "No compatible on-device model is available.",
     });
+
+    activeRequestId =
+      null;
+
+    return;
   }
+
+  let lastError =
+    null;
+
+  for (
+    let index = 0;
+    index <
+      candidates.length;
+    index +=
+      1
+  ) {
+    const modelId =
+      candidates[index];
+
+    let emittedText =
+      false;
+
+    try {
+      if (
+        index >
+        0
+      ) {
+        self.postMessage({
+          type:
+            "status",
+
+          requestId,
+
+          label:
+            "Switching to a lighter on-device model...",
+        });
+      }
+
+      await ensureEngine(
+        modelId,
+        requestId,
+      );
+
+      if (
+        activeRequestId !==
+        requestId
+      ) {
+        return;
+      }
+
+      self.postMessage({
+        type:
+          "status",
+
+        requestId,
+
+        label:
+          "Thinking on this device...",
+      });
+
+      const stream =
+        await engine
+          .chat
+          .completions
+          .create({
+            messages,
+
+            stream:
+              true,
+
+            max_tokens:
+              maxOutputTokens,
+
+            temperature:
+              0.7,
+          });
+
+      let finishReason =
+        "end_turn";
+
+      for await (
+        const chunk of
+          stream
+      ) {
+        if (
+          activeRequestId !==
+          requestId
+        ) {
+          return;
+        }
+
+        const choice =
+          chunk
+            .choices?.[0];
+
+        const text =
+          choice
+            ?.delta
+            ?.content ??
+          "";
+
+        if (
+          text
+        ) {
+          emittedText =
+            true;
+
+          self.postMessage({
+            type:
+              "delta",
+
+            requestId,
+
+            text,
+          });
+        }
+
+        if (
+          choice
+            ?.finish_reason ===
+          "length"
+        ) {
+          finishReason =
+            "max_tokens";
+        }
+      }
+
+      if (
+        activeRequestId ===
+        requestId
+      ) {
+        activeRequestId =
+          null;
+
+        self.postMessage({
+          type:
+            "done",
+
+          requestId,
+
+          finishReason,
+
+          modelId,
+        });
+      }
+
+      return;
+    } catch (
+      cause
+    ) {
+      lastError =
+        cause;
+
+      /*
+       * Never restart with a second model after visible text has already been
+       * emitted. Doing so would splice two answers together.
+       */
+      if (
+        emittedText
+      ) {
+        break;
+      }
+
+      if (
+        engine &&
+        typeof engine.unload ===
+          "function"
+      ) {
+        try {
+          await engine.unload();
+        } catch {
+          // The next ensureEngine call will still replace the stale engine.
+        }
+      }
+
+      engine =
+        null;
+
+      loadedModelId =
+        null;
+    }
+  }
+
+  if (
+    activeRequestId ===
+    requestId
+  ) {
+    activeRequestId =
+      null;
+  }
+
+  self.postMessage({
+    type:
+      "error",
+
+    requestId,
+
+    message:
+      lastError instanceof
+        Error
+        ? lastError.message
+        : "On-device inference failed.",
+  });
 }
 
 self.addEventListener(
