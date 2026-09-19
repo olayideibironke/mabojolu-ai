@@ -46,7 +46,7 @@ describe(
   "Mabojolu G runtime hierarchical goal reasoning",
   () => {
     it(
-      "turns a learned multi-step plan into dependency-ordered subgoals and completes the hierarchy",
+      "autonomously decomposes the high-level goal into causal prerequisite subgoals and completes the hierarchy",
       () => {
         const model =
           new WorldModel();
@@ -144,14 +144,16 @@ describe(
           subgoals[1]
             ?.dependsOnGoalIds,
         ).toEqual([
-          "hierarchy-step-1",
+          "autonomous-subgoal-1",
         ]);
 
         expect(
           subgoals[2]
-            ?.dependsOnGoalIds,
+            ?.dependsOnGoalIds
+            ?.sort(),
         ).toEqual([
-          "hierarchy-step-2",
+          "autonomous-subgoal-1",
+          "autonomous-subgoal-2",
         ]);
 
         expect(
@@ -160,9 +162,23 @@ describe(
               goal.description,
           ),
         ).toEqual([
-          "Reach modeled state after action A.",
-          "Reach modeled state after action C.",
-          "Reach modeled state after action B.",
+          "Make power equal true.",
+          "Make latch equal true.",
+          "Make vaultOpen equal true.",
+        ]);
+
+        expect(
+          result
+            .autonomousDecomposition
+            ?.goals
+            .map(
+              (goal) =>
+                goal.action,
+            ),
+        ).toEqual([
+          "A",
+          "C",
+          "B",
         ]);
       },
     );
@@ -225,8 +241,13 @@ describe(
           cognitiveSubgoals[1]
             ?.dependsOnGoalIds,
         ).toEqual([
-          "hierarchy-step-1",
+          "autonomous-subgoal-1",
         ]);
+
+        expect(
+          result
+            .autonomousDecomposition,
+        ).toBeDefined();
       },
     );
   },
