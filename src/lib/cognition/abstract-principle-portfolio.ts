@@ -944,6 +944,32 @@ export class AbstractPrinciplePortfolioController {
           },
 
           ...(selected
+              .composedContextProjection
+            ? {
+                composedContextProjection: {
+                  featureId:
+                    selected
+                      .composedContextProjection
+                      .featureId,
+
+                  components: [
+                    selected
+                      .composedContextProjection
+                      .components[0],
+                    selected
+                      .composedContextProjection
+                      .components[1],
+                  ],
+
+                  projectionKey:
+                    selected
+                      .composedContextProjection
+                      .projectionKey,
+                },
+              }
+            : {}),
+
+          ...(selected
               .learnedContextProjection
             ? {
                 learnedContextProjection: {
@@ -999,6 +1025,32 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .composedContextProjection
+        ? {
+            composedContextProjection: {
+              featureId:
+                selected
+                  .composedContextProjection
+                  .featureId,
+
+              components: [
+                selected
+                  .composedContextProjection
+                  .components[0],
+                selected
+                  .composedContextProjection
+                  .components[1],
+              ],
+
+              projectionKey:
+                selected
+                  .composedContextProjection
+                  .projectionKey,
+            },
+          }
+        : {}),
 
       ...(selected
           .learnedContextProjection
@@ -1061,6 +1113,32 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .composedContextProjection
+              ? {
+                  composedContextProjection: {
+                    featureId:
+                      selection
+                        .composedContextProjection
+                        .featureId,
+
+                    components: [
+                      selection
+                        .composedContextProjection
+                        .components[0],
+                      selection
+                        .composedContextProjection
+                        .components[1],
+                    ],
+
+                    projectionKey:
+                      selection
+                        .composedContextProjection
+                        .projectionKey,
+                  },
+                }
+              : {}),
 
             ...(selection
                 .learnedContextProjection
