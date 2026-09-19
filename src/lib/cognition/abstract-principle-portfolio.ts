@@ -841,49 +841,47 @@ export class AbstractPrinciplePortfolioController {
             : predicate
               ? {
                   symbolicPredicateProjection: {
-            ? {
-                symbolicPredicateProjection: {
-                  programId:
-                    predicate
-                      .projection
-                      .programId,
+                    programId:
+                      predicate
+                        .projection
+                        .programId,
 
-                  left:
-                    predicate
-                      .projection
-                      .left,
+                    left:
+                      predicate
+                        .projection
+                        .left,
 
-                  right:
-                    predicate
-                      .projection
-                      .right,
+                    right:
+                      predicate
+                        .projection
+                        .right,
 
-                  operator:
-                    predicate
-                      .projection
-                      .operator,
+                    operator:
+                      predicate
+                        .projection
+                        .operator,
 
-                  ...(predicate
-                      .projection
-                      .parameter !==
-                    undefined
-                    ? {
-                        parameter:
-                          predicate
-                            .projection
-                            .parameter,
-                      }
-                    : {}),
+                    ...(predicate
+                        .projection
+                        .parameter !==
+                      undefined
+                      ? {
+                          parameter:
+                            predicate
+                              .projection
+                              .parameter,
+                        }
+                      : {}),
 
-                  predicateValue:
-                    predicate
-                      .projection
-                      .predicateValue,
+                    predicateValue:
+                      predicate
+                        .projection
+                        .predicateValue,
 
-                  projectionKey:
-                    predicate
-                      .projection
-                      .projectionKey,
+                    projectionKey:
+                      predicate
+                        .projection
+                        .projectionKey,
                   },
                 }
               : {}),
@@ -1212,49 +1210,47 @@ export class AbstractPrinciplePortfolioController {
             : predicate
               ? {
                   symbolicPredicateProjection: {
-            ? {
-                symbolicPredicateProjection: {
-                  programId:
-                    predicate
-                      .projection
-                      .programId,
+                    programId:
+                      predicate
+                        .projection
+                        .programId,
 
-                  left:
-                    predicate
-                      .projection
-                      .left,
+                    left:
+                      predicate
+                        .projection
+                        .left,
 
-                  right:
-                    predicate
-                      .projection
-                      .right,
+                    right:
+                      predicate
+                        .projection
+                        .right,
 
-                  operator:
-                    predicate
-                      .projection
-                      .operator,
+                    operator:
+                      predicate
+                        .projection
+                        .operator,
 
-                  ...(predicate
-                      .projection
-                      .parameter !==
-                    undefined
-                    ? {
-                        parameter:
-                          predicate
-                            .projection
-                            .parameter,
-                      }
-                    : {}),
+                    ...(predicate
+                        .projection
+                        .parameter !==
+                      undefined
+                      ? {
+                          parameter:
+                            predicate
+                              .projection
+                              .parameter,
+                        }
+                      : {}),
 
-                  predicateValue:
-                    predicate
-                      .projection
-                      .predicateValue,
+                    predicateValue:
+                      predicate
+                        .projection
+                        .predicateValue,
 
-                  projectionKey:
-                    predicate
-                      .projection
-                      .projectionKey,
+                    projectionKey:
+                      predicate
+                        .projection
+                        .projectionKey,
                   },
                 }
               : {}),
