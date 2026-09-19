@@ -395,6 +395,14 @@ describe(
           "practice-beta",
         );
 
+        if (
+          !first
+        ) {
+          throw new Error(
+            "Expected an initial curriculum recommendation.",
+          );
+        }
+
         const firstRun =
           new CognitiveRuntime(
             new CurriculumVaultWorld(
@@ -459,6 +467,14 @@ describe(
           "practice-alpha",
         );
 
+        if (
+          !second
+        ) {
+          throw new Error(
+            "Expected a second curriculum recommendation.",
+          );
+        }
+
         const secondRun =
           new CognitiveRuntime(
             new CurriculumVaultWorld(
@@ -522,6 +538,14 @@ describe(
         ).toBe(
           "advanced-renamed",
         );
+
+        if (
+          !third
+        ) {
+          throw new Error(
+            "Expected the advanced curriculum recommendation.",
+          );
+        }
 
         expect(
           competence
