@@ -198,7 +198,7 @@ export function HandoverPrompt({
               <Button
                 variant="ghost"
                 onClick={() =>
-                  setIsOpen(
+                  onOpenChange(
                     false,
                   )
                 }
