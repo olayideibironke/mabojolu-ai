@@ -11,6 +11,10 @@ import type {
 } from "./abstract-principle-portfolio";
 
 import type {
+  ComposedContextFeatureApplicabilityModel,
+} from "./context-feature-composition";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
 } from "./context-feature-learning";
 
@@ -229,6 +233,13 @@ export interface CognitiveRuntimeOptions {
    */
   learnedContextFeatureApplicabilityModel?:
     LearnedContextFeatureApplicabilityModel;
+
+  /**
+   * Cross-episode learner that constructs pairwise structural context features
+   * when combinations predict principle usefulness beyond any atomic feature.
+   */
+  composedContextFeatureApplicabilityModel?:
+    ComposedContextFeatureApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -506,6 +517,10 @@ export class CognitiveRuntime {
           learnedContextFeatureApplicabilityModel:
             options
               .learnedContextFeatureApplicabilityModel,
+
+          composedContextFeatureApplicabilityModel:
+            options
+              .composedContextFeatureApplicabilityModel,
         });
 
     this.abstractPrincipleController =
