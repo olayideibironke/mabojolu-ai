@@ -27,6 +27,10 @@ import type {
 } from "./validated-predicate-search";
 
 import type {
+  AdaptiveValidatedPredicateApplicabilityModel,
+} from "./adaptive-predicate-champion";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
 } from "./context-feature-learning";
 
@@ -273,6 +277,13 @@ export interface CognitiveRuntimeOptions {
    */
   validatedSymbolicPredicateApplicabilityModel?:
     ValidatedSymbolicPredicateApplicabilityModel;
+
+  /**
+   * Validated symbolic predicate champion with fresh-reserve drift detection,
+   * challenger fitting, held-out comparison, and controlled replacement.
+   */
+  adaptiveValidatedPredicateApplicabilityModel?:
+    AdaptiveValidatedPredicateApplicabilityModel;
 }
 
 export interface CognitiveRunResult {
@@ -566,6 +577,10 @@ export class CognitiveRuntime {
           validatedSymbolicPredicateApplicabilityModel:
             options
               .validatedSymbolicPredicateApplicabilityModel,
+
+          adaptiveValidatedPredicateApplicabilityModel:
+            options
+              .adaptiveValidatedPredicateApplicabilityModel,
         });
 
     this.abstractPrincipleController =
