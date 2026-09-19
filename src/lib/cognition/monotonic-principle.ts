@@ -511,34 +511,37 @@ export class MonotonicProgressPrincipleController {
       !principle ||
       principle.status !==
         "active" ||
-      !input.accepted ||
-      input.changedKeys
-        .length !==
-        1
+      !input.accepted
     ) {
       return;
     }
 
-    const key =
-      input.changedKeys[0];
+    const hasNumericIncrease =
+      input.changedKeys.some(
+        (key) => {
+          const before =
+            input.before[
+              key
+            ];
 
-    const before =
-      input.before[
-        key
-      ];
+          const after =
+            input.after[
+              key
+            ];
 
-    const after =
-      input.after[
-        key
-      ];
+          return (
+            typeof before ===
+              "number" &&
+            typeof after ===
+              "number" &&
+            after >
+              before
+          );
+        },
+      );
 
     if (
-      typeof before ===
-        "number" &&
-      typeof after ===
-        "number" &&
-      after >
-        before
+      hasNumericIncrease
     ) {
       this.candidateAction =
         input.action;
