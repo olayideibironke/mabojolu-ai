@@ -63,6 +63,35 @@ const serverEnvSchema = z.object({
   ANTHROPIC_API_KEY:
     z.string().min(1).optional(),
 
+  /** Public Mabojolu origin used to construct OAuth callback URLs. */
+  MABOJOLU_APP_URL:
+    z.string().url().optional(),
+
+  /**
+   * Server-only secret used to encrypt connected-plugin access and refresh
+   * tokens before persistence.
+   */
+  MABOJOLU_PLUGIN_ENCRYPTION_KEY:
+    z.string().min(32).optional(),
+
+  GOOGLE_OAUTH_CLIENT_ID:
+    z.string().min(1).optional(),
+
+  GOOGLE_OAUTH_CLIENT_SECRET:
+    z.string().min(1).optional(),
+
+  MICROSOFT_OAUTH_CLIENT_ID:
+    z.string().min(1).optional(),
+
+  MICROSOFT_OAUTH_CLIENT_SECRET:
+    z.string().min(1).optional(),
+
+  GITHUB_OAUTH_CLIENT_ID:
+    z.string().min(1).optional(),
+
+  GITHUB_OAUTH_CLIENT_SECRET:
+    z.string().min(1).optional(),
+
   /**
    * Local Ollama HTTP endpoint.
    *
