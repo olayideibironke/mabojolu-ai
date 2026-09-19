@@ -647,6 +647,15 @@ class RelationalHeldOutWorld
       ];
     }
 
+    if (
+      this.level >=
+        2
+    ) {
+      return [
+        "TRY-GOAL",
+      ];
+    }
+
     return [
       "TRY-GOAL",
       "ADVANCE",
