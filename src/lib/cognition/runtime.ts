@@ -194,11 +194,13 @@ export interface CognitiveRunResult {
  *
  * Action-selection priority:
  *
- * 1. Use a causal world-model plan when enough knowledge exists.
- * 2. Use recalled successful episode knowledge when available.
- * 3. Experiment with never-tried actions.
- * 4. Re-test actions whose effect may depend on changed state.
- * 5. Continue state-specific exploration.
+ * 1. Run an information-seeking scientific-discovery setup when needed.
+ * 2. Use a causal world-model plan when enough knowledge exists.
+ * 3. Use a directly applicable repeatedly supported skill.
+ * 4. Compose multiple learned skills when no single skill reaches the goal.
+ * 5. Test a learned skill's relational structure under renamed target symbols.
+ * 6. Use broader structural transfer or same-environment episodic transfer.
+ * 7. Run causal-hypothesis experiments and evidence-driven exploration.
  *
  * Every real transition is fed back into the world model, so incorrect
  * predictions become contradiction evidence rather than permanent assumptions.
