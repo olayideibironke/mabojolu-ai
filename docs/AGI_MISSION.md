@@ -115,6 +115,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   policy principle with measured improvement in a third unfamiliar family;
 - competing higher-order abstractions with per-episode contextual selection and
   measured improvement in a fourth unfamiliar family;
+- learned principle applicability from cross-episode application outcomes with
+  explicit priors and principle-specific utility feedback;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -124,38 +126,36 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is learned principle applicability:
+The current central intelligence milestone is induced structural context
+signatures for abstraction applicability:
 
-1. preserve the existing abstraction portfolio and its independent evidence;
-2. represent target contexts with generic, symbol-free features rather than
-   source action or state names;
-3. start unseen principle/context pairs from an explicit uncertainty prior;
-4. update applicability from actual outcomes of selected principles across
-   episodes;
-5. distinguish learned evidence from an untrained model prior in the audit
-   trail;
-6. define usefulness in a principle-specific way so irrelevant state changes do
-   not create false positive evidence;
-7. allow learned applicability estimates to override the earlier fixed
-   heuristic preference when experience disagrees;
-8. verify that prior application experience improves selection in a later
-   held-out conflict relative to the same model without application evidence.
+1. derive applicability context directly from raw target-world transition
+   history rather than requiring hand-authored semantic labels such as
+   numeric/nonnumeric or productive-repeat/deferred-action as the evidence key;
+2. discard source action labels and state-variable names from the resulting
+   signature;
+3. retain only structural relations such as prior candidate effects, change
+   arity, value-transition shape, action recurrence, and temporal distance;
+4. assign an explicit uncertainty prior to unseen principle/signature pairs;
+5. learn applicability independently for each principle and induced signature;
+6. transfer that learned applicability across renamed actions and renamed state
+   variables when the underlying structural signature matches;
+7. keep persistent signature-level evidence separate from per-episode raw
+   history and bindings;
+8. compare a calibrated signature model against an identical uncalibrated model
+   on a held-out conflict.
 
-The initial generic context features are deliberately small: progress type
-(numeric, nonnumeric, or none) and candidate relation (productive repeat or
-deferred action). Applicability is estimated independently for each
-principle/context pair with an explicit Beta prior.
+The signature encoder is deterministic and symbol-independent. It observes raw
+before/after values and action recurrence, then emits a canonical structural
+signature containing no source symbols. The applicability learner uses that
+signature as its evidence key.
 
-For productive-repeat abstractions, successful evidence requires another numeric
-increase. For deferred-goal abstractions, successful evidence requires the retry
-to satisfy the environment goal. A changed but irrelevant distractor state is
-not sufficient.
-
-Even if verified, this remains controlled applicability learning, not AGI. The
-next stronger step should learn richer context representations or features from
-experience itself, rather than relying on this small hand-designed generic
-feature vocabulary, and should test calibration under sparse, noisy, and
-contradictory applicability evidence.
+This is a stronger removal of hand-authored semantic applicability categories,
+but it is not yet learned latent representation discovery. The structural
+feature vocabulary itself is still engineered. A later milestone should learn
+or compress useful context dimensions from broader experience, test robustness
+to irrelevant observations and noisy transitions, and determine whether the
+learned representation transfers beyond structurally isomorphic histories.
 
 ## Safety and audit principle
 
