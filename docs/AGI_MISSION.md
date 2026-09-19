@@ -113,6 +113,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   threshold causal structures with explicit negative-transfer boundaries;
 - controlled cross-family induction of a symbol-independent higher-order
   policy principle with measured improvement in a third unfamiliar family;
+- competing higher-order abstractions with per-episode contextual selection and
+  measured improvement in a fourth unfamiliar family;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -122,41 +124,38 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is competing abstractions with
-contextual principle selection:
+The current central intelligence milestone is learned principle applicability:
 
-1. induce more than one higher-order principle from independent cross-family
-   evidence;
-2. keep each principle's support, contradictions, confidence, and provenance
-   separate;
-3. keep persistent principle evidence separate from per-episode target binding
-   state;
-4. allow multiple active principles to become simultaneously eligible in a new
-   target environment;
-5. estimate target applicability from directly observed evidence rather than
-   source symbols;
-6. score competing recommendations using contextual applicability and learned
-   evidence confidence;
-7. select the principle with the strongest current fit, while preserving the
-   other principle for later evidence in the same episode;
-8. verify that contextual selection improves a fourth unfamiliar family beyond
-   both no abstraction and a single broad abstraction.
+1. preserve the existing abstraction portfolio and its independent evidence;
+2. represent target contexts with generic, symbol-free features rather than
+   source action or state names;
+3. start unseen principle/context pairs from an explicit uncertainty prior;
+4. update applicability from actual outcomes of selected principles across
+   episodes;
+5. distinguish learned evidence from an untrained model prior in the audit
+   trail;
+6. define usefulness in a principle-specific way so irrelevant state changes do
+   not create false positive evidence;
+7. allow learned applicability estimates to override the earlier fixed
+   heuristic preference when experience disagrees;
+8. verify that prior application experience improves selection in a later
+   held-out conflict relative to the same model without application evidence.
 
-The two controlled principles under test are:
+The initial generic context features are deliberately small: progress type
+(numeric, nonnumeric, or none) and candidate relation (productive repeat or
+deferred action). Applicability is estimated independently for each
+principle/context pair with an explicit Beta prior.
 
-- retry a previously deferred no-effect goal action after observable progress;
-- after directly observing monotonic numeric progress, repeat that productive
-  action once before returning to the deferred goal attempt.
+For productive-repeat abstractions, successful evidence requires another numeric
+increase. For deferred-goal abstractions, successful evidence requires the retry
+to satisfy the environment goal. A changed but irrelevant distractor state is
+not sufficient.
 
-A fourth-family task is constructed so both principles become plausible after
-the same observation but recommend different actions. The portfolio must first
-select the more specific numeric-progress abstraction, then later select the
-broader deferred-goal abstraction when the numeric repeat has been consumed.
-
-Even if verified, this is still controlled abstraction selection, not AGI.
-Later work must learn applicability models from broader evidence rather than
-using only hand-engineered contextual features, expand the abstraction set, and
-remain robust when principles conflict, partially apply, or fail.
+Even if verified, this remains controlled applicability learning, not AGI. The
+next stronger step should learn richer context representations or features from
+experience itself, rather than relying on this small hand-designed generic
+feature vocabulary, and should test calibration under sparse, noisy, and
+contradictory applicability evidence.
 
 ## Safety and audit principle
 
