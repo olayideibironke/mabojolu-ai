@@ -11,7 +11,7 @@ import {
 
 import {
   EvaluationIsolationGuard,
-  challengeFingerprint,
+  challengeInstanceFingerprint,
   type GatedSequenceChallengeSpec,
 } from "./synthetic-challenge";
 
@@ -447,7 +447,7 @@ export class AutonomousChallengeGenerator {
     this.generatedPracticeFingerprints
       .set(
         spec.id,
-        challengeFingerprint(
+        challengeInstanceFingerprint(
           spec,
         ),
       );
@@ -502,7 +502,7 @@ export class AutonomousChallengeGenerator {
     if (
       !expectedFingerprint ||
       expectedFingerprint !==
-        challengeFingerprint(
+        challengeInstanceFingerprint(
           input.challenge,
         )
     ) {
