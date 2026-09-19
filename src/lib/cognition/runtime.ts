@@ -170,6 +170,13 @@ export interface CognitiveRuntimeOptions {
     string;
 
   /**
+   * Structural family-kind identity. Abstraction activation requires evidence
+   * from more than one distinct family kind, not merely renamed family labels.
+   */
+  taskFamilyKind?:
+    string;
+
+  /**
    * Cross-family higher-order principle store.
    */
   abstractPrincipleLibrary?:
@@ -349,6 +356,10 @@ export class CognitiveRuntime {
     string |
     undefined;
 
+  private readonly taskFamilyKind:
+    string |
+    undefined;
+
   private readonly abstractPrincipleLibrary:
     CrossFamilyPrincipleLibrary |
     undefined;
@@ -412,6 +423,9 @@ export class CognitiveRuntime {
 
     this.taskFamily =
       options.taskFamily;
+
+    this.taskFamilyKind =
+      options.taskFamilyKind;
 
     this.abstractPrincipleLibrary =
       options.abstractPrincipleLibrary;
@@ -3003,6 +3017,7 @@ export class CognitiveRuntime {
     if (
       this.abstractPrincipleLibrary &&
       this.taskFamily &&
+      this.taskFamilyKind &&
       goalConditions &&
       completedAt &&
       episodeEvidenceId
@@ -3014,6 +3029,9 @@ export class CognitiveRuntime {
 
           family:
             this.taskFamily,
+
+          familyKind:
+            this.taskFamilyKind,
 
           solved,
 
@@ -3177,6 +3195,11 @@ export class CognitiveRuntime {
               supportFamilies: [
                 ...abstractPrinciple
                   .supportFamilies,
+              ],
+
+              supportFamilyKinds: [
+                ...abstractPrinciple
+                  .supportFamilyKinds,
               ],
 
               supportEpisodeIds: [
