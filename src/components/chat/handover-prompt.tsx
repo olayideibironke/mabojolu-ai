@@ -1,7 +1,6 @@
 "use client";
 
 import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -23,8 +22,14 @@ interface HandoverPromptProps {
   packet:
     string;
 
-  openRequestKey?:
-    number;
+  isOpen:
+    boolean;
+
+  onOpenChange:
+    (
+      isOpen:
+        boolean,
+    ) => void;
 
   onContinueInNewChat:
     (
@@ -36,31 +41,14 @@ interface HandoverPromptProps {
 export function HandoverPrompt({
   level,
   packet,
-  openRequestKey = 0,
+  isOpen,
+  onOpenChange,
   onContinueInNewChat,
 }: HandoverPromptProps) {
-  const [
-    isOpen,
-    setIsOpen,
-  ] = useState(false);
-
   const [
     copied,
     setCopied,
   ] = useState(false);
-
-  useEffect(() => {
-    if (
-      openRequestKey >
-        0
-    ) {
-      setIsOpen(
-        true,
-      );
-    }
-  }, [
-    openRequestKey,
-  ]);
 
   const heading =
     level ===
@@ -146,7 +134,7 @@ export function HandoverPrompt({
               size="sm"
               variant="secondary"
               onClick={() =>
-                setIsOpen(
+                onOpenChange(
                   true,
                 )
               }
@@ -172,7 +160,7 @@ export function HandoverPrompt({
               event.target ===
                 event.currentTarget
             ) {
-              setIsOpen(
+              onOpenChange(
                 false,
               );
             }
@@ -236,7 +224,7 @@ export function HandoverPrompt({
 
                 <Button
                   onClick={() => {
-                    setIsOpen(
+                    onOpenChange(
                       false,
                     );
 
