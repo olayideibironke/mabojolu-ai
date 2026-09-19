@@ -193,19 +193,90 @@ function validateCommonBlueprint(
 
   if (
     blueprint.kind ===
-      "threshold-accumulation" &&
-    (
-      !Number.isInteger(
-        blueprint.target,
-      ) ||
-      blueprint.target <
-        2 ||
-      blueprint.target >
-        4
-    )
+      "gated-sequence"
+  ) {
+    if (
+      new Set(
+        blueprint
+          .practiceActionLabels,
+      ).size !==
+        3 ||
+      new Set(
+        blueprint
+          .practiceStateKeys,
+      ).size !==
+        3
+    ) {
+      throw new Error(
+        "Gated-sequence blueprint labels and state keys must be unique.",
+      );
+    }
+
+    const roles = [
+      ...blueprint
+        .practiceActionRoleOrder,
+    ].sort();
+
+    if (
+      roles[0] !==
+        0 ||
+      roles[1] !==
+        1 ||
+      roles[2] !==
+        2
+    ) {
+      throw new Error(
+        "Gated-sequence blueprint roles must be a permutation of 0, 1, and 2.",
+      );
+    }
+
+    return;
+  }
+
+  if (
+    !Number.isInteger(
+      blueprint.target,
+    ) ||
+    blueprint.target <
+      2 ||
+    blueprint.target >
+      4
   ) {
     throw new Error(
       "Threshold blueprint target must be an integer between 2 and 4.",
+    );
+  }
+
+  if (
+    new Set(
+      blueprint
+        .practiceActionLabels,
+    ).size !==
+      2 ||
+    new Set(
+      blueprint
+        .practiceStateKeys,
+    ).size !==
+      2
+  ) {
+    throw new Error(
+      "Threshold blueprint labels and state keys must be unique.",
+    );
+  }
+
+  const roles = [
+    ...blueprint
+      .practiceActionRoleOrder,
+  ].sort();
+
+  if (
+    roles[0] !==
+      0 ||
+    roles[1] !==
+      1
+  ) {
+    throw new Error(
+      "Threshold blueprint roles must be a permutation of 0 and 1.",
     );
   }
 }
