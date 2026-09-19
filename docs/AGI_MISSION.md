@@ -127,6 +127,8 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   ordering structure to value combinations withheld during calibration;
 - complexity-regularized symbolic predicate search with explicit simplicity
   bias, contradictory-evidence testing, and transfer beyond basic relations;
+- one-shot held-out predicate validation that freezes fitted programs, rejects
+  failed holdouts, and keeps validation evidence out of applicability training;
 - local-first and browser-owned inference routing.
 
 These are research building blocks. They do not by themselves establish AGI.
@@ -136,48 +138,55 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-The current central intelligence milestone is held-out predicate validation and
-anti-overfitting:
+The current central intelligence milestone is fresh-reserve challenger/champion
+predicate adaptation under concept drift:
 
-1. fit symbolic predicate programs on one evidence partition only;
-2. freeze the selected program before any validation evidence is observed;
-3. route the next evidence partition into a sequestered validation set that
-   cannot change which program was selected;
-4. infer the frozen program's prediction orientation from fit evidence only;
-5. require held-out accuracy to exceed both a minimum threshold and the
-   majority-class validation baseline;
-6. reject fitted programs that fail held-out validation rather than allowing
-   them to influence action selection;
-7. keep validation outcomes out of post-approval applicability counts so the
-   holdout is not silently converted into training evidence;
-8. expose the fit count, validation count, frozen program id, validation
-   accuracy, baseline accuracy, and validation status in the audit trail;
-9. verify in the cognitive runtime that a fitted-but-unvalidated rule cannot
-   override older evidence, while the same rule can do so only after approval.
+1. bootstrap an initial symbolic champion through the verified fit/freeze/holdout
+   process before allowing it to affect action selection;
+2. monitor the validated champion only on fresh operational outcomes;
+3. detect degradation from a bounded recent correctness window rather than from
+   training or holdout scores;
+4. keep the drift-trigger window as incumbent operational evidence and never
+   reuse it as challenger fitting data;
+5. start challenger fitting only on outcomes observed after the drift trigger;
+6. freeze the challenger before its own validation reserve begins;
+7. compare challenger accuracy, incumbent champion accuracy, and the
+   majority-class baseline on exactly the same fresh challenger holdout;
+8. replace the champion only when the challenger exceeds the minimum validation
+   threshold and strictly beats both incumbent and baseline;
+9. retain the incumbent when the challenger fails that comparison;
+10. exclude challenger validation outcomes from the replacement champion's
+    applicability evidence after promotion;
+11. expose champion generation, replacement count, drift-window state,
+    challenger fit/validation counts, and the last comparison result in the
+    audit trail.
 
-The first controlled validation protocol is deliberately one-shot per principle.
-The first six qualifying application outcomes form the fit set. The next three
-form the holdout. Once the fit set closes, the winning v0.8 program is frozen.
-Validation may approve or reject that exact program but cannot search for a new
-one.
+The first controlled drift protocol uses a three-outcome operational correctness
+window. When champion accuracy across that complete window falls to 0.5 or
+below, Mabojolu opens a challenger cycle. The trigger observations remain part
+of the incumbent's operational history but the challenger starts with an empty
+fit partition.
 
-The controlled positive case fits the same structural predicate demonstrated in
-v0.8, then validates it on unseen combinations with both positive and negative
-outcomes. A separate falsification test gives the frozen program contradictory
-holdout labels and requires rejection.
+The controlled replacement experiment first validates an equality-based
+champion. A later distribution shift makes one-step differences useful. After
+three fresh incumbent errors, the challenger receives six new fit outcomes and
+then three additional held-out outcomes. The challenger learns
+abs(historyLength - distinctActionsSeen) <= 1 and replaces the equality champion
+only because it reaches perfect fresh-holdout accuracy while the incumbent and
+majority baseline each reach only two-thirds.
 
-The runtime test adds an older semantic applicability model that prefers the
-wrong deferred-goal abstraction. While the symbolic program is still validating,
-that older evidence remains in control. After the frozen program passes held-out
-validation, the validated predicate becomes the highest-trust applicability
-layer and can override the older model on an unseen target context.
+The runtime comparison keeps a frozen v0.9 equality champion as the control. On
+the same post-drift 3+/2 target, the frozen champion selects the wrong
+higher-order abstraction first and needs an extra cycle. The v1.0 adaptive model
+uses its generation-2 champion to choose the productive repeat immediately.
 
-Even if verified, this remains a controlled one-shot validation protocol. It
-does not yet solve adaptive validation reuse, concept drift, continual model
-replacement, multiple-testing correction across a growing grammar, or external
-benchmark leakage. Stronger work should add challenger/champion replacement,
-fresh validation reserves, calibration under distribution shift, and explicit
-controls against repeatedly tuning to the same holdout.
+Even if verified, this remains a small controlled drift protocol. It does not
+yet solve gradual drift, noisy change-point detection, repeated challenger
+search under multiple-testing pressure, rollback after a bad promotion,
+catastrophic forgetting across older regimes, or adaptive allocation of finite
+validation reserves. Stronger work should add reversible champion history,
+statistical drift confidence, regime memory, and safeguards against repeatedly
+searching until a challenger happens to pass by chance.
 
 ## Safety and audit principle
 
