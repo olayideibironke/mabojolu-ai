@@ -5,7 +5,6 @@ import {
   isGooglePluginProvider,
   type PluginProviderId,
 } from "./registry";
-import { serverEnv } from "@/lib/env";
 
 export interface PluginOAuthConfig {
   providerId:
@@ -33,20 +32,51 @@ export function pluginOAuthConfig(
 ):
   PluginOAuthConfig |
   null {
-  const env =
-    serverEnv();
+  const rawAppUrl =
+    process.env.MABOJOLU_APP_URL
+      ?.trim();
 
-  const appUrl =
-    env.MABOJOLU_APP_URL
-      ?.replace(
-        /\/+$/,
-        "",
-      );
+  const encryptionKey =
+    process.env
+      .MABOJOLU_PLUGIN_ENCRYPTION_KEY
+      ?.trim();
 
   if (
-    !appUrl ||
-    !env.MABOJOLU_PLUGIN_ENCRYPTION_KEY
+    !rawAppUrl ||
+    !encryptionKey ||
+    encryptionKey.length < 32
   ) {
+    return null;
+  }
+
+  let appUrl:
+    string;
+
+  try {
+    const parsed =
+      new URL(
+        rawAppUrl,
+      );
+
+    if (
+      parsed.protocol !==
+        "https:" &&
+      parsed.hostname !==
+        "localhost" &&
+      parsed.hostname !==
+        "127.0.0.1"
+    ) {
+      return null;
+    }
+
+    appUrl =
+      parsed
+        .toString()
+        .replace(
+          /\/+$/,
+          "",
+        );
+  } catch {
     return null;
   }
 
@@ -56,23 +86,29 @@ export function pluginOAuthConfig(
     )
       ? {
           clientId:
-            env.GOOGLE_OAUTH_CLIENT_ID,
+            process.env
+              .GOOGLE_OAUTH_CLIENT_ID,
           clientSecret:
-            env.GOOGLE_OAUTH_CLIENT_SECRET,
+            process.env
+              .GOOGLE_OAUTH_CLIENT_SECRET,
         }
       : providerId ===
           "microsoft"
         ? {
             clientId:
-              env.MICROSOFT_OAUTH_CLIENT_ID,
+              process.env
+                .MICROSOFT_OAUTH_CLIENT_ID,
             clientSecret:
-              env.MICROSOFT_OAUTH_CLIENT_SECRET,
+              process.env
+                .MICROSOFT_OAUTH_CLIENT_SECRET,
           }
         : {
             clientId:
-              env.GITHUB_OAUTH_CLIENT_ID,
+              process.env
+                .GITHUB_OAUTH_CLIENT_ID,
             clientSecret:
-              env.GITHUB_OAUTH_CLIENT_SECRET,
+              process.env
+                .GITHUB_OAUTH_CLIENT_SECRET,
           };
 
   if (
