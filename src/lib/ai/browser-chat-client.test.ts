@@ -7,6 +7,8 @@ import {
 } from "vitest";
 
 import {
+  BROWSER_FAILURE_COOLDOWN_MS,
+  BROWSER_FAILURE_STORAGE_KEY,
   shouldUseBrowserChat,
 } from "./browser-chat-client";
 
@@ -135,6 +137,45 @@ describe(
               },
             ],
           }),
+        ).toBe(false);
+      },
+    );
+
+    it(
+      "temporarily falls back to Ollama after a browser-compute failure",
+      () => {
+        enableWebGpu();
+
+        vi.stubGlobal(
+          "window",
+          {
+            localStorage: {
+              getItem:
+                (
+                  key:
+                    string,
+                ) =>
+                  key ===
+                    BROWSER_FAILURE_STORAGE_KEY
+                    ? String(
+                        Date.now() +
+                          BROWSER_FAILURE_COOLDOWN_MS,
+                      )
+                    : null,
+
+              removeItem:
+                vi.fn(),
+
+              setItem:
+                vi.fn(),
+            },
+          },
+        );
+
+        expect(
+          shouldUseBrowserChat(
+            BASE_BODY,
+          ),
         ).toBe(false);
       },
     );
