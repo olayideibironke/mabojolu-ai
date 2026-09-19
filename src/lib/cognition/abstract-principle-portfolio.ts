@@ -1610,6 +1610,16 @@ export class AbstractPrinciplePortfolioController {
           },
 
           ...(selected
+              .predicateAdaptation
+            ? {
+                predicateAdaptation: {
+                  ...selected
+                    .predicateAdaptation,
+                },
+              }
+            : {}),
+
+          ...(selected
               .predicateValidation
             ? {
                 predicateValidation: {
@@ -1787,6 +1797,16 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .predicateAdaptation
+        ? {
+            predicateAdaptation: {
+              ...selected
+                .predicateAdaptation,
+            },
+          }
+        : {}),
 
       ...(selected
           .predicateValidation
@@ -1971,6 +1991,16 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .predicateAdaptation
+              ? {
+                  predicateAdaptation: {
+                    ...selection
+                      .predicateAdaptation,
+                  },
+                }
+              : {}),
 
             ...(selection
                 .predicateValidation
