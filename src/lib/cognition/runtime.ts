@@ -2507,27 +2507,67 @@ export class CognitiveRuntime {
       goalConditions &&
       completedAt
     ) {
-      this.skillLibrary
-        .learnFromEpisode({
-          episodeId:
-            recordedEpisodeId ??
-            this.environment.id +
-              "::" +
+      const skill =
+        this.skillLibrary
+          .learnFromEpisode({
+            episodeId:
+              recordedEpisodeId ??
+              this.environment.id +
+                "::" +
+                completedAt,
+
+            environmentId:
+              this.environment.id,
+
+            solved,
+
+            goalConditions,
+
+            transitions:
+              this.episodeTransitions,
+
+            observedAt:
               completedAt,
+          });
 
-          environmentId:
-            this.environment.id,
+      if (
+        skill?.status ===
+        "active"
+      ) {
+        this.apply({
+          type:
+            "learning.recorded",
 
-          solved,
+          learning: {
+            id:
+              this.nextId(
+                "learning",
+              ),
 
-          goalConditions,
+            kind:
+              "skill",
 
-          transitions:
-            this.episodeTransitions,
+            statement:
+              `Repeated successful experience supports reusable skill ${skill.id}: ${skill.steps
+                .map(
+                  (step) =>
+                    step.action,
+                )
+                .join(" -> ")}.`,
 
-          observedAt:
-            completedAt,
+            confidence:
+              skill.confidence,
+
+            derivedFromIds: [
+              ...skill
+                .sourceEpisodeIds,
+            ],
+
+            createdAt:
+              this.now(),
+          },
         });
+      }
     }
 
     return this.result(
