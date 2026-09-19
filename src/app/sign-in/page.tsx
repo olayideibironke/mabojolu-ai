@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { redirect } from "next/navigation";
 
 import { DevSignIn } from "@/components/auth/dev-sign-in";
@@ -63,7 +64,15 @@ export default async function SignInPage() {
 
         <div className="rounded-2xl border border-border-subtle bg-surface-raised p-5 shadow-sm">
           {authMode === "supabase" ? (
-            <EmailPasswordAuth />
+            <Suspense
+              fallback={
+                <div className="py-6 text-center text-sm text-text-muted">
+                  Preparing sign-in...
+                </div>
+              }
+            >
+              <EmailPasswordAuth />
+            </Suspense>
           ) : (
             <DevSignIn />
           )}
