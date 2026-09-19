@@ -393,7 +393,6 @@ class RelationalCalibrationWorld
     return [
       this.config
         .progressAction,
-      "FINISH",
     ];
   }
 
