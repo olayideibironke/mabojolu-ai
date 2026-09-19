@@ -24,9 +24,6 @@ export interface PrincipleApplicabilityObservation {
 
   useful:
     boolean;
-
-  observedAt:
-    string;
 }
 
 export interface PrincipleApplicabilityEstimate {
