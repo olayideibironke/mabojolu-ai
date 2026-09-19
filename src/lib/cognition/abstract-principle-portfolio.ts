@@ -3,6 +3,11 @@ import type {
 } from "./environment";
 
 import {
+  PrincipleApplicabilityModel,
+  type PrincipleApplicabilityContext,
+} from "./principle-applicability-model";
+
+import {
   AbstractPrincipleController,
   CrossFamilyPrincipleLibrary,
   type AbstractPrinciple,
@@ -39,6 +44,16 @@ export interface PrincipleSelection {
 
   score:
     number;
+
+  applicabilitySource:
+    "static" |
+    "learned";
+
+  applicabilityEvidenceCount:
+    number;
+
+  applicabilityContext:
+    PrincipleApplicabilityContext;
 }
 
 export interface AbstractPrinciplePortfolioSnapshot {
@@ -132,10 +147,14 @@ export class AbstractPrinciplePortfolio {
       );
   }
 
-  createController():
+  createController(input?: {
+    applicabilityModel?:
+      PrincipleApplicabilityModel;
+  }):
     AbstractPrinciplePortfolioController {
     return new AbstractPrinciplePortfolioController(
       this,
+      input?.applicabilityModel,
     );
   }
 
@@ -201,9 +220,27 @@ export class AbstractPrinciplePortfolioController {
   private readonly selections:
     PrincipleSelection[] = [];
 
+  private lastProgressKind:
+    PrincipleApplicabilityContext[
+      "progressKind"
+    ] = "none";
+
+  private pendingSelection:
+    {
+      selection:
+        PrincipleSelection;
+
+      action:
+        string;
+    } |
+    undefined;
+
   constructor(
     private readonly portfolio:
       AbstractPrinciplePortfolio,
+
+    private readonly applicabilityModel?:
+      PrincipleApplicabilityModel,
   ) {
     this.deferredController =
       new AbstractPrincipleController(
@@ -232,6 +269,45 @@ export class AbstractPrinciplePortfolioController {
     changedKeys:
       readonly string[];
   }): void {
+    if (
+      this.pendingSelection &&
+      this.pendingSelection
+        .action ===
+        input.action &&
+      this.applicabilityModel
+    ) {
+      this.applicabilityModel
+        .record({
+          principleId:
+            this.pendingSelection
+              .selection
+              .principleId,
+
+          context:
+            this.pendingSelection
+              .selection
+              .applicabilityContext,
+
+          useful:
+            input.accepted &&
+            input.changedKeys
+              .length >
+              0,
+
+          observedAt:
+            new Date()
+              .toISOString(),
+        });
+
+      this.pendingSelection =
+        undefined;
+    }
+
+    this.lastProgressKind =
+      this.progressKindFor(
+        input,
+      );
+
     this.deferredController
       .observeTransition({
         action:
@@ -283,6 +359,28 @@ export class AbstractPrinciplePortfolioController {
       if (
         principle
       ) {
+        const context:
+          PrincipleApplicabilityContext = {
+          progressKind:
+            this.lastProgressKind,
+
+          candidateRelation:
+            "deferred-action",
+        };
+
+        const learned =
+          this.applicabilityModel
+            ?.estimate(
+              deferred
+                .principleId,
+              context,
+            );
+
+        const applicability =
+          learned
+            ?.applicability ??
+          deferred.applicability;
+
         candidates.push({
           action:
             deferred.action,
@@ -296,13 +394,28 @@ export class AbstractPrinciplePortfolioController {
           confidence:
             deferred.confidence,
 
-          applicability:
-            deferred.applicability,
+          applicability,
 
           score:
-            selectionScore(
-              deferred,
-            ),
+            selectionScore({
+              confidence:
+                deferred.confidence,
+
+              applicability,
+            }),
+
+          applicabilitySource:
+            learned
+              ? "learned"
+              : "static",
+
+          applicabilityEvidenceCount:
+            learned
+              ?.evidenceCount ??
+            0,
+
+          applicabilityContext:
+            context,
         });
       }
     }
@@ -318,6 +431,28 @@ export class AbstractPrinciplePortfolioController {
       if (
         principle
       ) {
+        const context:
+          PrincipleApplicabilityContext = {
+          progressKind:
+            "numeric",
+
+          candidateRelation:
+            "productive-repeat",
+        };
+
+        const learned =
+          this.applicabilityModel
+            ?.estimate(
+              monotonic
+                .principleId,
+              context,
+            );
+
+        const applicability =
+          learned
+            ?.applicability ??
+          monotonic.applicability;
+
         candidates.push({
           action:
             monotonic.action,
@@ -331,13 +466,28 @@ export class AbstractPrinciplePortfolioController {
           confidence:
             monotonic.confidence,
 
-          applicability:
-            monotonic.applicability,
+          applicability,
 
           score:
-            selectionScore(
-              monotonic,
-            ),
+            selectionScore({
+              confidence:
+                monotonic.confidence,
+
+              applicability,
+            }),
+
+          applicabilitySource:
+            learned
+              ? "learned"
+              : "static",
+
+          applicabilityEvidenceCount:
+            learned
+              ?.evidenceCount ??
+            0,
+
+          applicabilityContext:
+            context,
         });
       }
     }
@@ -406,10 +556,38 @@ export class AbstractPrinciplePortfolioController {
 
     this.selections.push({
       ...selected,
+
+      applicabilityContext: {
+        ...selected
+          .applicabilityContext,
+      },
     });
+
+    if (
+      this.applicabilityModel
+    ) {
+      this.pendingSelection = {
+        selection: {
+          ...selected,
+
+          applicabilityContext: {
+            ...selected
+              .applicabilityContext,
+          },
+        },
+
+        action:
+          selected.action,
+      };
+    }
 
     return {
       ...selected,
+
+      applicabilityContext: {
+        ...selected
+          .applicabilityContext,
+      },
     };
   }
 
@@ -424,8 +602,63 @@ export class AbstractPrinciplePortfolioController {
         this.selections.map(
           (selection) => ({
             ...selection,
+
+            applicabilityContext: {
+              ...selection
+                .applicabilityContext,
+            },
           }),
         ),
     };
+  }
+
+  private progressKindFor(input: {
+    before:
+      EnvironmentSnapshot;
+
+    after:
+      EnvironmentSnapshot;
+
+    changedKeys:
+      readonly string[];
+  }):
+    PrincipleApplicabilityContext[
+      "progressKind"
+    ] {
+    if (
+      input.changedKeys
+        .length ===
+        0
+    ) {
+      return "none";
+    }
+
+    const hasNumericIncrease =
+      input.changedKeys.some(
+        (key) => {
+          const before =
+            input.before[
+              key
+            ];
+
+          const after =
+            input.after[
+              key
+            ];
+
+          return (
+            typeof before ===
+              "number" &&
+            typeof after ===
+              "number" &&
+            after >
+              before
+          );
+        },
+      );
+
+    return hasNumericIncrease
+      ? "numeric"
+      : "nonnumeric";
   }
 }
