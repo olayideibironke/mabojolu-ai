@@ -272,6 +272,19 @@ describe(
         ).toBe(4);
 
         expect(
+          second.state
+            .learnings
+            .some(
+              (learning) =>
+                learning.kind ===
+                  "skill" &&
+                learning.statement.includes(
+                  "A -> C -> B",
+                ),
+            ),
+        ).toBe(true);
+
+        expect(
           target.solved,
         ).toBe(true);
 
