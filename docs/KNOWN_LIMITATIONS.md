@@ -110,15 +110,18 @@ This is why uploads are disabled by default via
 **To close it.** Add a processing step that extracts text, sets `extracted_text`,
 and advances the status to `ready`. The status field and the column already exist.
 
-### 7. No memory between conversations
+### 7. No autonomous semantic memory between conversations
 
-Each conversation starts fresh. The product says so in its empty state, its
-settings, and its system prompt.
+A fresh conversation does not silently inherit a user's entire prior history.
+Mabojolu now has an explicit continuity handover: when a conversation approaches
+its effective context budget, the interface can prepare a compact, reviewable
+handover containing the original objective, earlier constraints/decisions, the
+latest user direction, and recent working context. The user can copy it or
+continue directly in a new Mabojolu chat.
 
-A memory interface is deliberately absent rather than half-built: the
-specification requires user review, deletion, and privacy controls before memory
-is enabled, and shipping storage without those would create a privacy problem
-that is hard to undo.
+This is deliberate continuity, not autonomous semantic memory. A broader memory
+interface is still absent because persistent cross-chat memory needs user review,
+deletion, privacy controls, provenance, and evaluation before it is enabled.
 
 ### 8. No web browsing, code execution, or tools
 
