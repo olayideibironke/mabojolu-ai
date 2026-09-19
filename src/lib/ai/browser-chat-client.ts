@@ -108,7 +108,10 @@ function workerInstance():
 
   sharedWorker =
     new Worker(
-      "/workers/mabojolu-webllm-worker.js",
+      new URL(
+        "./mabojolu-webllm-worker.ts",
+        import.meta.url,
+      ),
       {
         type:
           "module",
