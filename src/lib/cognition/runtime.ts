@@ -37,9 +37,20 @@ import {
 } from "./scientific-discovery";
 
 import {
+  SkillComposer,
+  type SkillCompositionPlan,
+} from "./skill-composer";
+
+import {
   AutonomousSkillLibrary,
   type SkillRecommendation,
 } from "./skill-library";
+
+import {
+  StructuralSkillTransferEngine,
+  type StructuralSkillTransferSession,
+  type StructuralSkillTransferState,
+} from "./structural-skill-transfer";
 
 import {
   createCognitiveState,
@@ -74,6 +85,8 @@ interface ActionAttempt {
 type ActionChoiceStrategy =
   | "world-model-plan"
   | "skill"
+  | "skill-composition"
+  | "structural-skill"
   | "structural-transfer"
   | "transfer"
   | "scientific-discovery-setup"
@@ -157,6 +170,12 @@ export interface CognitiveRunResult {
   recalledSkill?:
     SkillRecommendation;
 
+  skillComposition?:
+    SkillCompositionPlan;
+
+  structuralSkillTransfer?:
+    StructuralSkillTransferState;
+
   generatedHypotheses:
     AutonomousCausalHypothesis[];
 
@@ -222,6 +241,23 @@ export class CognitiveRuntime {
   private skillAbandoned =
     false;
 
+  private skillComposition:
+    SkillCompositionPlan |
+    undefined;
+
+  private skillCompositionIndex =
+    0;
+
+  private skillCompositionAbandoned =
+    false;
+
+  private structuralSkillSession:
+    StructuralSkillTransferSession |
+    undefined;
+
+  private structuralSkillCorrectionRecorded =
+    false;
+
   private readonly maxCycles:
     number;
 
@@ -273,6 +309,14 @@ export class CognitiveRuntime {
 
   private readonly skillLibrary:
     AutonomousSkillLibrary |
+    undefined;
+
+  private readonly skillComposer:
+    SkillComposer |
+    undefined;
+
+  private readonly structuralSkillEngine:
+    StructuralSkillTransferEngine |
     undefined;
 
   private structuralSession:
@@ -327,6 +371,20 @@ export class CognitiveRuntime {
 
     this.skillLibrary =
       options.skillLibrary;
+
+    this.skillComposer =
+      this.skillLibrary
+        ? new SkillComposer(
+            this.skillLibrary,
+          )
+        : undefined;
+
+    this.structuralSkillEngine =
+      this.skillLibrary
+        ? new StructuralSkillTransferEngine(
+            this.skillLibrary,
+          )
+        : undefined;
 
     this.planner =
       this.worldModel
@@ -454,6 +512,11 @@ export class CognitiveRuntime {
     );
 
     this.initializeSkillTransfer(
+      snapshot,
+      initialActions,
+    );
+
+    this.initializeStructuralSkillTransfer(
       snapshot,
       initialActions,
     );
@@ -678,6 +741,23 @@ export class CognitiveRuntime {
         after,
       );
 
+      const structuralSkillUpdate =
+        choice.strategy ===
+          "structural-skill"
+          ? this.structuralSkillSession
+              ?.observeTransition({
+                action,
+
+                before,
+
+                after,
+
+                accepted:
+                  environmentResult
+                    .accepted,
+              })
+          : undefined;
+
       const structuralUpdate =
         this.structuralSession
           ?.observeTransition({
@@ -731,6 +811,12 @@ export class CognitiveRuntime {
       this.recordWorldModelCorrection(
         choice,
         changes,
+        observation,
+      );
+
+      this.recordStructuralSkillCorrection(
+        choice,
+        structuralSkillUpdate,
         observation,
       );
 
@@ -855,6 +941,28 @@ export class CognitiveRuntime {
       skill
     ) {
       return skill;
+    }
+
+    const composedSkill =
+      this.nextSkillCompositionAction(
+        availableActions,
+      );
+
+    if (
+      composedSkill
+    ) {
+      return composedSkill;
+    }
+
+    const structuralSkill =
+      this.nextStructuralSkillAction(
+        availableActions,
+      );
+
+    if (
+      structuralSkill
+    ) {
+      return structuralSkill;
     }
 
     const structural =
@@ -1406,11 +1514,73 @@ export class CognitiveRuntime {
       return;
     }
 
+    const goalConditions =
+      goalReader.call(
+        this.environment,
+      );
+
     this.recalledSkill =
       this.skillLibrary
         .recommendSkill({
           currentState:
             initialState,
+
+          goalConditions,
+
+          availableActions,
+        });
+
+    if (
+      !this.recalledSkill
+    ) {
+      this.skillComposition =
+        this.skillComposer
+          ?.compose({
+            currentState:
+              initialState,
+
+            goalConditions,
+
+            availableActions,
+          });
+    }
+  }
+
+  private initializeStructuralSkillTransfer(
+    initialState:
+      EnvironmentSnapshot,
+
+    availableActions:
+      readonly string[],
+  ): void {
+    if (
+      this.recalledSkill ||
+      (
+        this.skillComposition &&
+        this.skillComposition
+          .actions
+          .length >
+          0
+      ) ||
+      !this.structuralSkillEngine
+    ) {
+      return;
+    }
+
+    const goalReader =
+      this.environment
+        .getGoalConditions;
+
+    if (
+      !goalReader
+    ) {
+      return;
+    }
+
+    this.structuralSkillSession =
+      this.structuralSkillEngine
+        .createSession({
+          initialState,
 
           goalConditions:
             goalReader.call(
@@ -1493,6 +1663,182 @@ export class CognitiveRuntime {
     return undefined;
   }
 
+  private nextSkillCompositionAction(
+    availableActions:
+      readonly string[],
+  ): ActionChoice | undefined {
+    if (
+      !this.skillComposition ||
+      this.skillCompositionAbandoned
+    ) {
+      return undefined;
+    }
+
+    while (
+      this.skillCompositionIndex <
+      this.skillComposition
+        .actions
+        .length
+    ) {
+      const composed =
+        this.skillComposition
+          .actions[
+            this.skillCompositionIndex
+          ];
+
+      this.skillCompositionIndex +=
+        1;
+
+      if (
+        !availableActions.includes(
+          composed.action,
+        )
+      ) {
+        this.skillCompositionAbandoned =
+          true;
+
+        return undefined;
+      }
+
+      const skill =
+        this.skillLibrary
+          ?.getSkills()
+          .find(
+            (candidate) =>
+              candidate.id ===
+              composed.skillId,
+          );
+
+      const step =
+        skill
+          ?.steps[
+            composed.stepIndex
+          ];
+
+      return {
+        action:
+          composed.action,
+
+        strategy:
+          "skill-composition",
+
+        skillId:
+          composed.skillId,
+
+        skillStepIndex:
+          composed.stepIndex,
+
+        expectedEffects:
+          step
+            ? step.effects.map(
+                (effect) =>
+                  `${effect.key}: ${String(
+                    effect.before,
+                  )} -> ${String(
+                    effect.after,
+                  )}`,
+              )
+            : [
+                "A composed reusable skill predicts this action advances the larger goal.",
+              ],
+      };
+    }
+
+    return undefined;
+  }
+
+  private nextStructuralSkillAction(
+    availableActions:
+      readonly string[],
+  ): ActionChoice | undefined {
+    const recommendation =
+      this.structuralSkillSession
+        ?.recommend(
+          availableActions,
+        );
+
+    if (
+      !recommendation
+    ) {
+      return undefined;
+    }
+
+    return {
+      action:
+        recommendation.action,
+
+      strategy:
+        "structural-skill",
+
+      expectedEffects: [
+        recommendation
+            .expectedRole ===
+          "goal"
+          ? "A learned skill's relational structure predicts this renamed target action fills the final goal role."
+          : "A learned skill's relational structure predicts this renamed target action fills the next prerequisite role.",
+      ],
+    };
+  }
+
+  private recordStructuralSkillCorrection(
+    choice:
+      ActionChoice,
+
+    update:
+      {
+        invalidated:
+          boolean;
+
+        reason?:
+          string;
+      } |
+      undefined,
+
+    observation:
+      Observation,
+  ): void {
+    if (
+      choice.strategy !==
+        "structural-skill" ||
+      !update
+        ?.invalidated ||
+      this.structuralSkillCorrectionRecorded
+    ) {
+      return;
+    }
+
+    this.structuralSkillCorrectionRecorded =
+      true;
+
+    this.apply({
+      type:
+        "learning.recorded",
+
+      learning: {
+        id:
+          this.nextId(
+            "learning",
+          ),
+
+        kind:
+          "correction",
+
+        statement:
+          "Target evidence contradicted the learned skill's relational structure, so Mabojolu abandoned structural skill transfer and returned to evidence-driven problem solving.",
+
+        confidence:
+          0.95,
+
+        derivedFromIds: [
+          observation.id,
+        ],
+
+        createdAt:
+          this.now(),
+      },
+    });
+  }
+
   private recordSkillExecutionOutcome(
     choice:
       ActionChoice,
@@ -1507,8 +1853,12 @@ export class CognitiveRuntime {
       Observation,
   ): void {
     if (
-      choice.strategy !==
-        "skill" ||
+      (
+        choice.strategy !==
+          "skill" &&
+        choice.strategy !==
+          "skill-composition"
+      ) ||
       !choice.skillId ||
       choice.skillStepIndex ===
         undefined ||
@@ -1547,8 +1897,16 @@ export class CognitiveRuntime {
       return;
     }
 
-    this.skillAbandoned =
-      true;
+    if (
+      choice.strategy ===
+      "skill"
+    ) {
+      this.skillAbandoned =
+        true;
+    } else {
+      this.skillCompositionAbandoned =
+        true;
+    }
 
     this.apply({
       type:
@@ -1587,7 +1945,8 @@ export class CognitiveRuntime {
       readonly string[],
   ): void {
     if (
-      !this.structuralTransfer
+      !this.structuralTransfer ||
+      this.structuralSkillSession
     ) {
       return;
     }
@@ -1703,6 +2062,12 @@ export class CognitiveRuntime {
       case "skill":
         return "skill";
 
+      case "skill-composition":
+        return "skill-composition";
+
+      case "structural-skill":
+        return "structural-skill";
+
       case "structural-transfer":
         return "structural-transfer";
 
@@ -1733,6 +2098,16 @@ export class CognitiveRuntime {
       case "skill":
         return [
           "A repeatedly supported reusable skill predicts this action advances the goal.",
+        ];
+
+      case "skill-composition":
+        return [
+          "A sequence of separately learned reusable skills predicts this action advances a larger unfamiliar goal.",
+        ];
+
+      case "structural-skill":
+        return [
+          "A learned skill's relational structure predicts this action fills a corresponding role despite renamed target symbols.",
         ];
 
       case "structural-transfer":
@@ -2602,6 +2977,41 @@ export class CognitiveRuntime {
                   .actions,
               ],
             },
+          }
+        : {}),
+
+      ...(this.skillComposition
+        ? {
+            skillComposition: {
+              ...this.skillComposition,
+
+              skillIds: [
+                ...this.skillComposition
+                  .skillIds,
+              ],
+
+              actions:
+                this.skillComposition
+                  .actions
+                  .map(
+                    (action) => ({
+                      ...action,
+                    }),
+                  ),
+
+              projectedFinalState: {
+                ...this.skillComposition
+                  .projectedFinalState,
+              },
+            },
+          }
+        : {}),
+
+      ...(this.structuralSkillSession
+        ? {
+            structuralSkillTransfer:
+              this.structuralSkillSession
+                .getState(),
           }
         : {}),
 
