@@ -909,7 +909,11 @@ export class CognitiveRuntime {
             .expectedRole ===
           "goal"
           ? "A cross-environment structural analogy predicts this action fills the gated goal role."
-          : "A cross-environment structural analogy predicts this action fills a remaining setup role.",
+          : recommendation
+                .expectedRole ===
+              "probe"
+            ? "Competing structural hypotheses disagree about this action, so it was selected to reduce uncertainty."
+            : "A cross-environment structural analogy predicts this action fills a remaining setup role.",
       ],
     };
   }
