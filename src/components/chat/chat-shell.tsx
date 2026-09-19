@@ -194,14 +194,9 @@ export function ChatShell({
   ] = useState(false);
 
   const [
-    handoverRequestKey,
-    setHandoverRequestKey,
-  ] = useState(0);
-
-  const [
-    pendingHandover,
-    setPendingHandover,
-  ] = useState<string | null>(null);
+    isHandoverOpen,
+    setIsHandoverOpen,
+  ] = useState(false);
 
   const [
     isSettingsOpen,
@@ -278,6 +273,7 @@ export function ChatShell({
     messages,
     isStreaming,
     send,
+    startFreshConversation,
     stop,
     retry,
     regenerate,
@@ -780,8 +776,6 @@ export function ChatShell({
         packet:
           string,
       ) => {
-        reset();
-
         setActiveConversationId(
           null,
         );
@@ -794,15 +788,15 @@ export function ChatShell({
           false,
         );
 
+        setIsHandoverOpen(
+          false,
+        );
+
         setConversationEpoch(
           (
             value,
           ) =>
             value + 1,
-        );
-
-        setPendingHandover(
-          packet,
         );
 
         const url =
@@ -819,37 +813,16 @@ export function ChatShell({
           "",
           url,
         );
+
+        startFreshConversation(
+          packet,
+          [],
+        );
       },
-      [reset],
+      [
+        startFreshConversation,
+      ],
     );
-
-  useEffect(() => {
-    if (
-      !pendingHandover ||
-      isStreaming ||
-      messages.length >
-        0
-    ) {
-      return;
-    }
-
-    const packet =
-      pendingHandover;
-
-    setPendingHandover(
-      null,
-    );
-
-    send(
-      packet,
-      [],
-    );
-  }, [
-    isStreaming,
-    messages.length,
-    pendingHandover,
-    send,
-  ]);
 
   return (
     <div className="h-dvh overflow-hidden bg-surface-base text-text-primary">
@@ -928,11 +901,8 @@ export function ChatShell({
         onPrepareHandover={
           hasMessages
             ? () => {
-                setHandoverRequestKey(
-                  (
-                    value,
-                  ) =>
-                    value + 1,
+                setIsHandoverOpen(
+                  true,
                 );
 
                 setIsSidebarOpen(
@@ -1093,8 +1063,11 @@ export function ChatShell({
               packet={
                 handoverPacket
               }
-              openRequestKey={
-                handoverRequestKey
+              isOpen={
+                isHandoverOpen
+              }
+              onOpenChange={
+                setIsHandoverOpen
               }
               onContinueInNewChat={
                 continueInNewChatWithHandover
