@@ -589,6 +589,12 @@ describe(
           championOperationalEvidenceCount:
             3,
 
+          lastDriftTriggerEvidenceCount:
+            3,
+
+          lastDriftTriggerAccuracy:
+            0,
+
           challengerFitEvidenceCount:
             0,
 
