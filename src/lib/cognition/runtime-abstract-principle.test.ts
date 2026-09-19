@@ -253,6 +253,9 @@ describe(
               taskFamily:
                 "gated-family",
 
+              taskFamilyKind:
+                "gated-sequence",
+
               maxCycles:
                 8,
 
@@ -295,6 +298,9 @@ describe(
               taskFamily:
                 "threshold-family",
 
+              taskFamilyKind:
+                "threshold-accumulation",
+
               maxCycles:
                 8,
 
@@ -326,6 +332,15 @@ describe(
           "threshold-family",
         ]);
 
+        expect(
+          threshold
+            .abstractPrinciple
+            ?.supportFamilyKinds,
+        ).toEqual([
+          "gated-sequence",
+          "threshold-accumulation",
+        ]);
+
         const baseline =
           new CognitiveRuntime(
             new CategoricalUnlockWorld(),
@@ -349,6 +364,9 @@ describe(
 
               taskFamily:
                 "categorical-family",
+
+              taskFamilyKind:
+                "categorical-mode-unlock",
 
               maxCycles:
                 8,
@@ -400,6 +418,16 @@ describe(
           "gated-family",
           "threshold-family",
         ]);
+
+        expect(
+          transferred
+            .abstractPrinciple
+            ?.supportFamilyKinds,
+        ).toEqual([
+          "categorical-mode-unlock",
+          "gated-sequence",
+          "threshold-accumulation",
+        ]);
       },
     );
 
@@ -447,6 +475,9 @@ describe(
 
               taskFamily:
                 "categorical-family",
+
+              taskFamilyKind:
+                "categorical-mode-unlock",
 
               maxCycles:
                 8,
