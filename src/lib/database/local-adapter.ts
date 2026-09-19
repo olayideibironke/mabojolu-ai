@@ -1536,6 +1536,195 @@ export class LocalDatabaseAdapter implements DatabaseAdapter {
     });
   }
 
+  // --- Plugins ------------------------------------------------------------
+
+  async getPluginConnection(
+    userId: string,
+    provider: PluginProviderId,
+  ): Promise<PluginConnection | null> {
+    return this.run(
+      (db) => {
+        const connection =
+          db.pluginConnections.find(
+            (candidate) =>
+              candidate.userId ===
+                userId &&
+              candidate.provider ===
+                provider,
+          );
+
+        return connection
+          ? {
+              ...connection,
+              scopes: [
+                ...connection.scopes,
+              ],
+            }
+          : null;
+      },
+    );
+  }
+
+  async listPluginConnections(
+    userId: string,
+  ): Promise<PluginConnection[]> {
+    return this.run(
+      (db) =>
+        db.pluginConnections
+          .filter(
+            (connection) =>
+              connection.userId ===
+              userId,
+          )
+          .map(
+            (connection) => ({
+              ...connection,
+              scopes: [
+                ...connection.scopes,
+              ],
+            }),
+          ),
+    );
+  }
+
+  async upsertPluginConnection(
+    input:
+      UpsertPluginConnectionInput,
+  ): Promise<PluginConnection> {
+    return this.run(
+      async (db) => {
+        const now =
+          new Date().toISOString();
+
+        const existing =
+          db.pluginConnections.find(
+            (candidate) =>
+              candidate.userId ===
+                input.userId &&
+              candidate.provider ===
+                input.provider,
+          );
+
+        if (existing) {
+          existing.accountLabel =
+            input.accountLabel;
+
+          existing.accessTokenEncrypted =
+            input.accessTokenEncrypted;
+
+          existing.refreshTokenEncrypted =
+            input.refreshTokenEncrypted ??
+            existing.refreshTokenEncrypted;
+
+          existing.expiresAt =
+            input.expiresAt ??
+            null;
+
+          existing.scopes = [
+            ...input.scopes,
+          ];
+
+          existing.updatedAt =
+            now;
+
+          await this.persist(
+            db,
+          );
+
+          return {
+            ...existing,
+            scopes: [
+              ...existing.scopes,
+            ],
+          };
+        }
+
+        const created:
+          PluginConnection = {
+          userId:
+            input.userId,
+
+          provider:
+            input.provider,
+
+          accountLabel:
+            input.accountLabel,
+
+          accessTokenEncrypted:
+            input.accessTokenEncrypted,
+
+          refreshTokenEncrypted:
+            input.refreshTokenEncrypted ??
+            null,
+
+          expiresAt:
+            input.expiresAt ??
+            null,
+
+          scopes: [
+            ...input.scopes,
+          ],
+
+          createdAt:
+            now,
+
+          updatedAt:
+            now,
+        };
+
+        db.pluginConnections.push(
+          created,
+        );
+
+        await this.persist(
+          db,
+        );
+
+        return {
+          ...created,
+          scopes: [
+            ...created.scopes,
+          ],
+        };
+      },
+    );
+  }
+
+  async deletePluginConnection(
+    userId: string,
+    provider: PluginProviderId,
+  ): Promise<boolean> {
+    return this.run(
+      async (db) => {
+        const before =
+          db.pluginConnections.length;
+
+        db.pluginConnections =
+          db.pluginConnections.filter(
+            (connection) =>
+              !(
+                connection.userId ===
+                  userId &&
+                connection.provider ===
+                  provider
+              ),
+          );
+
+        const removed =
+          db.pluginConnections.length !==
+          before;
+
+        if (removed) {
+          await this.persist(
+            db,
+          );
+        }
+
+        return removed;
+      },
+    );
+  }
+
   // --- Administration -----------------------------------------------------
 
   async getAdminMetrics(): Promise<AdminMetrics> {
