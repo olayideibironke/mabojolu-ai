@@ -73,10 +73,22 @@ export class SyntheticGatedSequenceEnvironment
 
   getAvailableActions():
     readonly string[] {
-    return [
-      ...this.spec
-        .actionLabels,
-    ];
+    const order =
+      this.spec
+        .actionPresentationOrder ??
+      [
+        0,
+        1,
+        2,
+      ];
+
+    return order.map(
+      (index) =>
+        this.spec
+          .actionLabels[
+            index
+          ],
+    );
   }
 
   getGoalConditions():
