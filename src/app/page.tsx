@@ -57,6 +57,12 @@ export default async function HomePage() {
         persistenceKind={
           database.kind
         }
+        contextTokenBudget={
+          envResult.ok
+            ? envResult.env
+                .MABOJOLU_CONTEXT_TOKEN_BUDGET
+            : 120_000
+        }
       />
     </>
   );
