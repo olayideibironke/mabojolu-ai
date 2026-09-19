@@ -106,11 +106,23 @@ The WebLLM 0.2.85 runtime is pinned in Mabojolu's own dependency graph and
 bundled into the application worker at build time. Browser execution therefore
 no longer depends on esm.run, jsDelivr, or another JavaScript runtime CDN.
 
-Model weights and compiled model libraries are still fetched from the upstream
-locations defined by WebLLM's model registry on first use and then cached by the
-browser. Those large model artifacts are the remaining external delivery
-dependency; self-hosting them requires a dedicated artifact mirror rather than
-placing multi-gigabyte model files in the application repository.
+Mabojolu now also owns the browser model artifact control plane. An optional
+versioned artifact manifest can point the 1B and 3B browser models at a
+Westforge/Mabojolu-controlled mirror. The manifest must match Mabojolu's pinned
+WebLLM version, use HTTPS (localhost is allowed for development), and provide
+valid SRI metadata for the WebLLM-supported config/model-library/tokenizer
+artifacts. Integrity failures are configured to fail closed.
+
+No Westforge artifact mirror is deployed in this checkpoint, so the manifest
+URL remains unset by default. Until a real mirror and its integrity values are
+published, Mabojolu uses the pinned WebLLM-compatible upstream model records.
+When a mirror is configured successfully, Mabojolu tries it first and retains
+the compatible upstream record only as an explicit transition fallback.
+
+The multi-gigabyte model artifacts themselves are intentionally not committed to
+this application repository. Deploying the actual mirror is an infrastructure
+step separate from the now-implemented artifact routing, versioning, and
+integrity-control layer.
 
 ---
 
