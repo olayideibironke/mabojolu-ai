@@ -1442,6 +1442,16 @@ export class AbstractPrinciplePortfolioController {
           },
 
           ...(selected
+              .predicateValidation
+            ? {
+                predicateValidation: {
+                  ...selected
+                    .predicateValidation,
+                },
+              }
+            : {}),
+
+          ...(selected
               .symbolicPredicateProjection
             ? {
                 symbolicPredicateProjection: {
@@ -1609,6 +1619,16 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .predicateValidation
+        ? {
+            predicateValidation: {
+              ...selected
+                .predicateValidation,
+            },
+          }
+        : {}),
 
       ...(selected
           .symbolicPredicateProjection
@@ -1783,6 +1803,16 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .predicateValidation
+              ? {
+                  predicateValidation: {
+                    ...selection
+                      .predicateValidation,
+                  },
+                }
+              : {}),
 
             ...(selection
                 .symbolicPredicateProjection
