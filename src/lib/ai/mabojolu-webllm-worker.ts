@@ -3,6 +3,11 @@ import {
   type MLCEngineInterface,
 } from "@mlc-ai/web-llm";
 
+import {
+  resolveMabojoluArtifactSources,
+  type MabojoluArtifactSource,
+} from "./browser-artifacts";
+
 interface GenerateMessage {
   type:
     "generate";
@@ -12,6 +17,10 @@ interface GenerateMessage {
 
   modelCandidates:
     string[];
+
+  artifactManifestUrl?:
+    string |
+    null;
 
   messages:
     Array<{
@@ -44,7 +53,7 @@ let engine:
   MLCEngineInterface |
   null = null;
 
-let loadedModelId:
+let loadedEngineKey:
   string |
   null = null;
 
@@ -65,27 +74,14 @@ function post(
   );
 }
 
-async function ensureEngine(
-  modelId:
-    string,
-
-  requestId:
-    string,
-):
+async function unloadEngine():
   Promise<void> {
-  if (
-    engine &&
-    loadedModelId ===
-      modelId
-  ) {
-    return;
-  }
-
   if (
     engine
   ) {
     try {
-      await engine.unload();
+      await engine
+        .unload();
     } catch {
       // A stale engine can still be replaced below.
     }
@@ -94,8 +90,35 @@ async function ensureEngine(
   engine =
     null;
 
-  loadedModelId =
+  loadedEngineKey =
     null;
+}
+
+async function ensureEngine(
+  modelId:
+    string,
+
+  source:
+    MabojoluArtifactSource,
+
+  requestId:
+    string,
+):
+  Promise<void> {
+  const engineKey =
+    source.id +
+    "::" +
+    modelId;
+
+  if (
+    engine &&
+    loadedEngineKey ===
+      engineKey
+  ) {
+    return;
+  }
+
+  await unloadEngine();
 
   post({
     type:
@@ -104,13 +127,19 @@ async function ensureEngine(
     requestId,
 
     label:
-      "Preparing on-device model...",
+      source.kind ===
+        "mabojolu-mirror"
+        ? "Preparing Mabojolu model artifacts..."
+        : "Preparing compatible upstream model artifacts...",
   });
 
   engine =
     await CreateMLCEngine(
       modelId,
       {
+        appConfig:
+          source.appConfig,
+
         initProgressCallback:
           (
             progress,
@@ -140,8 +169,8 @@ async function ensureEngine(
       },
     );
 
-  loadedModelId =
-    modelId;
+  loadedEngineKey =
+    engineKey;
 }
 
 async function generate(
@@ -152,6 +181,7 @@ async function generate(
   const {
     requestId,
     modelCandidates,
+    artifactManifestUrl,
     messages,
     maxOutputTokens,
   } = message;
@@ -187,51 +217,45 @@ async function generate(
     return;
   }
 
+  const artifactResolution =
+    await resolveMabojoluArtifactSources(
+      artifactManifestUrl,
+    );
+
+  if (
+    artifactResolution.warning
+  ) {
+    post({
+      type:
+        "status",
+
+      requestId,
+
+      label:
+        artifactResolution
+          .warning,
+    });
+  }
+
   let lastError:
     unknown = null;
 
   for (
-    let index = 0;
-    index <
+    let modelIndex = 0;
+    modelIndex <
       candidates.length;
-    index +=
+    modelIndex +=
       1
   ) {
     const modelId =
-      candidates[index];
+      candidates[
+        modelIndex
+      ];
 
-    let emittedText =
-      false;
-
-    try {
-      if (
-        index >
-        0
-      ) {
-        post({
-          type:
-            "status",
-
-          requestId,
-
-          label:
-            "Switching to a lighter on-device model...",
-        });
-      }
-
-      await ensureEngine(
-        modelId,
-        requestId,
-      );
-
-      if (
-        activeRequestId !==
-        requestId ||
-        !engine
-      ) {
-        return;
-      }
-
+    if (
+      modelIndex >
+      0
+    ) {
       post({
         type:
           "status",
@@ -239,130 +263,184 @@ async function generate(
         requestId,
 
         label:
-          "Thinking on this device...",
+          "Switching to a lighter on-device model...",
       });
+    }
 
-      const stream =
-        await engine
-          .chat
-          .completions
-          .create({
-            messages,
+    for (
+      let sourceIndex = 0;
+      sourceIndex <
+        artifactResolution
+          .sources
+          .length;
+      sourceIndex +=
+        1
+    ) {
+      const source =
+        artifactResolution
+          .sources[
+            sourceIndex
+          ];
 
-            stream:
-              true,
+      let emittedText =
+        false;
 
-            max_tokens:
-              maxOutputTokens,
+      try {
+        if (
+          sourceIndex >
+            0
+        ) {
+          post({
+            type:
+              "status",
 
-            temperature:
-              0.7,
+            requestId,
+
+            label:
+              "Mabojolu artifact delivery was unavailable; switching to the compatible upstream artifact source.",
           });
+        }
 
-      let finishReason:
-        "end_turn" |
-        "max_tokens" =
-          "end_turn";
+        await ensureEngine(
+          modelId,
+          source,
+          requestId,
+        );
 
-      for await (
-        const chunk of
-          stream
-      ) {
         if (
           activeRequestId !==
-          requestId
+          requestId ||
+          !engine
         ) {
           return;
         }
 
-        const choice =
-          chunk
-            .choices?.[0];
-
-        const text =
-          choice
-            ?.delta
-            ?.content ??
-          "";
-
-        if (
-          text
-        ) {
-          emittedText =
-            true;
-
-          post({
-            type:
-              "delta",
-
-            requestId,
-
-            text,
-          });
-        }
-
-        if (
-          choice
-            ?.finish_reason ===
-          "length"
-        ) {
-          finishReason =
-            "max_tokens";
-        }
-      }
-
-      if (
-        activeRequestId ===
-        requestId
-      ) {
-        activeRequestId =
-          null;
-
         post({
           type:
-            "done",
+            "status",
 
           requestId,
 
-          finishReason,
-
-          modelId,
+          label:
+            "Thinking on this device...",
         });
-      }
 
-      return;
-    } catch (
-      cause
-    ) {
-      lastError =
-        cause;
-
-      /*
-       * Never restart with a second model after visible text has already been
-       * emitted. Doing so would splice two answers together.
-       */
-      if (
-        emittedText
-      ) {
-        break;
-      }
-
-      if (
-        engine
-      ) {
-        try {
+        const stream =
           await engine
-            .unload();
-        } catch {
-          // The next ensureEngine call will replace the stale engine.
+            .chat
+            .completions
+            .create({
+              messages,
+
+              stream:
+                true,
+
+              max_tokens:
+                maxOutputTokens,
+
+              temperature:
+                0.7,
+            });
+
+        let finishReason:
+          "end_turn" |
+          "max_tokens" =
+            "end_turn";
+
+        for await (
+          const chunk of
+            stream
+        ) {
+          if (
+            activeRequestId !==
+            requestId
+          ) {
+            return;
+          }
+
+          const choice =
+            chunk
+              .choices?.[0];
+
+          const text =
+            choice
+              ?.delta
+              ?.content ??
+            "";
+
+          if (
+            text
+          ) {
+            emittedText =
+              true;
+
+            post({
+              type:
+                "delta",
+
+              requestId,
+
+              text,
+            });
+          }
+
+          if (
+            choice
+              ?.finish_reason ===
+            "length"
+          ) {
+            finishReason =
+              "max_tokens";
+          }
         }
+
+        if (
+          activeRequestId ===
+          requestId
+        ) {
+          activeRequestId =
+            null;
+
+          post({
+            type:
+              "done",
+
+            requestId,
+
+            finishReason,
+
+            modelId,
+
+            artifactSource:
+              source.kind,
+
+            artifactSourceId:
+              source.id,
+          });
+        }
+
+        return;
+      } catch (
+        cause
+      ) {
+        lastError =
+          cause;
+
+        /*
+         * Never restart with another artifact source or model after visible
+         * text has already been emitted. Doing so would splice answers.
+         */
+        if (
+          emittedText
+        ) {
+          modelIndex =
+            candidates.length;
+
+          break;
+        }
+
+        await unloadEngine();
       }
-
-      engine =
-        null;
-
-      loadedModelId =
-        null;
     }
   }
 
