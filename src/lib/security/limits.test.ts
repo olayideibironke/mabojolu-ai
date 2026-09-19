@@ -78,6 +78,10 @@ function session(input: {
 
   admin?:
     boolean;
+
+  registeredAt?:
+    string |
+    null;
 } = {}):
   Session {
   const admin =
@@ -127,6 +131,14 @@ function session(input: {
 
     isAnonymous:
       anonymous,
+
+    registeredAt:
+      input.registeredAt ??
+      (
+        anonymous
+          ? null
+          : "2026-01-01T00:00:00.000Z"
+      ),
   };
 }
 
@@ -379,6 +391,43 @@ describe(
             ?.message,
         ).toContain(
           "upgrade to Pro",
+        );
+      },
+    );
+
+    it(
+      "gives an upgraded guest a fresh registered allowance starting at account confirmation",
+      async () => {
+        mocks
+          .database
+          .countRecentMessages
+          .mockResolvedValueOnce(
+            0,
+          )
+          .mockResolvedValueOnce(
+            10,
+          );
+
+        const decision =
+          await checkUsageLimits(
+            session({
+              registeredAt:
+                "2026-09-19T15:55:00.000Z",
+            }),
+          );
+
+        expect(
+          decision.allowed,
+        ).toBe(true);
+
+        expect(
+          mocks
+            .database
+            .countRecentMessages
+            .mock
+            .calls[0]?.[1],
+        ).toBe(
+          "2026-09-19T15:55:00.000Z",
         );
       },
     );
