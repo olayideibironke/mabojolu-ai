@@ -187,6 +187,32 @@ describe(
           session,
         ).toBeDefined();
 
+        expect(
+          session?.getState()
+            .hypothesisCount,
+        ).toBe(3);
+
+        const firstProbe =
+          session?.recommend([
+            "X",
+            "Y",
+            "Z",
+          ]);
+
+        expect(
+          firstProbe,
+        ).toMatchObject({
+          action:
+            "X",
+          expectedRole:
+            "probe",
+        });
+
+        expect(
+          firstProbe
+            ?.informationGain,
+        ).toBeGreaterThan(0);
+
         session?.observeTransition({
           action: "X",
           before: {
@@ -207,6 +233,24 @@ describe(
           },
           accepted:
             true,
+        });
+
+        expect(
+          session?.getState()
+            .hypothesisCount,
+        ).toBe(2);
+
+        expect(
+          session?.recommend([
+            "X",
+            "Y",
+            "Z",
+          ]),
+        ).toMatchObject({
+          action:
+            "Y",
+          expectedRole:
+            "probe",
         });
 
         session?.observeTransition({
