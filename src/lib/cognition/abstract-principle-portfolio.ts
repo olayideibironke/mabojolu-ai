@@ -557,6 +557,14 @@ export class AbstractPrinciplePortfolioController {
               deferred.action,
             );
 
+        const relational =
+          this.relationalContextFeatureApplicabilityModel
+            ?.estimate(
+              deferred
+                .principleId,
+              signature,
+            );
+
         const composed =
           this.composedContextFeatureApplicabilityModel
             ?.estimate(
@@ -590,6 +598,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          relational
+            ?.applicability ??
           composed
             ?.applicability ??
           featureLearned
@@ -624,12 +634,17 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            composed
-              ? composed.evidenceCount >
+            relational
+              ? relational.evidenceCount >
                   0
-                ? "composed-learned"
-                : "composed-prior"
-              : featureLearned
+                ? "relational-learned"
+                : "relational-prior"
+              : composed
+                ? composed.evidenceCount >
+                    0
+                  ? "composed-learned"
+                  : "composed-prior"
+                : featureLearned
                 ? featureLearned.evidenceCount >
                     0
                   ? "feature-learned"
@@ -647,6 +662,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            relational
+              ?.evidenceCount ??
             composed
               ?.evidenceCount ??
             featureLearned
@@ -659,6 +676,42 @@ export class AbstractPrinciplePortfolioController {
 
           applicabilityContext:
             context,
+
+          ...(relational
+            ? {
+                relationalContextProjection: {
+                  featureId:
+                    relational
+                      .projection
+                      .featureId,
+
+                  left:
+                    relational
+                      .projection
+                      .left,
+
+                  right:
+                    relational
+                      .projection
+                      .right,
+
+                  operator:
+                    relational
+                      .projection
+                      .operator,
+
+                  relationValue:
+                    relational
+                      .projection
+                      .relationValue,
+
+                  projectionKey:
+                    relational
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : {}),
 
           ...(composed
             ? {
@@ -704,7 +757,8 @@ export class AbstractPrinciplePortfolioController {
 
           ...(this.inducedContextApplicabilityModel ||
               this.learnedContextFeatureApplicabilityModel ||
-              this.composedContextFeatureApplicabilityModel
+              this.composedContextFeatureApplicabilityModel ||
+              this.relationalContextFeatureApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
@@ -740,6 +794,14 @@ export class AbstractPrinciplePortfolioController {
               monotonic.action,
             );
 
+        const relational =
+          this.relationalContextFeatureApplicabilityModel
+            ?.estimate(
+              monotonic
+                .principleId,
+              signature,
+            );
+
         const composed =
           this.composedContextFeatureApplicabilityModel
             ?.estimate(
@@ -773,6 +835,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          relational
+            ?.applicability ??
           composed
             ?.applicability ??
           featureLearned
@@ -807,12 +871,17 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            composed
-              ? composed.evidenceCount >
+            relational
+              ? relational.evidenceCount >
                   0
-                ? "composed-learned"
-                : "composed-prior"
-              : featureLearned
+                ? "relational-learned"
+                : "relational-prior"
+              : composed
+                ? composed.evidenceCount >
+                    0
+                  ? "composed-learned"
+                  : "composed-prior"
+                : featureLearned
                 ? featureLearned.evidenceCount >
                     0
                   ? "feature-learned"
@@ -830,6 +899,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            relational
+              ?.evidenceCount ??
             composed
               ?.evidenceCount ??
             featureLearned
@@ -842,6 +913,42 @@ export class AbstractPrinciplePortfolioController {
 
           applicabilityContext:
             context,
+
+          ...(relational
+            ? {
+                relationalContextProjection: {
+                  featureId:
+                    relational
+                      .projection
+                      .featureId,
+
+                  left:
+                    relational
+                      .projection
+                      .left,
+
+                  right:
+                    relational
+                      .projection
+                      .right,
+
+                  operator:
+                    relational
+                      .projection
+                      .operator,
+
+                  relationValue:
+                    relational
+                      .projection
+                      .relationValue,
+
+                  projectionKey:
+                    relational
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : {}),
 
           ...(composed
             ? {
@@ -887,7 +994,8 @@ export class AbstractPrinciplePortfolioController {
 
           ...(this.inducedContextApplicabilityModel ||
               this.learnedContextFeatureApplicabilityModel ||
-              this.composedContextFeatureApplicabilityModel
+              this.composedContextFeatureApplicabilityModel ||
+              this.relationalContextFeatureApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
