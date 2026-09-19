@@ -102,11 +102,15 @@ failing path. The server still handles authentication, quotas, and conversation
 persistence, including the verified 10 guest / 20 registered / 4-hour free
 access policy.
 
-The worker currently loads the pinned WebLLM 0.2.85 runtime from esm.run rather
-than shipping the WebLLM package inside the Mabojolu bundle. Model assets are
-downloaded by the browser and may take significant time on first use. Eliminating
-that remaining runtime/CDN dependency requires bundling or self-hosting the
-WebLLM runtime and model artifacts in a separately verified milestone.
+The WebLLM 0.2.85 runtime is pinned in Mabojolu's own dependency graph and
+bundled into the application worker at build time. Browser execution therefore
+no longer depends on esm.run, jsDelivr, or another JavaScript runtime CDN.
+
+Model weights and compiled model libraries are still fetched from the upstream
+locations defined by WebLLM's model registry on first use and then cached by the
+browser. Those large model artifacts are the remaining external delivery
+dependency; self-hosting them requires a dedicated artifact mirror rather than
+placing multi-gigabyte model files in the application repository.
 
 ---
 
@@ -171,7 +175,7 @@ change.
 
 | Port | Local | Production |
 | --- | --- | --- |
-| AI provider (`src/lib/ai/provider.ts`) | `mock` | `anthropic` |
+| AI inference | Browser WebGPU / local Ollama | Browser WebGPU first for eligible Fast text; configured Ollama fallback |
 | Persistence (`src/lib/database/types.ts`) | `local` JSON file | `supabase` |
 | Object storage (`src/lib/attachments/storage.ts`) | Local filesystem | Supabase Storage |
 
