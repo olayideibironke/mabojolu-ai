@@ -5,7 +5,7 @@ import { DevSignIn } from "@/components/auth/dev-sign-in";
 import { EmailPasswordAuth } from "@/components/auth/email-password-auth";
 import { BrandMark } from "@/components/ui/brand-mark";
 import { getSession } from "@/lib/auth/session";
-import { inspectServerEnv } from "@/lib/env";
+import { authRuntimeMode } from "@/lib/runtime-mode";
 
 export const metadata: Metadata = {
   title: "Sign in or create account",
@@ -34,13 +34,8 @@ export default async function SignInPage() {
     redirect("/");
   }
 
-  const envResult =
-    inspectServerEnv();
-
   const authMode =
-    envResult.ok
-      ? envResult.env.AUTH_MODE
-      : "dev";
+    authRuntimeMode();
 
   const isGuest =
     session?.isAnonymous === true;
