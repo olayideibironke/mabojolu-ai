@@ -424,18 +424,30 @@ export class AutonomousChallengeGenerator {
         nextGeneration,
 
       actionLabels: [
-        ...blueprint
-          .practiceActionLabels,
+        blueprint
+          .practiceActionLabels[0],
+        blueprint
+          .practiceActionLabels[1],
+        blueprint
+          .practiceActionLabels[2],
       ],
 
       stateKeys: [
-        ...blueprint
-          .practiceStateKeys,
+        blueprint
+          .practiceStateKeys[0],
+        blueprint
+          .practiceStateKeys[1],
+        blueprint
+          .practiceStateKeys[2],
       ],
 
       actionRoleOrder: [
-        ...blueprint
-          .practiceActionRoleOrder,
+        blueprint
+          .practiceActionRoleOrder[0],
+        blueprint
+          .practiceActionRoleOrder[1],
+        blueprint
+          .practiceActionRoleOrder[2],
       ],
     };
 
