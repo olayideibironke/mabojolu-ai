@@ -359,6 +359,127 @@ describe(
   "Mabojolu G fresh-reserve challenger champion predicate adaptation",
   () => {
     it(
+      "keeps a frozen bootstrap candidate out of selection until validation completes",
+      () => {
+        const model =
+          new AdaptiveValidatedPredicateApplicabilityModel();
+
+        for (
+          const input of [
+            {
+              history:
+                "1" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "2" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "3+" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "3+" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                false,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                false,
+            },
+          ]
+        ) {
+          record(
+            model,
+            input.history,
+            input.distinct,
+            input.useful,
+          );
+        }
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          )
+            .phase,
+        ).toBe(
+          "bootstrap-validation",
+        );
+
+        expect(
+          model.estimate(
+            "principle-a",
+            signature(
+              "3+",
+              "2",
+            ),
+          ),
+        ).toBeUndefined();
+
+        record(
+          model,
+          "3+",
+          "2",
+          true,
+        );
+
+        expect(
+          model.estimate(
+            "principle-a",
+            signature(
+              "3+",
+              "2",
+            ),
+          ),
+        ).toBeUndefined();
+      },
+    );
+
+    it(
       "bootstraps a validated champion without reusing bootstrap holdout as applicability evidence",
       () => {
         const model =
