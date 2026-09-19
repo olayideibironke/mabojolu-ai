@@ -352,6 +352,110 @@ describe(
     );
 
     it(
+      "recognizes numeric progress even when the same action also changes auxiliary state",
+      () => {
+        const library =
+          new MonotonicProgressPrincipleLibrary();
+
+        library.learnFromEpisode(
+          thresholdEpisode({
+            episodeId:
+              "one",
+
+            family:
+              "threshold-family",
+
+            familyKind:
+              "threshold-accumulation",
+
+            action:
+              "INC",
+
+            progressKey:
+              "progress",
+
+            goalAction:
+              "FINISH",
+
+            goalKey:
+              "done",
+          }),
+        );
+
+        library.learnFromEpisode(
+          thresholdEpisode({
+            episodeId:
+              "two",
+
+            family:
+              "charge-family",
+
+            familyKind:
+              "resource-charge",
+
+            action:
+              "CHARGE",
+
+            progressKey:
+              "energy",
+
+            goalAction:
+              "RELEASE",
+
+            goalKey:
+              "released",
+          }),
+        );
+
+        const controller =
+          new MonotonicProgressPrincipleController(
+            library,
+          );
+
+        controller.observeTransition({
+          action:
+            "ADVANCE",
+
+          accepted:
+            true,
+
+          before: {
+            level:
+              0,
+
+            armed:
+              false,
+          },
+
+          after: {
+            level:
+              1,
+
+            armed:
+              true,
+          },
+
+          changedKeys: [
+            "level",
+            "armed",
+          ],
+        });
+
+        expect(
+          controller.recommend([
+            "ADVANCE",
+          ]),
+        ).toMatchObject({
+          action:
+            "ADVANCE",
+
+          applicability:
+            0.95,
+        });
+      },
+    );
+
+    it(
       "only becomes applicable after direct target-world numeric progress evidence",
       () => {
         const library =
