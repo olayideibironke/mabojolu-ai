@@ -24,6 +24,9 @@ export interface AbstractPrinciple {
   supportFamilies:
     string[];
 
+  supportFamilyKinds:
+    string[];
+
   supportEpisodeIds:
     string[];
 
@@ -53,6 +56,9 @@ export interface AbstractPrincipleEpisode {
   family:
     string;
 
+  familyKind:
+    string;
+
   solved:
     boolean;
 
@@ -79,6 +85,9 @@ export interface AbstractPrincipleRecommendation {
 
 interface PrincipleSupport {
   family:
+    string;
+
+  familyKind:
     string;
 
   episodeId:
@@ -219,7 +228,8 @@ function findSupport(
  *   an action that initially had no observable effect later achieved the goal
  *   after other actions produced observable progress.
  *
- * Activation requires support from at least two distinct families.
+ * Activation requires support from at least two distinct family kinds, so
+ * relabeling one causal structure as multiple families is insufficient.
  */
 export class CrossFamilyPrincipleLibrary {
   private readonly supports:
@@ -263,6 +273,9 @@ export class CrossFamilyPrincipleLibrary {
     this.supports.push({
       family:
         episode.family,
+
+      familyKind:
+        episode.familyKind,
 
       episodeId:
         episode.episodeId,
@@ -323,18 +336,27 @@ export class CrossFamilyPrincipleLibrary {
       ),
     ].sort();
 
-    const familyCount =
-      supportFamilies.length;
+    const supportFamilyKinds = [
+      ...new Set(
+        this.supports.map(
+          (support) =>
+            support.familyKind,
+        ),
+      ),
+    ].sort();
+
+    const familyKindCount =
+      supportFamilyKinds.length;
 
     const status:
       AbstractPrincipleStatus =
         this.contradictionCount >=
           Math.max(
             2,
-            familyCount,
+            familyKindCount,
           )
           ? "retired"
-          : familyCount >=
+          : familyKindCount >=
               2
             ? "active"
             : "candidate";
@@ -351,6 +373,8 @@ export class CrossFamilyPrincipleLibrary {
 
       supportFamilies,
 
+      supportFamilyKinds,
+
       supportEpisodeIds:
         this.supports.map(
           (support) =>
@@ -365,7 +389,7 @@ export class CrossFamilyPrincipleLibrary {
 
       confidence:
         confidenceFor(
-          familyCount,
+          familyKindCount,
           this.contradictionCount,
         ),
 
