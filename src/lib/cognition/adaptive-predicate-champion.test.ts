@@ -745,20 +745,30 @@ describe(
 
         expect(
           estimate
-            ?.program,
+            ?.adaptation,
         ).toMatchObject({
-          operator:
-            "difference-equals",
-
-          parameter:
+          championGeneration:
             2,
+
+          championPredictsUsefulWhenPredicateIs:
+            false,
         });
 
         expect(
           estimate
             ?.projection
             .predicateValue,
-        ).toBe(true);
+        ).toBe(false);
+
+        expect(
+          estimate
+            ?.projection
+            .predicateValue,
+        ).toBe(
+          estimate
+            ?.adaptation
+            .championPredictsUsefulWhenPredicateIs,
+        );
 
         expect(
           estimate
