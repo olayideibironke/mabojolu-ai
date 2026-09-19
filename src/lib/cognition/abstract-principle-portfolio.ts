@@ -2,9 +2,9 @@ import type {
   EnvironmentSnapshot,
 } from "./environment";
 
-import {
+import type {
+  PrincipleApplicabilityContext,
   PrincipleApplicabilityModel,
-  type PrincipleApplicabilityContext,
 } from "./principle-applicability-model";
 
 import {
