@@ -70,6 +70,31 @@ that is tracked, and it contains no real values.
 
 ---
 
+## Compute independence
+
+Mabojolu's inference architecture is intentionally designed so paid API tokens
+are optional infrastructure rather than a requirement for cognition or chat.
+
+The current routing order is:
+
+1. user-owned browser/WebGPU compute;
+2. operator-controlled local Ollama;
+3. operator-controlled self-hosted inference;
+4. deterministic local mock compute for tests;
+5. paid external inference only after explicit opt-in.
+
+`src/lib/ai/compute-router.ts` enforces that ordering and refuses metered
+external inference by default. `src/lib/ai/browser-compute.ts` defines the
+browser-owned execution contract and a WebLLM-compatible streaming adapter.
+
+The browser contract is present in this checkpoint, but the WebLLM npm runtime
+is not yet bundled into the production UI. Until that final client integration
+is completed, real chat uses the configured local Ollama server. This distinction
+is intentional so the repository does not claim browser inference is live before
+it has been installed and verified on supported WebGPU hardware.
+
+---
+
 ## Commands
 
 | Command | Purpose |
