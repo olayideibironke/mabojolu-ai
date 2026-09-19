@@ -185,8 +185,14 @@ export function Sidebar({
     );
 
   const isOffCanvas =
-    !isOpen &&
-    !isDesktopLayout;
+    (
+      !isOpen &&
+      !isDesktopLayout
+    ) ||
+    (
+      isCollapsed &&
+      isDesktopLayout
+    );
 
   const hasPermanentAccount =
     isSignedIn &&
