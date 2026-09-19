@@ -85,13 +85,19 @@ The current routing order is:
 
 `src/lib/ai/compute-router.ts` enforces that ordering and refuses metered
 external inference by default. `src/lib/ai/browser-compute.ts` defines the
-browser-owned execution contract and a WebLLM-compatible streaming adapter.
+browser-owned execution contract, while the browser chat transport and module
+worker connect eligible Fast text chats to real WebGPU inference.
 
-The browser contract is present in this checkpoint, but the WebLLM npm runtime
-is not yet bundled into the production UI. Until that final client integration
-is completed, real chat uses the configured local Ollama server. This distinction
-is intentional so the repository does not claim browser inference is live before
-it has been installed and verified on supported WebGPU hardware.
+Browser Inference Integration v0.1 is browser-first for new Fast text chats on
+WebGPU-capable devices. The model runs in a module worker on the user's device;
+the server handles only authentication and conversation persistence. Image
+requests, Regular mode, Quality mode, and browsers without WebGPU continue to
+use the configured local Ollama server.
+
+The worker currently loads the pinned WebLLM 0.2.85 runtime from esm.run rather
+than shipping the WebLLM package inside the Mabojolu bundle. Model assets are
+downloaded by the browser and may take significant time on first use. A future
+self-hosted runtime/assets milestone can remove that CDN dependency as well.
 
 ---
 
