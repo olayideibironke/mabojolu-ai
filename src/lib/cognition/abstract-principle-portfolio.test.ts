@@ -406,16 +406,16 @@ describe(
     it(
       "holds multiple active abstractions with independent provenance",
       () => {
-        const snapshot =
+        const principles =
           trainedPortfolio()
-            .getSnapshot();
+            .getPrinciples();
 
         expect(
-          snapshot.principles,
+          principles,
         ).toHaveLength(2);
 
         expect(
-          snapshot.principles
+          principles
             .every(
               (principle) =>
                 principle.status ===
@@ -424,7 +424,7 @@ describe(
         ).toBe(true);
 
         expect(
-          snapshot.principles
+          principles
             .map(
               (principle) =>
                 principle.kind,
@@ -442,7 +442,10 @@ describe(
         const portfolio =
           trainedPortfolio();
 
-        portfolio.observeTransition({
+        const controller =
+          portfolio.createController();
+
+        controller.observeTransition({
           action:
             "TRY-GOAL",
 
@@ -468,7 +471,7 @@ describe(
           changedKeys: [],
         });
 
-        portfolio.observeTransition({
+        controller.observeTransition({
           action:
             "ADVANCE",
 
@@ -497,7 +500,7 @@ describe(
         });
 
         const selected =
-          portfolio.recommend([
+          controller.recommend([
             "TRY-GOAL",
             "ADVANCE",
           ]);
@@ -529,7 +532,10 @@ describe(
         const portfolio =
           trainedPortfolio();
 
-        portfolio.observeTransition({
+        const controller =
+          portfolio.createController();
+
+        controller.observeTransition({
           action:
             "TRY-GOAL",
 
@@ -555,7 +561,7 @@ describe(
           changedKeys: [],
         });
 
-        portfolio.observeTransition({
+        controller.observeTransition({
           action:
             "PREPARE",
 
@@ -584,7 +590,7 @@ describe(
         });
 
         expect(
-          portfolio.recommend([
+          controller.recommend([
             "TRY-GOAL",
             "PREPARE",
           ]),
@@ -607,10 +613,13 @@ describe(
         const portfolio =
           trainedPortfolio();
 
-        const before =
-          portfolio.getSnapshot();
+        const controller =
+          portfolio.createController();
 
-        portfolio.observeTransition({
+        const before =
+          portfolio.getPrinciples();
+
+        controller.observeTransition({
           action:
             "TRY",
 
@@ -630,7 +639,7 @@ describe(
           changedKeys: [],
         });
 
-        portfolio.observeTransition({
+        controller.observeTransition({
           action:
             "STEP",
 
@@ -652,13 +661,13 @@ describe(
           ],
         });
 
-        portfolio.recommend([
+        controller.recommend([
           "TRY",
           "STEP",
         ]);
 
         const after =
-          portfolio.getSnapshot();
+          controller.getSnapshot();
 
         expect(
           after.selections,
@@ -667,7 +676,7 @@ describe(
         expect(
           after.principles,
         ).toEqual(
-          before.principles,
+          before,
         );
       },
     );
