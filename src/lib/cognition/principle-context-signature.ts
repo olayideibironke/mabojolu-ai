@@ -510,10 +510,46 @@ export class StructuralContextSignatureEncoder {
     };
 
     return {
+      /*
+       * Preserve the verified v0.4 core signature key. Newer feature-learning
+       * milestones may inspect richer features without changing the older
+       * exact-key semantics.
+       */
       key:
-        JSON.stringify(
-          features,
-        ),
+        JSON.stringify({
+          lastChangeArity:
+            features
+              .lastChangeArity,
+
+          lastValueShapes: [
+            ...features
+              .lastValueShapes,
+          ],
+
+          candidateAttempts:
+            features
+              .candidateAttempts,
+
+          candidateNoEffectAttempts:
+            features
+              .candidateNoEffectAttempts,
+
+          candidateEffectAttempts:
+            features
+              .candidateEffectAttempts,
+
+          candidateMatchesLastAction:
+            features
+              .candidateMatchesLastAction,
+
+          candidateMatchesLastProductiveAction:
+            features
+              .candidateMatchesLastProductiveAction,
+
+          stepsSinceCandidateAttempt:
+            features
+              .stepsSinceCandidateAttempt,
+        }),
 
       features: {
         ...features,
@@ -536,6 +572,13 @@ export class InducedContextApplicabilityModel {
       string,
       EvidenceBucket
     >();
+
+  constructor(
+    private readonly keyMode:
+      "core" |
+      "full" =
+      "core",
+  ) {}
 
   record(
     observation:
@@ -687,7 +730,13 @@ export class InducedContextApplicabilityModel {
       principleId,
 
       signature:
-        signature.key,
+        this.keyMode ===
+          "full"
+          ? JSON.stringify(
+              signature
+                .features,
+            )
+          : signature.key,
     });
   }
 }
