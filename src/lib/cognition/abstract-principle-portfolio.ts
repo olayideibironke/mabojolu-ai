@@ -2,6 +2,12 @@ import type {
   EnvironmentSnapshot,
 } from "./environment";
 
+import {
+  StructuralContextSignatureEncoder,
+  type InducedContextApplicabilityModel,
+  type InducedContextSignature,
+} from "./principle-context-signature";
+
 import type {
   PrincipleApplicabilityContext,
   PrincipleApplicabilityModel,
@@ -48,13 +54,18 @@ export interface PrincipleSelection {
   applicabilitySource:
     "static" |
     "model-prior" |
-    "learned";
+    "learned" |
+    "induced-prior" |
+    "induced-learned";
 
   applicabilityEvidenceCount:
     number;
 
   applicabilityContext:
     PrincipleApplicabilityContext;
+
+  inducedContextSignature?:
+    InducedContextSignature;
 }
 
 export interface AbstractPrinciplePortfolioSnapshot {
@@ -151,11 +162,16 @@ export class AbstractPrinciplePortfolio {
   createController(input?: {
     applicabilityModel?:
       PrincipleApplicabilityModel;
+
+    inducedContextApplicabilityModel?:
+      InducedContextApplicabilityModel;
   }):
     AbstractPrinciplePortfolioController {
     return new AbstractPrinciplePortfolioController(
       this,
       input?.applicabilityModel,
+      input
+        ?.inducedContextApplicabilityModel,
     );
   }
 
@@ -221,6 +237,9 @@ export class AbstractPrinciplePortfolioController {
   private readonly selections:
     PrincipleSelection[] = [];
 
+  private readonly signatureEncoder =
+    new StructuralContextSignatureEncoder();
+
   private lastProgressKind:
     PrincipleApplicabilityContext[
       "progressKind"
@@ -242,6 +261,9 @@ export class AbstractPrinciplePortfolioController {
 
     private readonly applicabilityModel?:
       PrincipleApplicabilityModel,
+
+    private readonly inducedContextApplicabilityModel?:
+      InducedContextApplicabilityModel,
   ) {
     this.deferredController =
       new AbstractPrincipleController(
@@ -282,8 +304,7 @@ export class AbstractPrinciplePortfolioController {
       this.pendingSelection &&
       this.pendingSelection
         .action ===
-        input.action &&
-      this.applicabilityModel
+        input.action
     ) {
       const relation =
         this.pendingSelection
@@ -301,20 +322,46 @@ export class AbstractPrinciplePortfolioController {
             input.goalSatisfied ===
               true;
 
-      this.applicabilityModel
-        .record({
-          principleId:
-            this.pendingSelection
-              .selection
-              .principleId,
+      if (
+        this.applicabilityModel
+      ) {
+        this.applicabilityModel
+          .record({
+            principleId:
+              this.pendingSelection
+                .selection
+                .principleId,
 
-          context:
-            this.pendingSelection
-              .selection
-              .applicabilityContext,
+            context:
+              this.pendingSelection
+                .selection
+                .applicabilityContext,
 
-          useful,
-        });
+            useful,
+          });
+      }
+
+      if (
+        this.inducedContextApplicabilityModel &&
+        this.pendingSelection
+          .selection
+          .inducedContextSignature
+      ) {
+        this.inducedContextApplicabilityModel
+          .record({
+            principleId:
+              this.pendingSelection
+                .selection
+                .principleId,
+
+            signature:
+              this.pendingSelection
+                .selection
+                .inducedContextSignature,
+
+            useful,
+          });
+      }
 
       this.pendingSelection =
         undefined;
@@ -322,6 +369,11 @@ export class AbstractPrinciplePortfolioController {
 
     this.lastProgressKind =
       transitionProgressKind;
+
+    this.signatureEncoder
+      .observe(
+        input,
+      );
 
     this.deferredController
       .observeTransition({
@@ -383,6 +435,20 @@ export class AbstractPrinciplePortfolioController {
             "deferred-action",
         };
 
+        const signature =
+          this.signatureEncoder
+            .encodeCandidate(
+              deferred.action,
+            );
+
+        const induced =
+          this.inducedContextApplicabilityModel
+            ?.estimate(
+              deferred
+                .principleId,
+              signature,
+            );
+
         const learned =
           this.applicabilityModel
             ?.estimate(
@@ -392,6 +458,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          induced
+            ?.applicability ??
           learned
             ?.applicability ??
           deferred.applicability;
@@ -420,20 +488,34 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            learned
-              ? learned.evidenceCount >
+            induced
+              ? induced.evidenceCount >
                   0
-                ? "learned"
-                : "model-prior"
-              : "static",
+                ? "induced-learned"
+                : "induced-prior"
+              : learned
+                ? learned.evidenceCount >
+                    0
+                  ? "learned"
+                  : "model-prior"
+                : "static",
 
           applicabilityEvidenceCount:
+            induced
+              ?.evidenceCount ??
             learned
               ?.evidenceCount ??
             0,
 
           applicabilityContext:
             context,
+
+          ...(this.inducedContextApplicabilityModel
+            ? {
+                inducedContextSignature:
+                  signature,
+              }
+            : {}),
         });
       }
     }
@@ -458,6 +540,20 @@ export class AbstractPrinciplePortfolioController {
             "productive-repeat",
         };
 
+        const signature =
+          this.signatureEncoder
+            .encodeCandidate(
+              monotonic.action,
+            );
+
+        const induced =
+          this.inducedContextApplicabilityModel
+            ?.estimate(
+              monotonic
+                .principleId,
+              signature,
+            );
+
         const learned =
           this.applicabilityModel
             ?.estimate(
@@ -467,6 +563,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          induced
+            ?.applicability ??
           learned
             ?.applicability ??
           monotonic.applicability;
@@ -495,20 +593,34 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            learned
-              ? learned.evidenceCount >
+            induced
+              ? induced.evidenceCount >
                   0
-                ? "learned"
-                : "model-prior"
-              : "static",
+                ? "induced-learned"
+                : "induced-prior"
+              : learned
+                ? learned.evidenceCount >
+                    0
+                  ? "learned"
+                  : "model-prior"
+                : "static",
 
           applicabilityEvidenceCount:
+            induced
+              ?.evidenceCount ??
             learned
               ?.evidenceCount ??
             0,
 
           applicabilityContext:
             context,
+
+          ...(this.inducedContextApplicabilityModel
+            ? {
+                inducedContextSignature:
+                  signature,
+              }
+            : {}),
         });
       }
     }
@@ -585,7 +697,8 @@ export class AbstractPrinciplePortfolioController {
     });
 
     if (
-      this.applicabilityModel
+      this.applicabilityModel ||
+      this.inducedContextApplicabilityModel
     ) {
       this.pendingSelection = {
         selection: {
@@ -595,6 +708,31 @@ export class AbstractPrinciplePortfolioController {
             ...selected
               .applicabilityContext,
           },
+
+          ...(selected
+              .inducedContextSignature
+            ? {
+                inducedContextSignature: {
+                  key:
+                    selected
+                      .inducedContextSignature
+                      .key,
+
+                  features: {
+                    ...selected
+                      .inducedContextSignature
+                      .features,
+
+                    lastValueShapes: [
+                      ...selected
+                        .inducedContextSignature
+                        .features
+                        .lastValueShapes,
+                    ],
+                  },
+                },
+              }
+            : {}),
         },
 
         action:
@@ -609,6 +747,31 @@ export class AbstractPrinciplePortfolioController {
         ...selected
           .applicabilityContext,
       },
+
+      ...(selected
+          .inducedContextSignature
+        ? {
+            inducedContextSignature: {
+              key:
+                selected
+                  .inducedContextSignature
+                  .key,
+
+              features: {
+                ...selected
+                  .inducedContextSignature
+                  .features,
+
+                lastValueShapes: [
+                  ...selected
+                    .inducedContextSignature
+                    .features
+                    .lastValueShapes,
+                ],
+              },
+            },
+          }
+        : {}),
     };
   }
 
@@ -628,6 +791,31 @@ export class AbstractPrinciplePortfolioController {
               ...selection
                 .applicabilityContext,
             },
+
+            ...(selection
+                .inducedContextSignature
+              ? {
+                  inducedContextSignature: {
+                    key:
+                      selection
+                        .inducedContextSignature
+                        .key,
+
+                    features: {
+                      ...selection
+                        .inducedContextSignature
+                        .features,
+
+                      lastValueShapes: [
+                        ...selection
+                          .inducedContextSignature
+                          .features
+                          .lastValueShapes,
+                      ],
+                    },
+                  },
+                }
+              : {}),
           }),
         ),
     };
