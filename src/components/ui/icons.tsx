@@ -90,6 +90,57 @@ export function AttachmentIcon(props: IconProps) {
   );
 }
 
+export function LibraryIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M5 4.5h4.5v15H5a2 2 0 0 1-2-2v-11a2 2 0 0 1 2-2Z" />
+      <path d="M9.5 4.5H14v15H9.5M14 6h3.5a2 2 0 0 1 2 2v9.5a2 2 0 0 1-2 2H14" />
+    </Svg>
+  );
+}
+
+export function CalendarIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <rect x="3.5" y="5.5" width="17" height="15" rx="2" />
+      <path d="M7.5 3.5v4M16.5 3.5v4M3.5 10h17" />
+    </Svg>
+  );
+}
+
+export function PluginIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M8 4.5v4H4a4 4 0 0 0 0 8h4v4h4v-4h4a4 4 0 0 0 0-8h-4v-4Z" />
+    </Svg>
+  );
+}
+
+export function PinIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m8 4 8 8M14.5 3.5l6 6-3 1.5-4 4-1.5 3-6-6 3-1.5 4-4Z" />
+      <path d="m9.5 14.5-5 5" />
+    </Svg>
+  );
+}
+
+export function FolderIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="M3.5 7.5A2.5 2.5 0 0 1 6 5h4l2 2h6A2.5 2.5 0 0 1 20.5 9.5v7A2.5 2.5 0 0 1 18 19H6a2.5 2.5 0 0 1-2.5-2.5Z" />
+    </Svg>
+  );
+}
+
+export function ChevronDownIcon(props: IconProps) {
+  return (
+    <Svg {...props}>
+      <path d="m7 9 5 5 5-5" />
+    </Svg>
+  );
+}
+
 export function SettingsIcon(props: IconProps) {
   return (
     <Svg {...props}>
