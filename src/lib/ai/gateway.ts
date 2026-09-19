@@ -36,15 +36,16 @@ const providerCache = new Map<ProviderId, AiProvider>();
  * The browser works only with Mabojolu mode IDs. This server-side map resolves
  * those modes to the actual model registered for the configured provider.
  *
- * Local development:
- *   Fast, Regular, and Quality retain their Ollama models.
+ * Local-first operation:
+ *   Fast, Regular, and Quality resolve to local Ollama models with no external
+ *   per-token charge. This is Mabojolu's default operating mode in every
+ *   environment.
  *
- * Production:
- *   Fast and Regular use Claude Sonnet 5 through Mabojolu Swift.
- *   Quality uses Claude Opus 5 through Mabojolu Core.
+ * Optional compatibility:
+ *   Anthropic aliases remain available only when an operator explicitly opts
+ *   into the paid provider in server configuration.
  *
- * Automated tests:
- *   Every visible mode resolves to the deterministic mock provider.
+ * Automated tests may explicitly select the deterministic mock provider.
  */
 const MODEL_ALIASES: Readonly<
   Record<
@@ -182,7 +183,8 @@ function getProvider(
  * Resolve the model for the current environment.
  *
  * The browser sends a stable Mabojolu response-mode ID. The gateway maps that
- * mode to the correct local, cloud, or test model for the configured provider.
+ * mode to the correct local, optional cloud, or test model for the explicitly
+ * configured provider. Local inference is the default.
  *
  * Direct registry IDs remain supported for trusted server configuration such as
  * MABOJOLU_DEFAULT_MODEL.
