@@ -882,7 +882,13 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     if (
       !state ||
-      !champion
+      !champion ||
+      state.phase ===
+        "bootstrap-fit" ||
+      state.phase ===
+        "bootstrap-validation" ||
+      state.phase ===
+        "bootstrap-rejected"
     ) {
       return undefined;
     }
