@@ -122,6 +122,22 @@ export interface Goal {
 
   parentGoalId?: CognitiveId;
 
+  /**
+   * Goals that must be satisfied before this goal can become actionable.
+   */
+  dependsOnGoalIds?: CognitiveId[];
+
+  /**
+   * Why this goal cannot currently proceed.
+   */
+  blockedReason?: string;
+
+  /**
+   * When a blocked or abandoned branch is replanned, the replacement keeps an
+   * auditable link to the branch it supersedes.
+   */
+  replacementForGoalId?: CognitiveId;
+
   createdAt: string;
 
   updatedAt: string;
