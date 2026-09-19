@@ -31,6 +31,12 @@ import type {
 } from "./types";
 
 import {
+  StructuralTransferLibrary,
+  StructuralTransferSession,
+  type StructuralTransferUpdate,
+} from "./structural-transfer";
+
+import {
   WorldModel,
 } from "./world-model";
 
@@ -42,6 +48,7 @@ interface ActionAttempt {
 
 type ActionChoiceStrategy =
   | "world-model-plan"
+  | "structural-transfer"
   | "transfer"
   | "exploration"
   | "conditional"
@@ -74,6 +81,15 @@ export interface CognitiveRuntimeOptions {
    * knowledge to persist across episodes independently of sequence memory.
    */
   worldModel?: WorldModel;
+
+  /**
+   * Cross-environment structural analogy store.
+   *
+   * Templates contain relational role structure rather than source action or
+   * state-variable names.
+   */
+  structuralTransfer?:
+    StructuralTransferLibrary;
 }
 
 export interface CognitiveRunResult {
@@ -152,6 +168,17 @@ export class CognitiveRuntime {
     WorldModelPlanner |
     undefined;
 
+  private readonly structuralTransfer:
+    StructuralTransferLibrary |
+    undefined;
+
+  private structuralSession:
+    StructuralTransferSession |
+    undefined;
+
+  private structuralCorrectionRecorded =
+    false;
+
   constructor(
     private readonly environment:
       CognitiveEnvironment,
@@ -175,6 +202,9 @@ export class CognitiveRuntime {
 
     this.worldModel =
       options.worldModel;
+
+    this.structuralTransfer =
+      options.structuralTransfer;
 
     this.planner =
       this.worldModel
@@ -273,6 +303,11 @@ export class CognitiveRuntime {
     let snapshot =
       this.environment
         .observe();
+
+    this.initializeStructuralTransfer(
+      snapshot,
+      initialActions,
+    );
 
     this.recordObservation(
       snapshot,
@@ -485,6 +520,20 @@ export class CognitiveRuntime {
             this.now(),
         });
 
+      const structuralUpdate =
+        this.structuralSession
+          ?.observeTransition({
+            action,
+
+            before,
+
+            after,
+
+            accepted:
+              environmentResult
+                .accepted,
+          });
+
       this.learnFromTransition(
         action,
         before,
@@ -502,6 +551,12 @@ export class CognitiveRuntime {
       this.recordWorldModelCorrection(
         choice,
         changes,
+        observation,
+      );
+
+      this.recordStructuralTransferCorrection(
+        choice,
+        structuralUpdate,
         observation,
       );
 
@@ -590,6 +645,17 @@ export class CognitiveRuntime {
       modeled
     ) {
       return modeled;
+    }
+
+    const structural =
+      this.nextStructuralTransferAction(
+        availableActions,
+      );
+
+    if (
+      structural
+    ) {
+      return structural;
     }
 
     const transferred =
@@ -775,6 +841,79 @@ export class CognitiveRuntime {
     };
   }
 
+  private initializeStructuralTransfer(
+    initialState:
+      EnvironmentSnapshot,
+
+    availableActions:
+      readonly string[],
+  ): void {
+    if (
+      !this.structuralTransfer
+    ) {
+      return;
+    }
+
+    const goalReader =
+      this.environment
+        .getGoalConditions;
+
+    if (
+      !goalReader
+    ) {
+      return;
+    }
+
+    this.structuralSession =
+      this.structuralTransfer
+        .createSession({
+          environmentId:
+            this.environment.id,
+
+          initialState,
+
+          goalConditions:
+            goalReader.call(
+              this.environment,
+            ),
+
+          availableActions,
+        });
+  }
+
+  private nextStructuralTransferAction(
+    availableActions:
+      readonly string[],
+  ): ActionChoice | undefined {
+    const recommendation =
+      this.structuralSession
+        ?.recommend(
+          availableActions,
+        );
+
+    if (
+      !recommendation
+    ) {
+      return undefined;
+    }
+
+    return {
+      action:
+        recommendation.action,
+
+      strategy:
+        "structural-transfer",
+
+      expectedEffects: [
+        recommendation
+            .expectedRole ===
+          "goal"
+          ? "A cross-environment structural analogy predicts this action fills the gated goal role."
+          : "A cross-environment structural analogy predicts this action fills a remaining setup role.",
+      ],
+    };
+  }
+
   private nextTransferAction(
     availableActions:
       readonly string[],
@@ -819,6 +958,9 @@ export class CognitiveRuntime {
       case "world-model-plan":
         return "world-model-plan";
 
+      case "structural-transfer":
+        return "structural-transfer";
+
       case "transfer":
         return "transfer";
 
@@ -835,6 +977,11 @@ export class CognitiveRuntime {
       case "world-model-plan":
         return [
           "The learned causal world model predicts this action advances the goal.",
+        ];
+
+      case "structural-transfer":
+        return [
+          "A cross-environment structural analogy predicts this action contributes to the goal.",
         ];
 
       case "transfer":
@@ -1017,6 +1164,60 @@ export class CognitiveRuntime {
 
     void before;
     void after;
+  }
+
+  private recordStructuralTransferCorrection(
+    choice:
+      ActionChoice,
+
+    update:
+      StructuralTransferUpdate |
+      undefined,
+
+    observation:
+      Observation,
+  ): void {
+    if (
+      !update
+        ?.invalidated ||
+      this.structuralCorrectionRecorded
+    ) {
+      return;
+    }
+
+    this.structuralCorrectionRecorded =
+      true;
+
+    this.apply({
+      type:
+        "learning.recorded",
+
+      learning: {
+        id:
+          this.nextId(
+            "learning",
+          ),
+
+        kind:
+          "correction",
+
+        statement:
+          choice.strategy ===
+            "structural-transfer"
+            ? "A structurally transferred prediction failed, so the cross-environment analogy was abandoned."
+            : "Target-world evidence contradicted the active cross-environment analogy, so the structural transfer hypothesis was abandoned.",
+
+        confidence:
+          0.95,
+
+        derivedFromIds: [
+          observation.id,
+        ],
+
+        createdAt:
+          this.now(),
+      },
+    });
   }
 
   private recordTransferCorrection(
@@ -1411,6 +1612,35 @@ export class CognitiveRuntime {
     solved:
       boolean,
   ): CognitiveRunResult {
+    const goalReader =
+      this.environment
+        .getGoalConditions;
+
+    if (
+      this.structuralTransfer &&
+      goalReader
+    ) {
+      this.structuralTransfer
+        .learnFromEpisode({
+          environmentId:
+            this.environment.id,
+
+          solved,
+
+          goalConditions:
+            goalReader.call(
+              this.environment,
+            ),
+
+          availableActions:
+            this.environment
+              .getAvailableActions(),
+
+          transitions:
+            this.episodeTransitions,
+        });
+    }
+
     this.memory
       ?.recordEpisode({
         environmentId:
