@@ -517,6 +517,14 @@ export class AbstractPrinciplePortfolioController {
               deferred.action,
             );
 
+        const composed =
+          this.composedContextFeatureApplicabilityModel
+            ?.estimate(
+              deferred
+                .principleId,
+              signature,
+            );
+
         const featureLearned =
           this.learnedContextFeatureApplicabilityModel
             ?.estimate(
@@ -542,6 +550,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          composed
+            ?.applicability ??
           featureLearned
             ?.applicability ??
           induced
@@ -574,12 +584,17 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            featureLearned
-              ? featureLearned.evidenceCount >
+            composed
+              ? composed.evidenceCount >
                   0
-                ? "feature-learned"
-                : "feature-prior"
-              : induced
+                ? "composed-learned"
+                : "composed-prior"
+              : featureLearned
+                ? featureLearned.evidenceCount >
+                    0
+                  ? "feature-learned"
+                  : "feature-prior"
+                : induced
                 ? induced.evidenceCount >
                     0
                   ? "induced-learned"
@@ -592,6 +607,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            composed
+              ?.evidenceCount ??
             featureLearned
               ?.evidenceCount ??
             induced
@@ -602,6 +619,31 @@ export class AbstractPrinciplePortfolioController {
 
           applicabilityContext:
             context,
+
+          ...(composed
+            ? {
+                composedContextProjection: {
+                  featureId:
+                    composed
+                      .projection
+                      .featureId,
+
+                  components: [
+                    composed
+                      .projection
+                      .components[0],
+                    composed
+                      .projection
+                      .components[1],
+                  ],
+
+                  projectionKey:
+                    composed
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : {}),
 
           ...(featureLearned
             ? {
@@ -621,7 +663,8 @@ export class AbstractPrinciplePortfolioController {
             : {}),
 
           ...(this.inducedContextApplicabilityModel ||
-              this.learnedContextFeatureApplicabilityModel
+              this.learnedContextFeatureApplicabilityModel ||
+              this.composedContextFeatureApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
@@ -657,6 +700,14 @@ export class AbstractPrinciplePortfolioController {
               monotonic.action,
             );
 
+        const composed =
+          this.composedContextFeatureApplicabilityModel
+            ?.estimate(
+              monotonic
+                .principleId,
+              signature,
+            );
+
         const featureLearned =
           this.learnedContextFeatureApplicabilityModel
             ?.estimate(
@@ -682,6 +733,8 @@ export class AbstractPrinciplePortfolioController {
             );
 
         const applicability =
+          composed
+            ?.applicability ??
           featureLearned
             ?.applicability ??
           induced
@@ -714,12 +767,17 @@ export class AbstractPrinciplePortfolioController {
             }),
 
           applicabilitySource:
-            featureLearned
-              ? featureLearned.evidenceCount >
+            composed
+              ? composed.evidenceCount >
                   0
-                ? "feature-learned"
-                : "feature-prior"
-              : induced
+                ? "composed-learned"
+                : "composed-prior"
+              : featureLearned
+                ? featureLearned.evidenceCount >
+                    0
+                  ? "feature-learned"
+                  : "feature-prior"
+                : induced
                 ? induced.evidenceCount >
                     0
                   ? "induced-learned"
@@ -732,6 +790,8 @@ export class AbstractPrinciplePortfolioController {
                   : "static",
 
           applicabilityEvidenceCount:
+            composed
+              ?.evidenceCount ??
             featureLearned
               ?.evidenceCount ??
             induced
@@ -742,6 +802,31 @@ export class AbstractPrinciplePortfolioController {
 
           applicabilityContext:
             context,
+
+          ...(composed
+            ? {
+                composedContextProjection: {
+                  featureId:
+                    composed
+                      .projection
+                      .featureId,
+
+                  components: [
+                    composed
+                      .projection
+                      .components[0],
+                    composed
+                      .projection
+                      .components[1],
+                  ],
+
+                  projectionKey:
+                    composed
+                      .projection
+                      .projectionKey,
+                },
+              }
+            : {}),
 
           ...(featureLearned
             ? {
@@ -761,7 +846,8 @@ export class AbstractPrinciplePortfolioController {
             : {}),
 
           ...(this.inducedContextApplicabilityModel ||
-              this.learnedContextFeatureApplicabilityModel
+              this.learnedContextFeatureApplicabilityModel ||
+              this.composedContextFeatureApplicabilityModel
             ? {
                 inducedContextSignature:
                   signature,
