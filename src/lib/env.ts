@@ -9,8 +9,9 @@ import { z } from "zod";
  * a Client Component. The `server-only` import above turns that mistake into a
  * build error instead of leaking private configuration.
  *
- * Validation is lazy through `serverEnv()`, so Mabojolu can still build and run
- * in mock mode before any cloud-provider credential exists.
+ * Validation is lazy through `serverEnv()`. Mabojolu is local-first: the
+ * default real provider is Ollama and no cloud-provider credential is required.
+ * Paid cloud providers must be enabled explicitly.
  */
 const serverEnvSchema = z.object({
   NODE_ENV: z
@@ -39,7 +40,25 @@ const serverEnvSchema = z.object({
       "ollama",
       "anthropic",
     ])
-    .default("mock"),
+    .default("ollama"),
+
+  /**
+   * Paid external inference is disabled by default.
+   *
+   * This prevents an accidental configuration change from creating API usage.
+   * Set true only when the operator intentionally wants an external paid
+   * provider.
+   */
+  MABOJOLU_ALLOW_PAID_PROVIDERS:
+    z.enum([
+      "true",
+      "false",
+    ])
+      .default("false")
+      .transform(
+        (value) =>
+          value === "true",
+      ),
 
   ANTHROPIC_API_KEY:
     z.string().min(1).optional(),
@@ -329,9 +348,19 @@ function validate(): EnvValidationResult {
     env.SUPABASE_SERVICE_ROLE_KEY;
 
   /*
-   * Anthropic requires a credential. Ollama and mock mode do not require any
-   * API key.
+   * Local inference is the default. Paid external inference must be opted into
+   * explicitly and then configured with its provider credential.
    */
+  if (
+    env.AI_PROVIDER ===
+      "anthropic" &&
+    !env.MABOJOLU_ALLOW_PAID_PROVIDERS
+  ) {
+    issues.push(
+      'MABOJOLU_ALLOW_PAID_PROVIDERS: must be "true" before AI_PROVIDER can be set to "anthropic".',
+    );
+  }
+
   if (
     env.AI_PROVIDER ===
       "anthropic" &&
