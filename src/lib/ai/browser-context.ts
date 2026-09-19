@@ -179,53 +179,118 @@ export function buildBrowserContext(input: {
     };
   }
 
-  const selected:
-    BrowserContextMessage[] = [
-      latestUser,
-    ];
+  const history =
+    usableMessages.slice(
+      0,
+      latestUserIndex,
+    );
+
+  const segments:
+    BrowserContextMessage[][] =
+      [];
+
+  for (
+    let index =
+      history.length -
+      1;
+    index >=
+      0;
+  ) {
+    const current =
+      history[index];
+
+    if (
+      current.role ===
+        "assistant"
+    ) {
+      const previous =
+        index >
+          0
+          ? history[
+              index -
+              1
+            ]
+          : undefined;
+
+      if (
+        previous?.role ===
+        "user"
+      ) {
+        segments.push([
+          previous,
+          current,
+        ]);
+
+        index -=
+          2;
+
+        continue;
+      }
+
+      index -=
+        1;
+
+      continue;
+    }
+
+    segments.push([
+      current,
+    ]);
+
+    index -=
+      1;
+  }
+
+  const selectedSegments:
+    BrowserContextMessage[][] =
+      [];
 
   let usedTokens =
     requiredTokens;
 
   for (
-    let index =
-      latestUserIndex -
-      1;
-    index >=
-      0;
-    index -=
-      1
+    const segment of
+      segments
   ) {
-    const candidate =
-      usableMessages[
-        index
-      ];
-
-    const candidateTokens =
-      messageTokens(
-        candidate,
+    const segmentTokens =
+      segment.reduce(
+        (
+          total,
+          message,
+        ) =>
+          total +
+          messageTokens(
+            message,
+          ),
+        0,
       );
 
     if (
       usedTokens +
-        candidateTokens >
+        segmentTokens >
       inputBudget
     ) {
-      continue;
+      break;
     }
 
-    selected.unshift(
-      candidate,
+    selectedSegments.push(
+      segment,
     );
 
     usedTokens +=
-      candidateTokens;
+      segmentTokens;
   }
+
+  const selectedHistory =
+    selectedSegments
+      .reverse()
+      .flat();
 
   return {
     messages: [
       systemMessage,
-      ...selected,
+      ...selectedHistory,
+      latestUser,
     ],
 
     estimatedInputTokens:
@@ -234,7 +299,8 @@ export function buildBrowserContext(input: {
     omittedMessageCount:
       usableMessages
         .length -
-      selected.length,
+      selectedHistory.length -
+      1,
 
     fits:
       true,
