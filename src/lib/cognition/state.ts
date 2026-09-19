@@ -338,6 +338,14 @@ export function reduceCognitiveState(
         event.goal,
       );
 
+      const activeGoalId =
+        state.activeGoalId ===
+          event.goal.id &&
+        event.goal.status !==
+          "active"
+          ? undefined
+          : state.activeGoalId;
+
       return {
         ...state,
 
@@ -346,6 +354,15 @@ export function reduceCognitiveState(
             state.goals,
             event.goal,
           ),
+
+        ...(activeGoalId
+          ? {
+              activeGoalId,
+            }
+          : {
+              activeGoalId:
+                undefined,
+            }),
 
         updatedAt:
           event.goal.updatedAt,
