@@ -12,6 +12,12 @@ import {
 } from "./environment";
 
 import {
+  AutonomousGoalDecomposer,
+  type AutonomousGoalDecomposition,
+  type DecomposedGoal,
+} from "./goal-decomposer";
+
+import {
   HierarchicalGoalReasoner,
   type GoalHierarchySnapshot,
 } from "./goal-hierarchy";
@@ -78,12 +84,6 @@ interface ActionChoice {
 
   expectedEffects?:
     string[];
-
-  hierarchyGoalId?:
-    string;
-
-  predictedState?:
-    EnvironmentSnapshot;
 }
 
 export interface CognitiveRuntimeOptions {
@@ -136,6 +136,9 @@ export interface CognitiveRunResult {
 
   generatedHypotheses:
     AutonomousCausalHypothesis[];
+
+  autonomousDecomposition?:
+    AutonomousGoalDecomposition;
 
   goalHierarchy:
     GoalHierarchySnapshot;
@@ -199,14 +202,19 @@ export class CognitiveRuntime {
   private readonly rootGoalId:
     string;
 
-  private hierarchyPlanInitialized =
-    false;
+  private readonly goalDecomposer:
+    AutonomousGoalDecomposer |
+    undefined;
 
-  private hierarchyPlanGoalIds:
-    string[] = [];
+  private autonomousDecomposition:
+    AutonomousGoalDecomposition |
+    undefined;
 
-  private hierarchyPlanIndex =
-    0;
+  private readonly decomposedGoalById =
+    new Map<
+      string,
+      DecomposedGoal
+    >();
 
   private readonly memory:
     CognitiveMemory |
@@ -266,6 +274,13 @@ export class CognitiveRuntime {
 
     this.worldModel =
       options.worldModel;
+
+    this.goalDecomposer =
+      this.worldModel
+        ? new AutonomousGoalDecomposer(
+            this.worldModel,
+          )
+        : undefined;
 
     this.hypothesisEngine =
       options.hypothesisEngine ??
@@ -393,6 +408,11 @@ export class CognitiveRuntime {
     let snapshot =
       this.environment
         .observe();
+
+    this.initializeAutonomousGoalDecomposition(
+      snapshot,
+      initialActions,
+    );
 
     this.initializeStructuralTransfer(
       snapshot,
@@ -610,8 +630,7 @@ export class CognitiveRuntime {
             this.now(),
         });
 
-      this.updateGoalHierarchyAfterAction(
-        choice,
+      this.advanceGoalHierarchyFromObservation(
         after,
       );
 
@@ -1028,15 +1047,6 @@ export class CognitiveRuntime {
       return undefined;
     }
 
-    this.initializeGoalHierarchyFromPlan(
-      plan.steps,
-    );
-
-    const hierarchyGoalId =
-      this.hierarchyPlanGoalIds[
-        this.hierarchyPlanIndex
-      ];
-
     return {
       action:
         firstStep.action,
@@ -1053,73 +1063,73 @@ export class CognitiveRuntime {
               effect.after,
             )}`,
         ),
-
-      ...(hierarchyGoalId
-        ? {
-            hierarchyGoalId,
-          }
-        : {}),
-
-      predictedState: {
-        ...firstStep
-          .predictedState,
-      },
     };
   }
 
-  private initializeGoalHierarchyFromPlan(
-    steps:
-      readonly {
-        action: string;
-        predictedState:
-          EnvironmentSnapshot;
-      }[],
+  private initializeAutonomousGoalDecomposition(
+    snapshot:
+      EnvironmentSnapshot,
+
+    availableActions:
+      readonly string[],
   ): void {
     if (
-      this.hierarchyPlanInitialized ||
-      steps.length ===
+      this.autonomousDecomposition ||
+      !this.goalDecomposer
+    ) {
+      return;
+    }
+
+    const goalReader =
+      this.environment
+        .getGoalConditions;
+
+    if (
+      !goalReader
+    ) {
+      return;
+    }
+
+    const decomposition =
+      this.goalDecomposer
+        .decompose({
+          currentState:
+            snapshot,
+
+          goalConditions:
+            goalReader.call(
+              this.environment,
+            ),
+
+          availableActions,
+        });
+
+    if (
+      !decomposition ||
+      decomposition
+        .goals
+        .length ===
         0
     ) {
       return;
     }
 
-    const specifications =
-      steps.map(
-        (
-          step,
-          index,
-        ) => {
-          const id =
-            `hierarchy-step-${index + 1}`;
+    this.autonomousDecomposition =
+      decomposition;
 
-          const previousId =
-            index > 0
-              ? `hierarchy-step-${index}`
-              : undefined;
-
-          const stateDescription =
-            Object.entries(
-              step.predictedState,
-            )
-              .sort(
-                ([left], [right]) =>
-                  left.localeCompare(
-                    right,
-                  ),
-              )
-              .map(
-                ([key, value]) =>
-                  `${key}=${String(
-                    value,
-                  )}`,
-              )
-              .join(", ");
-
-          return {
-            id,
+    this.goalHierarchy
+      .decompose(
+        this.rootGoalId,
+        decomposition.goals.map(
+          (
+            goal,
+            index,
+          ) => ({
+            id:
+              goal.id,
 
             description:
-              `Reach modeled state after action ${step.action}.`,
+              goal.description,
 
             priority:
               Math.max(
@@ -1128,105 +1138,110 @@ export class CognitiveRuntime {
                   index,
               ),
 
-            successCriteria: [
-              `Observable state matches: ${stateDescription}.`,
+            successCriteria:
+              Object.entries(
+                goal.conditions,
+              ).map(
+                ([key, value]) =>
+                  `${key}=${String(
+                    value,
+                  )}`,
+              ),
+
+            dependsOnGoalIds: [
+              ...goal
+                .dependsOnGoalIds,
             ],
-
-            ...(previousId
-              ? {
-                  dependsOnGoalIds: [
-                    previousId,
-                  ],
-                }
-              : {}),
-          };
-        },
+          }),
+        ),
       );
 
-    this.goalHierarchy
-      .decompose(
-        this.rootGoalId,
-        specifications,
-      );
-
-    this.hierarchyPlanGoalIds =
-      specifications.map(
-        (specification) =>
-          specification.id,
-      );
-
-    this.hierarchyPlanInitialized =
-      true;
-
-    const next =
-      this.goalHierarchy
-        .nextActionableGoal();
-
-    if (
-      next
+    for (
+      const goal of
+        decomposition.goals
     ) {
-      this.goalHierarchy
-        .activate(
-          next.id,
+      this.decomposedGoalById
+        .set(
+          goal.id,
+          {
+            ...goal,
+
+            conditions: {
+              ...goal.conditions,
+            },
+
+            dependsOnGoalIds: [
+              ...goal
+                .dependsOnGoalIds,
+            ],
+          },
         );
     }
 
-    this.syncGoalHierarchyToState();
+    this.advanceGoalHierarchyFromObservation(
+      snapshot,
+    );
   }
 
-  private updateGoalHierarchyAfterAction(
-    choice:
-      ActionChoice,
-
-    after:
+  private advanceGoalHierarchyFromObservation(
+    snapshot:
       EnvironmentSnapshot,
   ): void {
     if (
-      !choice.hierarchyGoalId ||
-      !choice.predictedState
+      !this.autonomousDecomposition
     ) {
       return;
     }
 
-    const predictionMatched =
-      snapshotSignature(
-        choice.predictedState,
-      ) ===
-      snapshotSignature(
-        after,
-      );
-
-    if (
-      predictionMatched
-    ) {
+    let next =
       this.goalHierarchy
-        .complete(
-          choice
-            .hierarchyGoalId,
-        );
+        .nextActionableGoal();
 
-      this.hierarchyPlanIndex +=
-        1;
-
-      const next =
-        this.goalHierarchy
-          .nextActionableGoal();
+    while (
+      next
+    ) {
+      const decomposed =
+        this.decomposedGoalById
+          .get(
+            next.id,
+          );
 
       if (
-        next
+        !decomposed
+      ) {
+        break;
+      }
+
+      const satisfied =
+        Object.entries(
+          decomposed.conditions,
+        ).every(
+          ([key, value]) =>
+            Object.is(
+              snapshot[key],
+              value,
+            ),
+        );
+
+      if (
+        !satisfied
       ) {
         this.goalHierarchy
           .activate(
             next.id,
           );
+
+        break;
       }
-    } else {
+
       this.goalHierarchy
-        .block(
-          choice
-            .hierarchyGoalId,
-          "The observed state did not match the modeled subgoal prediction.",
+        .complete(
+          next.id,
         );
+
+      next =
+        this.goalHierarchy
+          .nextActionableGoal();
     }
 
     this.syncGoalHierarchyToState();
@@ -1266,6 +1281,7 @@ export class CognitiveRuntime {
       });
     }
   }
+
   private nextAutonomousHypothesisAction(
     availableActions:
       readonly string[],
@@ -2222,6 +2238,38 @@ export class CognitiveRuntime {
                 ...this.recalledPlan
                   .actions,
               ],
+            },
+          }
+        : {}),
+
+      ...(this.autonomousDecomposition
+        ? {
+            autonomousDecomposition: {
+              ...this.autonomousDecomposition,
+
+              goalConditions: {
+                ...this.autonomousDecomposition
+                  .goalConditions,
+              },
+
+              goals:
+                this.autonomousDecomposition
+                  .goals
+                  .map(
+                    (goal) => ({
+                      ...goal,
+
+                      conditions: {
+                        ...goal
+                          .conditions,
+                      },
+
+                      dependsOnGoalIds: [
+                        ...goal
+                          .dependsOnGoalIds,
+                      ],
+                    }),
+                  ),
             },
           }
         : {}),
