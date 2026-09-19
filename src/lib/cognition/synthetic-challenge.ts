@@ -45,6 +45,17 @@ export interface GatedSequenceChallengeSpec {
       0 | 1 | 2,
       0 | 1 | 2,
     ];
+
+  /**
+   * Optional order in which the three action labels are exposed to the agent.
+   * This changes exploration difficulty without changing the hidden causal skill.
+   */
+  actionPresentationOrder?:
+    readonly [
+      0 | 1 | 2,
+      0 | 1 | 2,
+      0 | 1 | 2,
+    ];
 }
 
 function validateUnique(
@@ -111,6 +122,46 @@ export function validateChallengeSpec(
       "Challenge action roles must be a permutation of 0, 1, and 2.",
     );
   }
+
+  if (
+    spec.actionPresentationOrder
+  ) {
+    const presentation = [
+      ...spec
+        .actionPresentationOrder,
+    ].sort();
+
+    if (
+      presentation[0] !==
+        0 ||
+      presentation[1] !==
+        1 ||
+      presentation[2] !==
+        2
+    ) {
+      throw new Error(
+        "Challenge action presentation order must be a permutation of 0, 1, and 2.",
+      );
+    }
+  }
+}
+
+function normalizedPresentationOrder(
+  spec:
+    GatedSequenceChallengeSpec,
+):
+  readonly [
+    0 | 1 | 2,
+    0 | 1 | 2,
+    0 | 1 | 2,
+  ] {
+  return spec
+    .actionPresentationOrder ??
+    [
+      0,
+      1,
+      2,
+    ];
 }
 
 export function challengeFingerprint(
@@ -142,6 +193,12 @@ export function challengeFingerprint(
 
     actionRoleOrder: [
       ...spec.actionRoleOrder,
+    ],
+
+    actionPresentationOrder: [
+      ...normalizedPresentationOrder(
+        spec,
+      ),
     ],
   });
 }
@@ -186,6 +243,12 @@ export function challengeInstanceFingerprint(
 
     actionRoleOrder: [
       ...spec.actionRoleOrder,
+    ],
+
+    actionPresentationOrder: [
+      ...normalizedPresentationOrder(
+        spec,
+      ),
     ],
   });
 }
