@@ -3,6 +3,11 @@ import type {
 } from "./environment";
 
 import type {
+  ComposedContextFeatureApplicabilityModel,
+  ComposedContextProjection,
+} from "./context-feature-composition";
+
+import type {
   LearnedContextFeatureApplicabilityModel,
   LearnedContextProjection,
 } from "./context-feature-learning";
@@ -63,7 +68,9 @@ export interface PrincipleSelection {
     "induced-prior" |
     "induced-learned" |
     "feature-prior" |
-    "feature-learned";
+    "feature-learned" |
+    "composed-prior" |
+    "composed-learned";
 
   applicabilityEvidenceCount:
     number;
@@ -76,6 +83,9 @@ export interface PrincipleSelection {
 
   learnedContextProjection?:
     LearnedContextProjection;
+
+  composedContextProjection?:
+    ComposedContextProjection;
 }
 
 export interface AbstractPrinciplePortfolioSnapshot {
@@ -178,6 +188,9 @@ export class AbstractPrinciplePortfolio {
 
     learnedContextFeatureApplicabilityModel?:
       LearnedContextFeatureApplicabilityModel;
+
+    composedContextFeatureApplicabilityModel?:
+      ComposedContextFeatureApplicabilityModel;
   }):
     AbstractPrinciplePortfolioController {
     return new AbstractPrinciplePortfolioController(
@@ -187,6 +200,8 @@ export class AbstractPrinciplePortfolio {
         ?.inducedContextApplicabilityModel,
       input
         ?.learnedContextFeatureApplicabilityModel,
+      input
+        ?.composedContextFeatureApplicabilityModel,
     );
   }
 
@@ -282,6 +297,9 @@ export class AbstractPrinciplePortfolioController {
 
     private readonly learnedContextFeatureApplicabilityModel?:
       LearnedContextFeatureApplicabilityModel,
+
+    private readonly composedContextFeatureApplicabilityModel?:
+      ComposedContextFeatureApplicabilityModel,
   ) {
     this.deferredController =
       new AbstractPrincipleController(
@@ -384,6 +402,28 @@ export class AbstractPrinciplePortfolioController {
           .inducedContextSignature
       ) {
         this.learnedContextFeatureApplicabilityModel
+          .record({
+            principleId:
+              this.pendingSelection
+                .selection
+                .principleId,
+
+            signature:
+              this.pendingSelection
+                .selection
+                .inducedContextSignature,
+
+            useful,
+          });
+      }
+
+      if (
+        this.composedContextFeatureApplicabilityModel &&
+        this.pendingSelection
+          .selection
+          .inducedContextSignature
+      ) {
+        this.composedContextFeatureApplicabilityModel
           .record({
             principleId:
               this.pendingSelection
@@ -805,7 +845,8 @@ export class AbstractPrinciplePortfolioController {
     if (
       this.applicabilityModel ||
       this.inducedContextApplicabilityModel ||
-      this.learnedContextFeatureApplicabilityModel
+      this.learnedContextFeatureApplicabilityModel ||
+      this.composedContextFeatureApplicabilityModel
     ) {
       this.pendingSelection = {
         selection: {
