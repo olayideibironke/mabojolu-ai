@@ -25,12 +25,14 @@ const FAST_MODEL_IDS = new Set([
 
 const REGULAR_MODEL_IDS = new Set([
   "mabojolu-regular",
+  "mabojolu-browser-regular",
   "qwen3.5:2b",
   "mabojolu regular",
 ]);
 
 const QUALITY_MODEL_IDS = new Set([
   "mabojolu-local",
+  "mabojolu-browser-quality",
   "qwen3.5:4b",
   "mabojolu quality",
   "mabojolu local",
@@ -62,20 +64,38 @@ function resolveModel(
   if (
     REGULAR_MODEL_IDS.has(normalized)
   ) {
+    const onDevice =
+      normalized ===
+        "mabojolu-browser-regular";
+
     return {
-      label: "Mabojolu Regular",
+      label:
+        onDevice
+          ? "Mabojolu Regular · On-device"
+          : "Mabojolu Regular",
       description:
-        "Generated with the balanced local response model.",
+        onDevice
+          ? "Generated on this device with browser WebGPU inference."
+          : "Generated with the balanced local response model.",
     };
   }
 
   if (
     QUALITY_MODEL_IDS.has(normalized)
   ) {
+    const onDevice =
+      normalized ===
+        "mabojolu-browser-quality";
+
     return {
-      label: "Mabojolu Quality",
+      label:
+        onDevice
+          ? "Mabojolu Quality · On-device"
+          : "Mabojolu Quality",
       description:
-        "Generated with the strongest available local response model.",
+        onDevice
+          ? "Generated on this device with browser WebGPU inference."
+          : "Generated with the strongest available local response model.",
     };
   }
 
