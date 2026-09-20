@@ -237,21 +237,29 @@ beforeEach(
         usageByModel: [],
       });
 
-    mocks.env
-      .MABOJOLU_MAINTENANCE_MODE =
+    mocks.runtimeConfig
+      .maintenanceMode =
       false;
 
-    mocks.env
-      .MABOJOLU_MAX_CONCURRENT_GENERATIONS =
+    mocks.runtimeConfig
+      .maxConcurrentGenerations =
       2;
 
-    mocks.env
-      .MABOJOLU_DAILY_MESSAGE_LIMIT =
+    mocks.runtimeConfig
+      .dailyMessageLimit =
       200;
 
-    mocks.env
-      .MABOJOLU_DAILY_COST_LIMIT_USD =
+    mocks.runtimeConfig
+      .dailyCostLimitUsd =
       0;
+
+    mocks.runtimeConfig
+      .rateLimitMax =
+      30;
+
+    mocks.runtimeConfig
+      .rateLimitWindowMs =
+      60_000;
   },
 );
 
