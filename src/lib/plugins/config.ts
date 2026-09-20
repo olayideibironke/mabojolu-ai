@@ -102,14 +102,23 @@ export function pluginOAuthConfig(
               process.env
                 .MICROSOFT_OAUTH_CLIENT_SECRET,
           }
-        : {
-            clientId:
-              process.env
-                .GITHUB_OAUTH_CLIENT_ID,
-            clientSecret:
-              process.env
-                .GITHUB_OAUTH_CLIENT_SECRET,
-          };
+        : providerId ===
+            "github"
+          ? {
+              clientId:
+                process.env
+                  .GITHUB_OAUTH_CLIENT_ID,
+              clientSecret:
+                process.env
+                  .GITHUB_OAUTH_CLIENT_SECRET,
+            }
+          : null;
+
+  if (
+    !credentials
+  ) {
+    return null;
+  }
 
   if (
     !credentials.clientId ||
