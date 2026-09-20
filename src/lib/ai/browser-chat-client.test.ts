@@ -189,6 +189,22 @@ describe(
     );
 
     it(
+      "does not silently route Fast text to a server provider when browser workers are unavailable",
+      () => {
+        vi.stubGlobal(
+          "Worker",
+          undefined,
+        );
+
+        expect(
+          shouldUseBrowserChat(
+            BASE_BODY,
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
       "does not silently route Fast text to a server provider after a browser failure cooldown",
       () => {
         vi.stubGlobal(
