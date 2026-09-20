@@ -280,6 +280,11 @@ export function Sidebar({
   ] = useState(false);
 
   const [
+    chatMenuId,
+    setChatMenuId,
+  ] = useState<string | null>(null);
+
+  const [
     showProjects,
     setShowProjects,
   ] = useState(true);
@@ -404,6 +409,74 @@ export function Sidebar({
     }
   }, [
     projectRenamingId,
+  ]);
+
+  useEffect(() => {
+    if (!chatMenuId) {
+      return;
+    }
+
+    const closeOnPointer =
+      (
+        event:
+          MouseEvent,
+      ) => {
+        const target =
+          event.target;
+
+        if (
+          target instanceof
+            Element &&
+          target.closest(
+            `[data-chat-row="${chatMenuId}"]`,
+          )
+        ) {
+          return;
+        }
+
+        setChatMenuId(
+          null,
+        );
+      };
+
+    const closeOnEscape =
+      (
+        event:
+          KeyboardEvent,
+      ) => {
+        if (
+          event.key ===
+            "Escape"
+        ) {
+          setChatMenuId(
+            null,
+          );
+        }
+      };
+
+    document.addEventListener(
+      "mousedown",
+      closeOnPointer,
+    );
+
+    document.addEventListener(
+      "keydown",
+      closeOnEscape,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        closeOnPointer,
+      );
+
+      document.removeEventListener(
+        "keydown",
+        closeOnEscape,
+      );
+    };
+  }, [
+    chatMenuId,
   ]);
 
   useEffect(() => {
@@ -859,8 +932,10 @@ export function Sidebar({
       );
     }
 
-    return (
-      <div className="group relative">
+    if (
+      options?.compact
+    ) {
+      return (
         <button
           type="button"
           onClick={() =>
@@ -873,11 +948,7 @@ export function Sidebar({
               ? "true"
               : undefined
           }
-          className={`w-full truncate rounded-xl py-2 pl-3 text-left text-sm transition-colors ${
-            options?.compact
-              ? "pr-3"
-              : "pr-[7.5rem]"
-          } ${
+          className={`w-full truncate rounded-xl py-2 px-3 text-left text-sm transition-colors ${
             isActive
               ? "bg-surface-raised text-text-primary shadow-sm"
               : "text-text-secondary hover:bg-surface-raised/70 hover:text-text-primary"
@@ -885,77 +956,181 @@ export function Sidebar({
         >
           {conversation.title}
         </button>
+      );
+    }
 
-        {!options?.compact ? (
-          <span className="absolute right-1 top-1/2 flex -translate-y-1/2 opacity-0 transition-opacity focus-within:opacity-100 group-hover:opacity-100">
-            <IconButton
-              size="sm"
-              label={
-                pinnedIds.includes(
-                  conversation.id,
-                )
-                  ? `Unpin chat: ${conversation.title}`
-                  : `Pin chat: ${conversation.title}`
+    const isPinned =
+      pinnedIds.includes(
+        conversation.id,
+      );
+
+    const isProject =
+      projectIds.includes(
+        conversation.id,
+      );
+
+    return (
+      <div
+        data-chat-row={
+          conversation.id
+        }
+        className={`relative flex items-center rounded-xl transition-colors ${
+          isActive
+            ? "bg-surface-raised shadow-sm"
+            : "hover:bg-surface-raised/70"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() =>
+            onSelectConversation(
+              conversation.id,
+            )
+          }
+          aria-current={
+            isActive
+              ? "true"
+              : undefined
+          }
+          className={`min-w-0 flex-1 truncate rounded-xl py-2 pl-3 pr-1 text-left text-sm ${
+            isActive
+              ? "text-text-primary"
+              : "text-text-secondary hover:text-text-primary"
+          }`}
+        >
+          {conversation.title}
+        </button>
+
+        <span className="mr-1 flex shrink-0 items-center">
+          <IconButton
+            size="sm"
+            label={`Rename chat: ${conversation.title}`}
+            onClick={() => {
+              setChatMenuId(
+                null,
+              );
+
+              beginRename(
+                conversation,
+              );
+            }}
+          >
+            <EditIcon className="h-4 w-4" />
+          </IconButton>
+
+          <div className="relative">
+            <button
+              type="button"
+              aria-label={`Chat actions: ${conversation.title}`}
+              aria-haspopup="menu"
+              aria-expanded={
+                chatMenuId ===
+                conversation.id
               }
               onClick={() =>
-                toggleStoredId(
-                  conversation.id,
-                  "pinned",
+                setChatMenuId(
+                  (
+                    current,
+                  ) =>
+                    current ===
+                    conversation.id
+                      ? null
+                      : conversation.id,
                 )
               }
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg leading-none text-text-secondary transition-colors hover:bg-surface-base hover:text-text-primary"
             >
-              <PinIcon className="h-4 w-4" />
-            </IconButton>
+              <span
+                aria-hidden="true"
+                className="-mt-1"
+              >
+                &hellip;
+              </span>
+            </button>
 
-            <IconButton
-              size="sm"
-              label={
-                projectIds.includes(
-                  conversation.id,
-                )
-                  ? `Remove from projects: ${conversation.title}`
-                  : `Add to projects: ${conversation.title}`
-              }
-              onClick={() =>
-                toggleStoredId(
-                  conversation.id,
-                  "project",
-                )
-              }
-            >
-              <FolderIcon className="h-4 w-4" />
-            </IconButton>
+            {chatMenuId ===
+            conversation.id ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-9 z-50 w-48 overflow-hidden rounded-xl border border-border-default bg-surface-raised p-1 shadow-lg"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    toggleStoredId(
+                      conversation.id,
+                      "pinned",
+                    );
 
-            <IconButton
-              size="sm"
-              label={`Rename chat: ${conversation.title}`}
-              onClick={() =>
-                beginRename(
-                  conversation,
-                )
-              }
-            >
-              <EditIcon className="h-4 w-4" />
-            </IconButton>
+                    setChatMenuId(
+                      null,
+                    );
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-sunken"
+                >
+                  <PinIcon className="h-4 w-4" />
 
-            <IconButton
-              size="sm"
-              label={`Delete chat: ${conversation.title}`}
-              onClick={() =>
-                setRequestedDeleteId(
-                  conversation.id,
-                )
-              }
-            >
-              <TrashIcon className="h-4 w-4" />
-            </IconButton>
-          </span>
-        ) : null}
+                  <span>
+                    {isPinned
+                      ? "Unpin"
+                      : "Pin"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    toggleStoredId(
+                      conversation.id,
+                      "project",
+                    );
+
+                    setChatMenuId(
+                      null,
+                    );
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-sunken"
+                >
+                  <FolderIcon className="h-4 w-4" />
+
+                  <span>
+                    {isProject
+                      ? "Remove from Projects"
+                      : "Add to Projects"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setChatMenuId(
+                      null,
+                    );
+
+                    setRequestedDeleteId(
+                      conversation.id,
+                    );
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-surface-sunken"
+                >
+                  <TrashIcon className="h-4 w-4" />
+
+                  <span>
+                    Delete
+                  </span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </span>
       </div>
     );
   }
 
-  function projectButton(
+  function projectButton  function projectButton(
     conversation:
       ConversationSummary,
   ) {
