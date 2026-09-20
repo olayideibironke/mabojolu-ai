@@ -78,7 +78,7 @@ describe(
     );
 
     it(
-      "keeps larger response modes on their configured runtime",
+      "keeps Regular and Quality text modes on user-owned browser compute",
       () => {
         expect(
           shouldUseBrowserChat({
@@ -87,7 +87,7 @@ describe(
             modelId:
               "mabojolu-regular",
           }),
-        ).toBe(false);
+        ).toBe(true);
 
         expect(
           shouldUseBrowserChat({
@@ -96,12 +96,12 @@ describe(
             modelId:
               "mabojolu-local",
           }),
-        ).toBe(false);
+        ).toBe(true);
       },
     );
 
     it(
-      "keeps image requests off the text-only browser model",
+      "keeps local-mode image requests inside the browser path for explicit rejection",
       () => {
         expect(
           shouldUseBrowserChat({
@@ -133,7 +133,7 @@ describe(
               },
             ],
           }),
-        ).toBe(false);
+        ).toBe(true);
       },
     );
 
