@@ -34,7 +34,7 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Fast",
     label: "Mabojolu Fast",
     description:
-      "Private on-device inference using Mabojolu’s smallest browser model for the quickest startup and response.",
+      "Private on-device inference that prefers Chrome’s built-in AI when available, with Mabojolu’s lightweight browser model as fallback.",
     bestFor:
       "Private on-device responses, short questions, quick explanations, simple drafting, and everyday assistance.",
   },
