@@ -364,12 +364,11 @@ function clearBrowserComputeFailure():
 }
 
 /**
- * Browser inference v0.1 intentionally activates only for Mabojolu Fast and
- * text-only conversations.
+ * Browser-owned text inference for Mabojolu Fast, Regular, and Quality.
  *
- * Fast uses the smallest verified WebLLM model in this checkpoint. Image
- * requests and the larger response modes stay on the configured Ollama server
- * until browser VLM and device-tier selection are verified separately.
+ * Each mode stays on user-owned WebGPU compute. Device capability controls the
+ * model candidate set, while image requests are rejected explicitly until a
+ * verified browser vision model is available.
  */
 export function shouldUseBrowserChat(
   body:
@@ -654,7 +653,7 @@ export async function streamBrowserChat(
         "provider_unavailable",
 
       message:
-        "On-device Fast mode is temporarily paused after a browser-compute failure. Try again shortly or use another WebGPU-capable device.",
+        "On-device Mabojolu is temporarily paused after a browser-compute failure. Try again shortly or use another WebGPU-capable device.",
 
       retryable:
         true,
