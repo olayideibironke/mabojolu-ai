@@ -3,6 +3,9 @@
 
 import Link from "next/link";
 import {
+  useRouter,
+} from "next/navigation";
+import {
   useEffect,
   useMemo,
   useState,
@@ -217,6 +220,9 @@ export function PluginCatalog({
   items:
     PluginCatalogItem[];
 }) {
+  const router =
+    useRouter();
+
   const [
     query,
     setQuery,
@@ -497,6 +503,61 @@ export function PluginCatalog({
         .trim();
 
     if (!name) {
+      return;
+    }
+
+    const normalizedName =
+      name.toLowerCase();
+
+    const normalizedWebsite =
+      normalizeDomain(
+        draftWebsite,
+      )
+        ?.toLowerCase();
+
+    const knownPlugin =
+      PLUGIN_MARKETPLACE
+        .find(
+          (
+            entry,
+          ) => {
+            if (
+              !entry.providerId
+            ) {
+              return false;
+            }
+
+            const nameMatches =
+              entry.name
+                .toLowerCase() ===
+              normalizedName;
+
+            const domainMatches =
+              Boolean(
+                normalizedWebsite &&
+                entry.domain &&
+                entry.domain
+                  .toLowerCase() ===
+                  normalizedWebsite,
+              );
+
+            return (
+              nameMatches ||
+              domainMatches
+            );
+          },
+        );
+
+    if (
+      knownPlugin
+        ?.providerId
+    ) {
+      closeWizard();
+
+      router.push(
+        `/api/plugins/${knownPlugin.providerId}/connect`,
+      );
+
       return;
     }
 
