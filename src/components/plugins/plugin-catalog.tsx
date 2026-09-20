@@ -300,35 +300,47 @@ export function PluginCatalog({
 
   useEffect(
     () => {
-      try {
-        const raw =
-          window.localStorage
-            .getItem(
-              CUSTOM_PLUGIN_STORAGE_KEY,
-            );
+      const timeoutId =
+        window.setTimeout(
+          () => {
+            try {
+              const raw =
+                window.localStorage
+                  .getItem(
+                    CUSTOM_PLUGIN_STORAGE_KEY,
+                  );
 
-        if (!raw) {
-          return;
-        }
+              if (!raw) {
+                return;
+              }
 
-        const parsed =
-          JSON.parse(
-            raw,
-          );
+              const parsed =
+                JSON.parse(
+                  raw,
+                );
 
-        if (
-          Array.isArray(
-            parsed,
-          )
-        ) {
-          setCustomDrafts(
-            parsed as
-              CustomPluginDraft[],
-          );
-        }
-      } catch {
-        // Ignore malformed local drafts and keep the marketplace usable.
-      }
+              if (
+                Array.isArray(
+                  parsed,
+                )
+              ) {
+                setCustomDrafts(
+                  parsed as
+                    CustomPluginDraft[],
+                );
+              }
+            } catch {
+              // Ignore malformed local drafts and keep the marketplace usable.
+            }
+          },
+          0,
+        );
+
+      return () => {
+        window.clearTimeout(
+          timeoutId,
+        );
+      };
     },
     [],
   );
