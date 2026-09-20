@@ -7,6 +7,7 @@ import {
 } from "@mlc-ai/web-llm";
 
 import {
+  BROWSER_MODEL_FAST,
   BROWSER_MODEL_1B,
   BROWSER_MODEL_3B,
 } from "./browser-device-profile";
@@ -18,6 +19,7 @@ export const MABOJOLU_WEBLLM_VERSION =
   "0.2.85" as const;
 
 export const MABOJOLU_BROWSER_MODEL_IDS = [
+  BROWSER_MODEL_FAST,
   BROWSER_MODEL_1B,
   BROWSER_MODEL_3B,
 ] as const;
@@ -140,6 +142,8 @@ function isAllowedModelId(
     typeof value ===
       "string" &&
     (
+      value ===
+        BROWSER_MODEL_FAST ||
       value ===
         BROWSER_MODEL_1B ||
       value ===
