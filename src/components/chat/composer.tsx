@@ -30,6 +30,7 @@ interface ComposerProps {
   focusKey?: number;
   disabled?: boolean;
   disabledReason?: string;
+  imageAttachmentsEnabled?: boolean;
   computeStatus?: string | null;
   selectedModelId: MabojoluModelId;
 
@@ -444,6 +445,7 @@ export function Composer({
   focusKey = 0,
   disabled = false,
   disabledReason,
+  imageAttachmentsEnabled = false,
   computeStatus = null,
   selectedModelId,
   onModelChange,
@@ -806,7 +808,8 @@ export function Composer({
     useCallback(() => {
       if (
         disabled ||
-        isStreaming
+        isStreaming ||
+        !imageAttachmentsEnabled
       ) {
         return;
       }
@@ -816,6 +819,7 @@ export function Composer({
       fileInputRef.current?.click();
     }, [
       disabled,
+      imageAttachmentsEnabled,
       isStreaming,
     ]);
 
@@ -1371,11 +1375,20 @@ export function Composer({
               disabled={
                 disabled ||
                 isStreaming ||
+                !imageAttachmentsEnabled ||
                 attachments.length >=
                   MAX_IMAGE_COUNT
               }
-              aria-label="Attach images"
-              title="Attach images"
+              aria-label={
+                imageAttachmentsEnabled
+                  ? "Attach images"
+                  : "Image understanding is coming soon"
+              }
+              title={
+                imageAttachmentsEnabled
+                  ? "Attach images"
+                  : "On-device image understanding is coming soon"
+              }
               className="inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-base hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
               <PaperclipIcon />
