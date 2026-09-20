@@ -6,6 +6,7 @@ import {
 
 import {
   browserModePlan,
+  resolveAvailableBrowserMode,
 } from "./browser-mode-policy";
 
 import type {
@@ -112,6 +113,38 @@ describe(
             ),
           ).available,
         ).toBe(true);
+      },
+    );
+
+    it(
+      "falls back from Quality to Regular on a standard device",
+      () => {
+        expect(
+          resolveAvailableBrowserMode(
+            "mabojolu-local",
+            profile(
+              "standard",
+            ),
+          ),
+        ).toBe(
+          "mabojolu-regular",
+        );
+      },
+    );
+
+    it(
+      "keeps a supported preferred mode unchanged",
+      () => {
+        expect(
+          resolveAvailableBrowserMode(
+            "mabojolu-fast",
+            profile(
+              "standard",
+            ),
+          ),
+        ).toBe(
+          "mabojolu-fast",
+        );
       },
     );
 
