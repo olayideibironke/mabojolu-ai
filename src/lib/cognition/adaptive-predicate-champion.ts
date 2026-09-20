@@ -21,6 +21,7 @@ export type AdaptivePredicatePhase =
   | "bootstrap-fit"
   | "bootstrap-validation"
   | "champion"
+  | "regime-recall-validation"
   | "challenger-fit"
   | "challenger-validation"
   | "bootstrap-rejected";
@@ -43,6 +44,25 @@ export interface AdaptivePredicateSummary {
 
   replacementCount:
     number;
+
+  archivedChampionCount:
+    number;
+
+  rollbackCount:
+    number;
+
+  regimeRecallValidationEvidenceCount:
+    number;
+
+  lastRegimeRecallAccuracy?:
+    number;
+
+  lastRegimeRecallGeneration?:
+    number;
+
+  lastRegimeRecallDecision?:
+    "rolled-back" |
+    "no-match";
 
   bootstrapFitEvidenceCount:
     number;
@@ -151,6 +171,12 @@ interface PrincipleState {
   champion?:
     FrozenProgram;
 
+  archivedChampions:
+    FrozenProgram[];
+
+  regimeRecallValidation:
+    Observation[];
+
   recentChampionCorrectness:
     boolean[];
 
@@ -159,6 +185,19 @@ interface PrincipleState {
 
   replacementCount:
     number;
+
+  rollbackCount:
+    number;
+
+  lastRegimeRecallAccuracy?:
+    number;
+
+  lastRegimeRecallGeneration?:
+    number;
+
+  lastRegimeRecallDecision?:
+    "rolled-back" |
+    "no-match";
 
   lastDriftTriggerEvidenceCount?:
     number;
@@ -187,6 +226,9 @@ interface PrincipleState {
 
 const EPSILON =
   1e-12;
+
+const MAX_ARCHIVED_CHAMPIONS =
+  8;
 
 function cloneSignature(
   signature:
@@ -223,6 +265,57 @@ function cloneObservation(
     useful:
       observation.useful,
   };
+}
+
+function cloneFrozenProgram(
+  frozen:
+    FrozenProgram,
+):
+  FrozenProgram {
+  return {
+    program: {
+      ...frozen.program,
+    },
+
+    predictsUsefulWhenPredicateIs:
+      frozen
+        .predictsUsefulWhenPredicateIs,
+
+    baseEvidence:
+      frozen
+        .baseEvidence
+        .map(
+          cloneObservation,
+        ),
+
+    /*
+     * Operational evidence belongs to the regime activation that produced it.
+     * A recalled regime starts a fresh operational record so observations from
+     * a later drift period do not contaminate the restored applicability score.
+     */
+    operationalEvidence: [],
+
+    generation:
+      frozen.generation,
+  };
+}
+
+function sameFrozenProgram(
+  left:
+    FrozenProgram,
+
+  right:
+    FrozenProgram,
+):
+  boolean {
+  return (
+    left.program.id ===
+      right.program.id &&
+    left
+      .predictsUsefulWhenPredicateIs ===
+      right
+        .predictsUsefulWhenPredicateIs
+  );
 }
 
 function countValue(
@@ -741,6 +834,31 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     if (
       state.phase ===
+        "regime-recall-validation"
+    ) {
+      state.regimeRecallValidation
+        .push(
+          observation,
+        );
+
+      if (
+        state.regimeRecallValidation
+          .length >=
+          this.validationObservationTarget
+      ) {
+        this.finalizeRegimeRecall(
+          state,
+        );
+      }
+
+      return this.estimate(
+        input.principleId,
+        input.signature,
+      );
+    }
+
+    if (
+      state.phase ===
         "challenger-fit"
     ) {
       const challenger =
@@ -867,7 +985,7 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       ) <=
         this.driftAccuracyThreshold
     ) {
-      this.startChallenger(
+      this.startAdaptation(
         state,
       );
     }
@@ -1002,6 +1120,15 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         replacementCount:
           0,
 
+        archivedChampionCount:
+          0,
+
+        rollbackCount:
+          0,
+
+        regimeRecallValidationEvidenceCount:
+          0,
+
         bootstrapFitEvidenceCount:
           0,
 
@@ -1060,9 +1187,16 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
       bootstrapValidation: [],
 
+      archivedChampions: [],
+
+      regimeRecallValidation: [],
+
       recentChampionCorrectness: [],
 
       replacementCount:
+        0,
+
+      rollbackCount:
         0,
     };
 
@@ -1201,7 +1335,7 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       "bootstrap-validation-failed";
   }
 
-  private startChallenger(
+  private startAdaptation(
     state:
       PrincipleState,
   ): void {
@@ -1214,8 +1348,40 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         state,
       );
 
+    state.recentChampionCorrectness =
+      [];
+
+    if (
+      state.archivedChampions
+        .length >
+        0
+    ) {
+      state.phase =
+        "regime-recall-validation";
+
+      state.regimeRecallValidation =
+        [];
+
+      state.challenger =
+        undefined;
+
+      return;
+    }
+
+    this.startChallenger(
+      state,
+    );
+  }
+
+  private startChallenger(
+    state:
+      PrincipleState,
+  ): void {
     state.phase =
       "challenger-fit";
+
+    state.regimeRecallValidation =
+      [];
 
     state.challenger = {
       fitModel:
@@ -1229,9 +1395,6 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
       validation: [],
     };
-
-    state.recentChampionCorrectness =
-      [];
   }
 
   private freezeChallenger(
@@ -1294,6 +1457,206 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     state.phase =
       "challenger-validation";
+  }
+
+  private rememberChampion(
+    state:
+      PrincipleState,
+
+    champion:
+      FrozenProgram,
+  ): void {
+    state.archivedChampions =
+      state.archivedChampions
+        .filter(
+          (
+            archived,
+          ) =>
+            !sameFrozenProgram(
+              archived,
+              champion,
+            ),
+        );
+
+    state.archivedChampions
+      .push(
+        cloneFrozenProgram(
+          champion,
+        ),
+      );
+
+    if (
+      state.archivedChampions
+        .length >
+        MAX_ARCHIVED_CHAMPIONS
+    ) {
+      state.archivedChampions
+        .splice(
+          0,
+          state
+            .archivedChampions
+            .length -
+            MAX_ARCHIVED_CHAMPIONS,
+        );
+    }
+  }
+
+  private finalizeRegimeRecall(
+    state:
+      PrincipleState,
+  ): void {
+    const champion =
+      state.champion;
+
+    if (
+      !champion ||
+      state.archivedChampions
+        .length ===
+        0
+    ) {
+      state.lastRegimeRecallDecision =
+        "no-match";
+
+      this.startChallenger(
+        state,
+      );
+
+      return;
+    }
+
+    const baseline =
+      majorityBaseline(
+        state.regimeRecallValidation,
+      );
+
+    const championAccuracy =
+      accuracy(
+        state.regimeRecallValidation,
+        champion,
+      );
+
+    const ranked =
+      state.archivedChampions
+        .map(
+          (
+            archived,
+          ) => ({
+            archived,
+
+            accuracy:
+              accuracy(
+                state.regimeRecallValidation,
+                archived,
+              ),
+          }),
+        )
+        .sort(
+          (
+            left,
+            right,
+          ) =>
+            right.accuracy -
+            left.accuracy,
+        );
+
+    const best =
+      ranked[0];
+
+    const second =
+      ranked[1];
+
+    state.lastRegimeRecallAccuracy =
+      best?.accuracy;
+
+    state.lastRegimeRecallGeneration =
+      best?.archived
+        .generation;
+
+    const uniquelyBest =
+      Boolean(
+        best &&
+        (
+          !second ||
+          best.accuracy >
+            second.accuracy +
+              EPSILON
+        ),
+      );
+
+    const qualifies =
+      Boolean(
+        best &&
+        uniquelyBest &&
+        best.accuracy >=
+          this.minimumValidationAccuracy &&
+        best.accuracy >
+          championAccuracy +
+            EPSILON &&
+        best.accuracy >
+          baseline +
+            EPSILON,
+      );
+
+    if (
+      !best ||
+      !qualifies
+    ) {
+      state.lastRegimeRecallDecision =
+        "no-match";
+
+      this.startChallenger(
+        state,
+      );
+
+      return;
+    }
+
+    const restored =
+      cloneFrozenProgram(
+        best.archived,
+      );
+
+    state.archivedChampions =
+      state.archivedChampions
+        .filter(
+          (
+            archived,
+          ) =>
+            archived !==
+            best.archived,
+        );
+
+    this.rememberChampion(
+      state,
+      champion,
+    );
+
+    state.champion =
+      restored;
+
+    state.rollbackCount +=
+      1;
+
+    state.lastRegimeRecallDecision =
+      "rolled-back";
+
+    state.lastReplacementDecision =
+      "retained";
+
+    state.lastRejectionReason =
+      undefined;
+
+    state.regimeRecallValidation =
+      [];
+
+    state.challenger =
+      undefined;
+
+    state.recentChampionCorrectness =
+      [];
+
+    state.phase =
+      "champion";
   }
 
   private finalizeChallenger(
@@ -1366,6 +1729,11 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         baseline +
         EPSILON
     ) {
+      this.rememberChampion(
+        state,
+        champion,
+      );
+
       state.champion = {
         program: {
           ...challenger.program,
@@ -1502,6 +1870,46 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
       replacementCount:
         state.replacementCount,
+
+      archivedChampionCount:
+        state.archivedChampions
+          .length,
+
+      rollbackCount:
+        state.rollbackCount,
+
+      regimeRecallValidationEvidenceCount:
+        state.regimeRecallValidation
+          .length,
+
+      ...(state
+          .lastRegimeRecallAccuracy !==
+        undefined
+        ? {
+            lastRegimeRecallAccuracy:
+              state
+                .lastRegimeRecallAccuracy,
+          }
+        : {}),
+
+      ...(state
+          .lastRegimeRecallGeneration !==
+        undefined
+        ? {
+            lastRegimeRecallGeneration:
+              state
+                .lastRegimeRecallGeneration,
+          }
+        : {}),
+
+      ...(state
+          .lastRegimeRecallDecision
+        ? {
+            lastRegimeRecallDecision:
+              state
+                .lastRegimeRecallDecision,
+          }
+        : {}),
 
       bootstrapFitEvidenceCount:
         state.bootstrapFit
