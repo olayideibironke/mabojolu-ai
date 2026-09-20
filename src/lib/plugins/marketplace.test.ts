@@ -9,6 +9,10 @@ import {
   PLUGIN_MARKETPLACE,
 } from "./marketplace";
 
+import type {
+  PluginProviderId,
+} from "./registry";
+
 describe(
   "Mabojolu plugin marketplace catalog",
   () => {
@@ -111,8 +115,8 @@ describe(
               ),
           );
 
-        for (
-          const providerId of [
+        const expectedProviderIds =
+          [
             "github",
             "vercel",
             "supabase",
@@ -122,7 +126,11 @@ describe(
             "google-drive",
             "google-calendar",
             "microsoft",
-          ]
+          ] as const satisfies readonly PluginProviderId[];
+
+        for (
+          const providerId of
+            expectedProviderIds
         ) {
           expect(
             providerIds.has(
