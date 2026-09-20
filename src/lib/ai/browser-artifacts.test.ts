@@ -35,6 +35,25 @@ function manifest() {
     models: [
       {
         modelId:
+          BROWSER_MODEL_FAST,
+
+        modelUrl:
+          "https://models.example.test/qwen-fast",
+
+        modelLibUrl:
+          "https://models.example.test/libs/qwen-fast.wasm",
+
+        integrity: {
+          config:
+            VALID_SRI,
+
+          modelLib:
+            VALID_SRI,
+        },
+      },
+
+      {
+        modelId:
           BROWSER_MODEL_1B,
 
         modelUrl:
@@ -104,7 +123,7 @@ describe(
         expect(
           parsed
             ?.models,
-        ).toHaveLength(2);
+        ).toHaveLength(3);
       },
     );
 
@@ -185,6 +204,22 @@ describe(
           buildMabojoluMirrorAppConfig(
             parsed,
           );
+
+        const fast =
+          appConfig
+            .model_list
+            .find(
+              (record) =>
+                record
+                  .model_id ===
+                BROWSER_MODEL_FAST,
+            );
+
+        expect(
+          fast?.model,
+        ).toBe(
+          "https://models.example.test/qwen-fast",
+        );
 
         const oneB =
           appConfig
