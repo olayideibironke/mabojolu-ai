@@ -28,23 +28,29 @@ const mocks =
           vi.fn(),
       };
 
-      const env = {
-        MABOJOLU_MAINTENANCE_MODE:
+      const runtimeConfig = {
+        maintenanceMode:
           false,
 
-        MABOJOLU_MAX_CONCURRENT_GENERATIONS:
+        maxConcurrentGenerations:
           2,
 
-        MABOJOLU_DAILY_MESSAGE_LIMIT:
+        dailyMessageLimit:
           200,
 
-        MABOJOLU_DAILY_COST_LIMIT_USD:
+        dailyCostLimitUsd:
           0,
+
+        rateLimitMax:
+          30,
+
+        rateLimitWindowMs:
+          60_000,
       };
 
       return {
         database,
-        env,
+        runtimeConfig,
       };
     },
   );
@@ -59,11 +65,11 @@ vi.mock(
 );
 
 vi.mock(
-  "@/lib/env",
+  "./runtime-config",
   () => ({
-    serverEnv:
+    usageRuntimeConfig:
       () =>
-        mocks.env,
+        mocks.runtimeConfig,
   }),
 );
 
@@ -507,8 +513,8 @@ describe(
     it(
       "can skip only the global provider-spend ceiling for browser-owned inference",
       async () => {
-        mocks.env
-          .MABOJOLU_DAILY_COST_LIMIT_USD =
+        mocks.runtimeConfig
+          .dailyCostLimitUsd =
           5;
 
         mocks
