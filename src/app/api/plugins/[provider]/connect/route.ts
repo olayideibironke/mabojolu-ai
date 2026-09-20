@@ -58,20 +58,6 @@ export async function GET(
     );
   }
 
-  const access =
-    await resolvePluginAccess(
-      session,
-    );
-
-  if (!access.allowed) {
-    return Response.redirect(
-      new URL(
-        "/plugins?error=paid-required",
-        request.url,
-      ),
-    );
-  }
-
   const {
     provider,
   } =
@@ -85,6 +71,21 @@ export async function GET(
     return Response.redirect(
       new URL(
         "/plugins?error=unknown-provider",
+        request.url,
+      ),
+    );
+  }
+
+  const access =
+    await resolvePluginAccess(
+      session,
+      provider,
+    );
+
+  if (!access.allowed) {
+    return Response.redirect(
+      new URL(
+        "/plugins?error=paid-required",
         request.url,
       ),
     );
