@@ -1170,7 +1170,7 @@ export function ChatShell({
           persistenceKind
         }
         selectedModelId={
-          selectedModelId
+          effectiveModelId
         }
         onModelChange={
           changeModel
