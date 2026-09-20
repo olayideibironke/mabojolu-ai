@@ -65,7 +65,7 @@ describe(
   "Mabojolu browser chat routing",
   () => {
     it(
-      "routes eligible Fast text chat to user-owned WebGPU compute",
+      "keeps eligible Fast text chat on user-owned browser compute",
       () => {
         enableWebGpu();
 
@@ -78,10 +78,8 @@ describe(
     );
 
     it(
-      "keeps larger response modes on the configured server runtime",
+      "keeps larger response modes on their configured runtime",
       () => {
-        enableWebGpu();
-
         expect(
           shouldUseBrowserChat({
             ...BASE_BODY,
@@ -105,8 +103,6 @@ describe(
     it(
       "keeps image requests off the text-only browser model",
       () => {
-        enableWebGpu();
-
         expect(
           shouldUseBrowserChat({
             ...BASE_BODY,
@@ -142,10 +138,8 @@ describe(
     );
 
     it(
-      "falls back to Ollama when the current prompt cannot fit the browser context without truncation",
+      "does not silently route oversized Fast text to a server provider",
       () => {
-        enableWebGpu();
-
         expect(
           shouldUseBrowserChat({
             ...BASE_BODY,
@@ -162,15 +156,41 @@ describe(
               },
             ],
           }),
-        ).toBe(false);
+        ).toBe(true);
       },
     );
 
     it(
-      "temporarily falls back to Ollama after a browser-compute failure",
+      "does not silently route Fast text to a server provider when WebGPU is unavailable",
       () => {
-        enableWebGpu();
+        vi.stubGlobal(
+          "Worker",
+          class FakeWorker {},
+        );
 
+        Object.defineProperty(
+          navigator,
+          "gpu",
+          {
+            configurable:
+              true,
+
+            value:
+              undefined,
+          },
+        );
+
+        expect(
+          shouldUseBrowserChat(
+            BASE_BODY,
+          ),
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "does not silently route Fast text to a server provider after a browser failure cooldown",
+      () => {
         vi.stubGlobal(
           "window",
           {
@@ -201,62 +221,7 @@ describe(
           shouldUseBrowserChat(
             BASE_BODY,
           ),
-        ).toBe(false);
-      },
-    );
-
-    it(
-      "falls back when WebGPU is unavailable",
-      () => {
-        vi.stubGlobal(
-          "Worker",
-          class FakeWorker {},
-        );
-
-        Object.defineProperty(
-          navigator,
-          "gpu",
-          {
-            configurable:
-              true,
-
-            value:
-              undefined,
-          },
-        );
-
-        expect(
-          shouldUseBrowserChat(
-            BASE_BODY,
-          ),
-        ).toBe(false);
-      },
-    );
-
-    it(
-      "falls back when browser workers are unavailable",
-      () => {
-        Object.defineProperty(
-          navigator,
-          "gpu",
-          {
-            configurable:
-              true,
-
-            value: {},
-          },
-        );
-
-        vi.stubGlobal(
-          "Worker",
-          undefined,
-        );
-
-        expect(
-          shouldUseBrowserChat(
-            BASE_BODY,
-          ),
-        ).toBe(false);
+        ).toBe(true);
       },
     );
   },
