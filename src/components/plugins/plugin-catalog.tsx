@@ -645,14 +645,12 @@ export function PluginCatalog({
     if (
       providerId &&
       runtime
-        ?.connectionMode ===
-        "oauth" &&
-      runtime.configured
     ) {
       return (
         <Link
           href={`/api/plugins/${providerId}/connect`}
           aria-label={`Connect ${entry.name}`}
+          title={`Connect ${entry.name}`}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-default text-xl font-light text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary"
         >
           +
@@ -663,7 +661,8 @@ export function PluginCatalog({
     return (
       <button
         type="button"
-        aria-label={`Add ${entry.name}`}
+        aria-label={`Add custom plugin ${entry.name}`}
+        title={`Set up ${entry.name}`}
         onClick={() =>
           openWizard(
             entry,
