@@ -279,10 +279,38 @@ export function Sidebar({
     setShowAllChats,
   ] = useState(false);
 
+  const [
+    showProjects,
+    setShowProjects,
+  ] = useState(true);
+
+  const [
+    projectMenuId,
+    setProjectMenuId,
+  ] = useState<string | null>(null);
+
+  const [
+    projectRenamingId,
+    setProjectRenamingId,
+  ] = useState<string | null>(null);
+
+  const [
+    projectRenameDraft,
+    setProjectRenameDraft,
+  ] = useState("");
+
+  const [
+    projectDeleteId,
+    setProjectDeleteId,
+  ] = useState<string | null>(null);
+
   const closeButtonRef =
     useRef<HTMLButtonElement>(null);
 
   const renameInputRef =
+    useRef<HTMLInputElement>(null);
+
+  const projectRenameInputRef =
     useRef<HTMLInputElement>(null);
 
   const isDesktopLayout =
@@ -366,6 +394,86 @@ export function Sidebar({
     }
   }, [renamingId]);
 
+  useEffect(() => {
+    if (projectRenamingId) {
+      projectRenameInputRef.current
+        ?.focus();
+
+      projectRenameInputRef.current
+        ?.select();
+    }
+  }, [
+    projectRenamingId,
+  ]);
+
+  useEffect(() => {
+    if (!projectMenuId) {
+      return;
+    }
+
+    const closeOnPointer =
+      (
+        event:
+          MouseEvent,
+      ) => {
+        const target =
+          event.target;
+
+        if (
+          target instanceof
+            Element &&
+          target.closest(
+            `[data-project-row="${projectMenuId}"]`,
+          )
+        ) {
+          return;
+        }
+
+        setProjectMenuId(
+          null,
+        );
+      };
+
+    const closeOnEscape =
+      (
+        event:
+          KeyboardEvent,
+      ) => {
+        if (
+          event.key ===
+            "Escape"
+        ) {
+          setProjectMenuId(
+            null,
+          );
+        }
+      };
+
+    document.addEventListener(
+      "mousedown",
+      closeOnPointer,
+    );
+
+    document.addEventListener(
+      "keydown",
+      closeOnEscape,
+    );
+
+    return () => {
+      document.removeEventListener(
+        "mousedown",
+        closeOnPointer,
+      );
+
+      document.removeEventListener(
+        "keydown",
+        closeOnEscape,
+      );
+    };
+  }, [
+    projectMenuId,
+  ]);
+
   const beginRename =
     useCallback(
       (
@@ -436,6 +544,83 @@ export function Sidebar({
         onRenameConversation,
         renameDraft,
         renamingId,
+      ],
+    );
+
+  const beginProjectRename =
+    useCallback(
+      (
+        conversation:
+          ConversationSummary,
+      ) => {
+        setProjectMenuId(
+          null,
+        );
+
+        setProjectRenamingId(
+          conversation.id,
+        );
+
+        setProjectRenameDraft(
+          conversation.title,
+        );
+      },
+      [],
+    );
+
+  const cancelProjectRename =
+    useCallback(() => {
+      setProjectRenamingId(
+        null,
+      );
+
+      setProjectRenameDraft(
+        "",
+      );
+    }, []);
+
+  const commitProjectRename =
+    useCallback(
+      async () => {
+        if (!projectRenamingId) {
+          return;
+        }
+
+        const trimmed =
+          projectRenameDraft.trim();
+
+        const original =
+          conversations.find(
+            (
+              conversation,
+            ) =>
+              conversation.id ===
+              projectRenamingId,
+          );
+
+        if (
+          trimmed.length ===
+            0 ||
+          trimmed ===
+            original?.title
+        ) {
+          cancelProjectRename();
+          return;
+        }
+
+        await onRenameConversation(
+          projectRenamingId,
+          trimmed,
+        );
+
+        cancelProjectRename();
+      },
+      [
+        cancelProjectRename,
+        conversations,
+        onRenameConversation,
+        projectRenameDraft,
+        projectRenamingId,
       ],
     );
 
@@ -770,6 +955,291 @@ export function Sidebar({
     );
   }
 
+  function projectButton(
+    conversation:
+      ConversationSummary,
+  ) {
+    const isActive =
+      conversation.id ===
+      activeConversationId;
+
+    const isPinned =
+      pinnedIds.includes(
+        conversation.id,
+      );
+
+    if (
+      projectDeleteId ===
+      conversation.id
+    ) {
+      return (
+        <div className="rounded-xl border border-border-default bg-surface-raised p-2.5">
+          <p className="text-xs leading-5 text-text-primary">
+            Delete this project chat? This cannot be undone.
+          </p>
+
+          <div className="mt-2 flex items-center justify-end gap-1.5">
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() =>
+                setProjectDeleteId(
+                  null,
+                )
+              }
+            >
+              Cancel
+            </Button>
+
+            <Button
+              size="sm"
+              variant="danger"
+              onClick={() => {
+                onDeleteConversation(
+                  conversation.id,
+                );
+
+                setProjectDeleteId(
+                  null,
+                );
+
+                setProjectMenuId(
+                  null,
+                );
+              }}
+            >
+              Delete
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    if (
+      projectRenamingId ===
+      conversation.id
+    ) {
+      return (
+        <div className="rounded-xl border border-border-default bg-surface-raised p-2">
+          <label
+            className="sr-only"
+            htmlFor={`rename-project-${conversation.id}`}
+          >
+            Project title
+          </label>
+
+          <div className="flex items-center gap-2">
+            <FolderIcon className="h-4 w-4 shrink-0 text-text-secondary" />
+
+            <input
+              id={`rename-project-${conversation.id}`}
+              ref={
+                projectRenameInputRef
+              }
+              value={
+                projectRenameDraft
+              }
+              maxLength={
+                MAX_TITLE_CHARS
+              }
+              onChange={(
+                event,
+              ) =>
+                setProjectRenameDraft(
+                  event.target
+                    .value,
+                )
+              }
+              onKeyDown={(
+                event,
+              ) => {
+                if (
+                  event.key ===
+                    "Enter"
+                ) {
+                  event.preventDefault();
+
+                  void commitProjectRename();
+                }
+
+                if (
+                  event.key ===
+                    "Escape"
+                ) {
+                  event.preventDefault();
+
+                  cancelProjectRename();
+                }
+              }}
+              onBlur={() =>
+                void commitProjectRename()
+              }
+              className="min-w-0 flex-1 rounded-lg bg-transparent py-1 text-sm text-text-primary outline-none"
+            />
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div
+        data-project-row={
+          conversation.id
+        }
+        className={`relative flex items-center rounded-xl transition-colors ${
+          isActive
+            ? "bg-surface-raised shadow-sm"
+            : "hover:bg-surface-raised/70"
+        }`}
+      >
+        <button
+          type="button"
+          onClick={() =>
+            onSelectConversation(
+              conversation.id,
+            )
+          }
+          aria-current={
+            isActive
+              ? "true"
+              : undefined
+          }
+          className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-xl py-2 pl-3 pr-1 text-left text-sm ${
+            isActive
+              ? "text-text-primary"
+              : "text-text-secondary hover:text-text-primary"
+          }`}
+        >
+          <FolderIcon className="h-4 w-4 shrink-0" />
+
+          <span className="truncate">
+            {conversation.title}
+          </span>
+        </button>
+
+        <span className="mr-1 flex shrink-0 items-center">
+          <IconButton
+            size="sm"
+            label={`Rename project: ${conversation.title}`}
+            onClick={() =>
+              beginProjectRename(
+                conversation,
+              )
+            }
+          >
+            <EditIcon className="h-4 w-4" />
+          </IconButton>
+
+          <div className="relative">
+            <button
+              type="button"
+              aria-label={`Project actions: ${conversation.title}`}
+              aria-haspopup="menu"
+              aria-expanded={
+                projectMenuId ===
+                conversation.id
+              }
+              onClick={() =>
+                setProjectMenuId(
+                  (
+                    current,
+                  ) =>
+                    current ===
+                    conversation.id
+                      ? null
+                      : conversation.id,
+                )
+              }
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-lg leading-none text-text-secondary transition-colors hover:bg-surface-base hover:text-text-primary"
+            >
+              <span
+                aria-hidden="true"
+                className="-mt-1"
+              >
+                &hellip;
+              </span>
+            </button>
+
+            {projectMenuId ===
+            conversation.id ? (
+              <div
+                role="menu"
+                className="absolute right-0 top-9 z-50 w-48 overflow-hidden rounded-xl border border-border-default bg-surface-raised p-1 shadow-lg"
+              >
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    toggleStoredId(
+                      conversation.id,
+                      "pinned",
+                    );
+
+                    setProjectMenuId(
+                      null,
+                    );
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-sunken"
+                >
+                  <PinIcon className="h-4 w-4" />
+
+                  <span>
+                    {isPinned
+                      ? "Unpin"
+                      : "Pin"}
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    toggleStoredId(
+                      conversation.id,
+                      "project",
+                    );
+
+                    setProjectMenuId(
+                      null,
+                    );
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-text-primary hover:bg-surface-sunken"
+                >
+                  <FolderIcon className="h-4 w-4" />
+
+                  <span>
+                    Remove from Projects
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  role="menuitem"
+                  onClick={() => {
+                    setProjectMenuId(
+                      null,
+                    );
+
+                    setProjectDeleteId(
+                      conversation.id,
+                    );
+                  }}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-danger hover:bg-surface-sunken"
+                >
+                  <TrashIcon className="h-4 w-4" />
+
+                  <span>
+                    Delete
+                  </span>
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </span>
+      </div>
+    );
+  }
+
   return (
     <>
       {isOpen ? (
@@ -970,6 +1440,10 @@ export function Sidebar({
                         >
                           {conversationButton(
                             conversation,
+                            {
+                              compact:
+                                true,
+                            },
                           )}
                         </div>
                       ),
@@ -981,31 +1455,53 @@ export function Sidebar({
               {projects.length >
               0 ? (
                 <section>
-                  <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                    Projects
-                  </p>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setShowProjects(
+                        (
+                          value,
+                        ) =>
+                          !value,
+                      )
+                    }
+                    aria-expanded={
+                      showProjects
+                    }
+                    className="flex w-full items-center gap-1 px-2 pb-1 text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted hover:text-text-secondary"
+                  >
+                    <span>
+                      Projects
+                    </span>
 
-                  <div className="space-y-0.5">
-                    {projects.map(
-                      (
-                        conversation,
-                      ) => (
-                        <div
-                          key={
-                            `project-${conversation.id}`
-                          }
-                        >
-                          {conversationButton(
-                            conversation,
-                            {
-                              compact:
-                                true,
-                            },
-                          )}
-                        </div>
-                      ),
-                    )}
-                  </div>
+                    <ChevronDownIcon
+                      className={`h-3.5 w-3.5 transition-transform ${
+                        showProjects
+                          ? ""
+                          : "-rotate-90"
+                      }`}
+                    />
+                  </button>
+
+                  {showProjects ? (
+                    <div className="space-y-0.5">
+                      {projects.map(
+                        (
+                          conversation,
+                        ) => (
+                          <div
+                            key={
+                              `project-${conversation.id}`
+                            }
+                          >
+                            {projectButton(
+                              conversation,
+                            )}
+                          </div>
+                        ),
+                      )}
+                    </div>
+                  ) : null}
                 </section>
               ) : null}
 
