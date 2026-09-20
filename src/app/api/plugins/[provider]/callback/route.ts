@@ -76,18 +76,6 @@ export async function GET(
     );
   }
 
-  const access =
-    await resolvePluginAccess(
-      session,
-    );
-
-  if (!access.allowed) {
-    return pluginRedirect(
-      request,
-      "error=paid-required",
-    );
-  }
-
   const {
     provider,
   } =
@@ -101,6 +89,19 @@ export async function GET(
     return pluginRedirect(
       request,
       "error=unknown-provider",
+    );
+  }
+
+  const access =
+    await resolvePluginAccess(
+      session,
+      provider,
+    );
+
+  if (!access.allowed) {
+    return pluginRedirect(
+      request,
+      "error=paid-required",
     );
   }
 
