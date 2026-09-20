@@ -10,6 +10,10 @@ import {
   SignOutIcon,
   TrashIcon,
 } from "@/components/ui/icons";
+import { useBrowserDeviceProfile } from "@/hooks/use-browser-device-profile";
+import {
+  browserModePlan,
+} from "@/lib/ai/browser-mode-policy";
 
 export type MabojoluModelId =
   | "mabojolu-fast"
@@ -30,7 +34,7 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Fast",
     label: "Mabojolu Fast",
     description:
-      "Adaptive browser-first inference on compatible WebGPU devices, with automatic lighter-model recovery and local Ollama fallback.",
+      "Private on-device inference in your browser, optimized for the quickest response.",
     bestFor:
       "Private on-device responses, short questions, quick explanations, simple drafting, and everyday assistance.",
   },
@@ -39,7 +43,7 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Regular",
     label: "Mabojolu Regular",
     description:
-      "A balanced local mode with stronger responses while remaining responsive.",
+      "Balanced on-device browser inference for stronger everyday responses.",
     bestFor:
       "General conversations, routine writing, summaries, planning, and most daily tasks.",
   },
@@ -48,7 +52,7 @@ const MODEL_OPTIONS: readonly ModelOption[] = [
     name: "Quality",
     label: "Mabojolu Quality",
     description:
-      "The strongest available local mode with more detailed reasoning and writing.",
+      "The strongest on-device browser mode, enabled when this device has enough resources.",
     bestFor:
       "Analysis, technical work, complex planning, longer writing, and difficult questions.",
   },
@@ -80,6 +84,9 @@ export function SettingsDialog({
 }: SettingsDialogProps) {
   const router = useRouter();
   const dialogRef = useRef<HTMLDialogElement>(null);
+
+  const deviceProfile =
+    useBrowserDeviceProfile();
 
   const [isSigningOut, setIsSigningOut] = useState(false);
   const [showDeleteConfirmation, setShowDeleteConfirmation] =
@@ -280,10 +287,22 @@ export function SettingsDialog({
               const isSelected =
                 selectedModelId === option.id;
 
+              const plan =
+                deviceProfile
+                  ? browserModePlan(
+                      option.id,
+                      deviceProfile,
+                    )
+                  : null;
+
+              const isUnavailable =
+                plan !== null &&
+                !plan.available;
+
               return (
                 <label
                   key={option.id}
-                  className={`relative cursor-pointer rounded-2xl border p-4 transition-[border-color,background-color,box-shadow] ${
+                  className={`relative rounded-2xl border p-4 transition-[border-color,background-color,box-shadow] ${isUnavailable ? "cursor-not-allowed opacity-60 " : "cursor-pointer "}${
                     isSelected
                       ? "border-accent bg-accent-subtle shadow-sm"
                       : "border-border-subtle bg-surface-raised hover:border-border-strong"
@@ -295,6 +314,7 @@ export function SettingsDialog({
                     value={option.id}
                     checked={isSelected}
                     onChange={() => onModelChange(option.id)}
+                    disabled={isUnavailable}
                     className="sr-only"
                   />
 
@@ -307,6 +327,12 @@ export function SettingsDialog({
                       <span className="mt-1 block text-xs leading-5 text-text-secondary">
                         {option.description}
                       </span>
+
+                      {isUnavailable ? (
+                        <span className="mt-1 block text-[11px] leading-5 text-text-muted">
+                          {plan?.unavailableReason}
+                        </span>
+                      ) : null}
                     </span>
 
                     <span
@@ -499,9 +525,11 @@ export function SettingsDialog({
           </p>
 
           <p className="mt-2 text-xs leading-5 text-text-secondary">
-            Local response modes process messages through Ollama on
-            the computer running Mabojolu. No paid cloud AI API is
-            used in local mode.
+            Fast, Regular, and Quality text modes run on your device
+            through browser WebGPU when supported. The first use may
+            download model files, which the browser then caches for
+            later sessions. No paid cloud AI API is used by these
+            on-device modes.
           </p>
         </section>
 
