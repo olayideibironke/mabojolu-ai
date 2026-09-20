@@ -97,30 +97,6 @@ function parseStoredIds(
   }
 }
 
-function readStoredIds(
-  key:
-    string,
-):
-  string[] {
-  if (
-    typeof window ===
-      "undefined"
-  ) {
-    return [];
-  }
-
-  try {
-    return parseStoredIds(
-      window.localStorage
-        .getItem(
-          key,
-        ),
-    );
-  } catch {
-    return [];
-  }
-}
-
 function storedIdsSnapshot(
   key:
     string,
@@ -994,10 +970,6 @@ export function Sidebar({
                         >
                           {conversationButton(
                             conversation,
-                            {
-                              compact:
-                                true,
-                            },
                           )}
                         </div>
                       ),
