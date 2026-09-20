@@ -11,6 +11,7 @@ import type {
 } from "@/lib/database/types";
 
 import {
+  hasPluginAccess,
   resolvePluginAccess,
 } from "./access";
 import {
@@ -664,10 +665,6 @@ export async function buildWorkspacePluginContext(input: {
       input.session,
     );
 
-  if (!access.allowed) {
-    return undefined;
-  }
-
   const wantsAny =
     wantsMail(
       input.latestUserContent,
@@ -709,6 +706,16 @@ export async function buildWorkspacePluginContext(input: {
     const connection of
       connections
   ) {
+    if (
+      !hasPluginAccess(
+        input.session,
+        access.account,
+        connection.provider,
+      )
+    ) {
+      continue;
+    }
+
     try {
       const token =
         await accessTokenFor(
