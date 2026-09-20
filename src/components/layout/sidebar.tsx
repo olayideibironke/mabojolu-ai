@@ -1130,7 +1130,7 @@ export function Sidebar({
     );
   }
 
-  function projectButton  function projectButton(
+  function projectButton(
     conversation:
       ConversationSummary,
   ) {
