@@ -176,3 +176,44 @@ export function browserModePlan(
       true,
   };
 }
+
+
+export function resolveAvailableBrowserMode(
+  preferred:
+    BrowserOwnedModelId,
+
+  profile:
+    BrowserDeviceProfile,
+):
+  BrowserOwnedModelId {
+  if (
+    browserModePlan(
+      preferred,
+      profile,
+    ).available
+  ) {
+    return preferred;
+  }
+
+  const fallbackOrder:
+    BrowserOwnedModelId[] = [
+      "mabojolu-regular",
+      "mabojolu-fast",
+    ];
+
+  for (
+    const candidate of
+      fallbackOrder
+  ) {
+    if (
+      browserModePlan(
+        candidate,
+        profile,
+      ).available
+    ) {
+      return candidate;
+    }
+  }
+
+  return preferred;
+}
