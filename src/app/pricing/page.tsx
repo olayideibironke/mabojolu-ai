@@ -79,6 +79,7 @@ export default function PricingPage() {
               <li>20 registered free responses per 4-hour rolling window</li>
               <li>Free access refreshes automatically after waiting</li>
               <li>Saved conversation history</li>
+              <li>Free developer plugins</li>
             </ul>
 
             <Link
@@ -109,6 +110,7 @@ export default function PricingPage() {
               <li>Shorter or no waiting periods</li>
               <li>Premium response modes</li>
               <li>Additional Mabojolu capabilities</li>
+              <li>Premium workspace plugins</li>
             </ul>
 
             <div className="mt-8 flex h-11 w-full items-center justify-center rounded-xl border border-border-default bg-surface-base px-4 text-sm font-semibold text-text-muted">
