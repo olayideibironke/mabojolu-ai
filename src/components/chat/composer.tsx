@@ -12,6 +12,10 @@ import {
 } from "react";
 
 import type { MabojoluModelId } from "@/components/layout/settings-dialog";
+import { useBrowserDeviceProfile } from "@/hooks/use-browser-device-profile";
+import {
+  browserModePlan,
+} from "@/lib/ai/browser-mode-policy";
 import type { ChatImageAttachment } from "@/types/chat";
 
 interface ComposerProps {
@@ -26,6 +30,7 @@ interface ComposerProps {
   focusKey?: number;
   disabled?: boolean;
   disabledReason?: string;
+  computeStatus?: string | null;
   selectedModelId: MabojoluModelId;
 
   onModelChange: (
@@ -439,11 +444,15 @@ export function Composer({
   focusKey = 0,
   disabled = false,
   disabledReason,
+  computeStatus = null,
   selectedModelId,
   onModelChange,
 }: ComposerProps) {
   const [draft, setDraft] =
     useState("");
+
+  const deviceProfile =
+    useBrowserDeviceProfile();
 
   const [
     attachments,
@@ -1388,14 +1397,32 @@ export function Composer({
                   className="h-9 appearance-none rounded-full border border-border-subtle bg-surface-base pl-3 pr-9 text-sm font-medium text-text-primary outline-none transition-colors focus:border-border-default focus:outline-none focus:ring-0"
                 >
                   {MODEL_OPTIONS.map(
-                    (option) => (
-                      <option
-                        key={option.id}
-                        value={option.id}
-                      >
-                        {option.label}
-                      </option>
-                    ),
+                    (option) => {
+                      const plan =
+                        deviceProfile
+                          ? browserModePlan(
+                              option.id,
+                              deviceProfile,
+                            )
+                          : null;
+
+                      return (
+                        <option
+                          key={option.id}
+                          value={option.id}
+                          disabled={
+                            plan !== null &&
+                            !plan.available
+                          }
+                        >
+                          {option.label}
+                          {plan !== null &&
+                          !plan.available
+                            ? " · unavailable"
+                            : ""}
+                        </option>
+                      );
+                    },
                   )}
                 </select>
 
@@ -1475,6 +1502,16 @@ export function Composer({
             className="mt-2 text-center text-[11px] leading-4 text-danger"
           >
             {attachmentError}
+          </p>
+        ) : null}
+
+        {computeStatus ? (
+          <p
+            role="status"
+            aria-live="polite"
+            className="mt-2 text-center text-[11px] leading-4 text-text-muted"
+          >
+            {computeStatus}
           </p>
         ) : null}
 
