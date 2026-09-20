@@ -51,6 +51,9 @@ export interface BrowserDeviceProbe {
     boolean;
 }
 
+export const BROWSER_MODEL_FAST =
+  "Qwen2.5-0.5B-Instruct-q4f16_1-MLC";
+
 export const BROWSER_MODEL_1B =
   "Llama-3.2-1B-Instruct-q4f16_1-MLC";
 
