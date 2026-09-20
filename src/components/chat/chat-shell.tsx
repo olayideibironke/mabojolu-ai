@@ -272,6 +272,7 @@ export function ChatShell({
   const {
     messages,
     isStreaming,
+    statusLabel,
     send,
     startFreshConversation,
     stop,
@@ -1092,6 +1093,9 @@ export function ChatShell({
               !isSignedIn
             }
             disabledReason="Preparing Mabojolu..."
+            computeStatus={
+              statusLabel
+            }
             selectedModelId={
               selectedModelId
             }
