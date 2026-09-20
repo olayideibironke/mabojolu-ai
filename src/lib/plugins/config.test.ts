@@ -62,6 +62,40 @@ describe(
     );
 
     it(
+      "does not reuse GitHub credentials for catalog-only providers",
+      () => {
+        vi.stubEnv(
+          "MABOJOLU_APP_URL",
+          "https://www.mabojolu.com",
+        );
+        vi.stubEnv(
+          "MABOJOLU_PLUGIN_ENCRYPTION_KEY",
+          "12345678901234567890123456789012",
+        );
+        vi.stubEnv(
+          "GITHUB_OAUTH_CLIENT_ID",
+          "github-client-id",
+        );
+        vi.stubEnv(
+          "GITHUB_OAUTH_CLIENT_SECRET",
+          "github-client-secret",
+        );
+
+        expect(
+          pluginOAuthConfig(
+            "vercel",
+          ),
+        ).toBeNull();
+
+        expect(
+          pluginOAuthConfig(
+            "supabase",
+          ),
+        ).toBeNull();
+      },
+    );
+
+    it(
       "returns null when provider credentials are missing",
       () => {
         vi.stubEnv(
