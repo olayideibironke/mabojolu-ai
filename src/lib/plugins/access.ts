@@ -8,6 +8,11 @@ import type {
   BillingAccount,
 } from "@/lib/database/types";
 
+import {
+  getPluginProvider,
+  type PluginProviderId,
+} from "./registry";
+
 export function hasPaidPluginAccess(
   session:
     Session,
@@ -37,9 +42,42 @@ export function hasPaidPluginAccess(
   );
 }
 
+export function hasPluginAccess(
+  session:
+    Session,
+
+  account:
+    BillingAccount |
+    null,
+
+  providerId:
+    PluginProviderId,
+):
+  boolean {
+  const provider =
+    getPluginProvider(
+      providerId,
+    );
+
+  if (
+    provider.accessTier ===
+      "free"
+  ) {
+    return true;
+  }
+
+  return hasPaidPluginAccess(
+    session,
+    account,
+  );
+}
+
 export async function resolvePluginAccess(
   session:
     Session,
+
+  providerId?:
+    PluginProviderId,
 ): Promise<{
   account:
     BillingAccount |
@@ -58,9 +96,15 @@ export async function resolvePluginAccess(
     account,
 
     allowed:
-      hasPaidPluginAccess(
-        session,
-        account,
-      ),
+      providerId
+        ? hasPluginAccess(
+            session,
+            account,
+            providerId,
+          )
+        : hasPaidPluginAccess(
+            session,
+            account,
+          ),
   };
 }
