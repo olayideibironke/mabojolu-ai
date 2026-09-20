@@ -9,6 +9,12 @@ import {
   resolveAvailableBrowserMode,
 } from "./browser-mode-policy";
 
+import {
+  BROWSER_MODEL_FAST,
+  BROWSER_MODEL_1B,
+  BROWSER_MODEL_3B,
+} from "./browser-device-profile";
+
 import type {
   BrowserDeviceProfile,
 } from "./browser-device-profile";
@@ -66,16 +72,29 @@ describe(
   "browser response mode policy",
   () => {
     it(
-      "keeps Fast available on constrained compatible devices",
+      "uses the lightweight model for Fast even on compatible devices",
       () => {
-        expect(
+        const plan =
           browserModePlan(
             "mabojolu-fast",
             profile(
               "constrained",
             ),
-          ).available,
+          );
+
+        expect(
+          plan.available,
         ).toBe(true);
+
+        expect(
+          plan.modelCandidates,
+        ).toEqual([
+          BROWSER_MODEL_FAST,
+        ]);
+
+        expect(
+          plan.maxOutputTokens,
+        ).toBe(512);
       },
     );
 
@@ -145,6 +164,34 @@ describe(
         ).toBe(
           "mabojolu-fast",
         );
+      },
+    );
+
+    it(
+      "keeps Regular and Quality on larger models",
+      () => {
+        expect(
+          browserModePlan(
+            "mabojolu-regular",
+            profile(
+              "strong",
+            ),
+          ).modelCandidates,
+        ).toEqual([
+          BROWSER_MODEL_3B,
+          BROWSER_MODEL_1B,
+        ]);
+
+        expect(
+          browserModePlan(
+            "mabojolu-local",
+            profile(
+              "strong",
+            ),
+          ).modelCandidates,
+        ).toEqual([
+          BROWSER_MODEL_3B,
+        ]);
       },
     );
 
