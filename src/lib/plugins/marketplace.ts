@@ -301,7 +301,7 @@ export const PLUGIN_MARKETPLACE:
     },
     {
       id: "atlassian-rovo",
-      name: "Atlassian Rovo",
+      name: "Atlassian Rovo (Legacy)",
       description: "Manage Jira and Confluence",
       category: "Productivity",
       domain: "atlassian.com",
@@ -322,7 +322,7 @@ export const PLUGIN_MARKETPLACE:
     },
     {
       id: "todoist",
-      name: "Todoist",
+      name: "Todoist: To Do List & Calendar",
       description: "To-do lists, tasks, and calendar",
       category: "Productivity",
       domain: "todoist.com",
@@ -608,7 +608,7 @@ export const PLUGIN_MARKETPLACE:
     },
     {
       id: "teams",
-      name: "Microsoft Teams",
+      name: "Teams",
       description: "Summarize Teams and follow up",
       category: "Communication",
       domain: "microsoft.com",
