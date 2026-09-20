@@ -5,11 +5,14 @@ import {
 } from "./browser-context";
 
 import {
-  BROWSER_MODEL_1B,
-  BROWSER_MODEL_3B,
   profileBrowserDevice,
-  type BrowserDeviceProfile,
 } from "./browser-device-profile";
+
+import {
+  browserModePlan,
+  isBrowserOwnedModel,
+  type BrowserOwnedModelId,
+} from "./browser-mode-policy";
 
 import type {
   StreamCallbacks,
@@ -25,155 +28,6 @@ const BROWSER_FAILURE_STORAGE_KEY =
 
 const BROWSER_FAILURE_COOLDOWN_MS =
   30 * 60 * 1_000;
-
-type BrowserOwnedModelId =
-  | "mabojolu-fast"
-  | "mabojolu-regular"
-  | "mabojolu-local";
-
-interface BrowserModePlan {
-  displayModel:
-    string;
-
-  modelCandidates:
-    string[];
-
-  maxOutputTokens:
-    number;
-
-  unavailableReason?:
-    string;
-}
-
-function isBrowserOwnedModel(
-  value:
-    string |
-    undefined,
-):
-  value is
-    BrowserOwnedModelId {
-  return (
-    value ===
-      "mabojolu-fast" ||
-    value ===
-      "mabojolu-regular" ||
-    value ===
-      "mabojolu-local"
-  );
-}
-
-function browserModePlan(
-  modelId:
-    BrowserOwnedModelId,
-
-  profile:
-    BrowserDeviceProfile,
-):
-  BrowserModePlan {
-  if (
-    profile.tier ===
-      "unavailable"
-  ) {
-    return {
-      displayModel:
-        "mabojolu-browser-" +
-        modelId.replace(
-          "mabojolu-",
-          "",
-        ),
-
-      modelCandidates:
-        [],
-
-      maxOutputTokens:
-        0,
-
-      unavailableReason:
-        "This device cannot run Mabojolu on-device because the required browser compute is unavailable.",
-    };
-  }
-
-  if (
-    modelId ===
-      "mabojolu-fast"
-  ) {
-    return {
-      displayModel:
-        "mabojolu-browser-fast",
-
-      modelCandidates:
-        [
-          ...profile
-            .modelCandidates,
-        ],
-
-      maxOutputTokens:
-        profile
-          .maxOutputTokens,
-    };
-  }
-
-  if (
-    modelId ===
-      "mabojolu-regular"
-  ) {
-    return {
-      displayModel:
-        "mabojolu-browser-regular",
-
-      modelCandidates:
-        profile.tier ===
-          "strong"
-          ? [
-              BROWSER_MODEL_3B,
-              BROWSER_MODEL_1B,
-            ]
-          : [
-              BROWSER_MODEL_1B,
-            ],
-
-      maxOutputTokens:
-        profile.tier ===
-          "constrained"
-          ? 768
-          : profile.tier ===
-              "strong"
-            ? 1536
-            : 1024,
-    };
-  }
-
-  if (
-    profile.tier !==
-      "strong"
-  ) {
-    return {
-      displayModel:
-        "mabojolu-browser-quality",
-
-      modelCandidates:
-        [],
-
-      maxOutputTokens:
-        0,
-
-      unavailableReason:
-        "Mabojolu Quality needs a stronger WebGPU-capable device. Use Fast or Regular on this device.",
-    };
-  }
-
-  return {
-    displayModel:
-      "mabojolu-browser-quality",
-
-    modelCandidates: [
-      BROWSER_MODEL_3B,
-    ],
-
-    maxOutputTokens:
-      1536,
-  };
-}
 
 const BROWSER_ARTIFACT_MANIFEST_URL =
   process.env
@@ -740,10 +594,8 @@ export async function streamBrowserChat(
     );
 
   if (
-    modePlan
-      .modelCandidates
-      .length ===
-      0
+    !modePlan
+      .available
   ) {
     await settlePersistence({
       conversationId:
