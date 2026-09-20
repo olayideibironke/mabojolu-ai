@@ -1,4 +1,5 @@
 import {
+  BROWSER_MODEL_FAST,
   BROWSER_MODEL_1B,
   BROWSER_MODEL_3B,
   type BrowserDeviceProfile,
@@ -91,15 +92,15 @@ export function browserModePlan(
       displayModel:
         "mabojolu-browser-fast",
 
-      modelCandidates:
-        [
-          ...profile
-            .modelCandidates,
-        ],
+      modelCandidates: [
+        BROWSER_MODEL_FAST,
+      ],
 
       maxOutputTokens:
-        profile
-          .maxOutputTokens,
+        profile.tier ===
+          "constrained"
+          ? 512
+          : 768,
 
       available:
         true,
