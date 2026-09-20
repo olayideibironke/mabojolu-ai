@@ -974,7 +974,7 @@ export function Sidebar({
         data-chat-row={
           conversation.id
         }
-        className={`relative flex items-center rounded-xl transition-colors ${
+        className={`group relative flex items-center rounded-xl transition-colors ${
           isActive
             ? "bg-surface-raised shadow-sm"
             : "hover:bg-surface-raised/70"
@@ -1001,7 +1001,14 @@ export function Sidebar({
           {conversation.title}
         </button>
 
-        <span className="mr-1 flex shrink-0 items-center">
+        <span
+          className={`mr-1 flex shrink-0 items-center transition-opacity ${
+            chatMenuId ===
+              conversation.id
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+          }`}
+        >
           <IconButton
             size="sm"
             label={`Rename chat: ${conversation.title}`}
@@ -1261,7 +1268,7 @@ export function Sidebar({
         data-project-row={
           conversation.id
         }
-        className={`relative flex items-center rounded-xl transition-colors ${
+        className={`group relative flex items-center rounded-xl transition-colors ${
           isActive
             ? "bg-surface-raised shadow-sm"
             : "hover:bg-surface-raised/70"
@@ -1292,7 +1299,14 @@ export function Sidebar({
           </span>
         </button>
 
-        <span className="mr-1 flex shrink-0 items-center">
+        <span
+          className={`mr-1 flex shrink-0 items-center transition-opacity ${
+            projectMenuId ===
+              conversation.id
+              ? "opacity-100"
+              : "opacity-0 group-hover:opacity-100 focus-within:opacity-100"
+          }`}
+        >
           <IconButton
             size="sm"
             label={`Rename project: ${conversation.title}`}
