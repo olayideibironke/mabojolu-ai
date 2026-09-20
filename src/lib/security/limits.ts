@@ -3,7 +3,7 @@ import "server-only";
 import { chatError } from "@/lib/ai/errors";
 import type { Session } from "@/lib/auth/session";
 import { getDatabase } from "@/lib/database";
-import { serverEnv } from "@/lib/env";
+import { usageRuntimeConfig } from "./runtime-config";
 
 import {
   FREE_WINDOW_HOURS,
@@ -71,8 +71,8 @@ export async function checkUsageLimits(
     UsageLimitOptions =
       {},
 ): Promise<LimitDecision> {
-  const env =
-    serverEnv();
+  const config =
+    usageRuntimeConfig();
 
   const userId =
     session.userId;
@@ -82,7 +82,7 @@ export async function checkUsageLimits(
    * database, or provider work that makes generation unsafe.
    */
   if (
-    env.MABOJOLU_MAINTENANCE_MODE
+    config.maintenanceMode
   ) {
     return {
       allowed: false,
@@ -109,7 +109,7 @@ export async function checkUsageLimits(
 
   if (
     running >=
-    env.MABOJOLU_MAX_CONCURRENT_GENERATIONS
+    config.maxConcurrentGenerations
   ) {
     return {
       allowed: false,
@@ -281,7 +281,7 @@ export async function checkUsageLimits(
 
         if (
           dailyCompletedResponses >=
-          env.MABOJOLU_DAILY_MESSAGE_LIMIT
+          config.dailyMessageLimit
         ) {
           await database.recordSafetyEvent(
             {
@@ -297,7 +297,7 @@ export async function checkUsageLimits(
                 "info",
 
               detail:
-                `Received ${dailyCompletedResponses} successful responses in 24 hours, limit ${env.MABOJOLU_DAILY_MESSAGE_LIMIT}.`,
+                `Received ${dailyCompletedResponses} successful responses in 24 hours, limit ${config.dailyMessageLimit}.`,
             },
           );
 
@@ -327,7 +327,7 @@ export async function checkUsageLimits(
     options
       .enforceProviderCostCeiling !==
       false &&
-    env.MABOJOLU_DAILY_COST_LIMIT_USD >
+    config.dailyCostLimitUsd >
       0
   ) {
     const metrics =
@@ -346,7 +346,7 @@ export async function checkUsageLimits(
 
     if (
       spentToday >=
-      env.MABOJOLU_DAILY_COST_LIMIT_USD
+      config.dailyCostLimitUsd
     ) {
       await database.recordSafetyEvent(
         {
