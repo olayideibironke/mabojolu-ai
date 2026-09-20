@@ -89,6 +89,66 @@ describe(
     );
 
     it(
+      "marks developer connectors free and workspace connectors premium",
+      () => {
+        for (
+          const providerId of [
+            "github",
+            "vercel",
+            "supabase",
+            "cloudflare",
+            "resend",
+          ] as const
+        ) {
+          expect(
+            getPluginProvider(
+              providerId,
+            ).accessTier,
+          ).toBe(
+            "free",
+          );
+        }
+
+        for (
+          const providerId of [
+            "google-calendar",
+            "google-drive",
+            "google-gmail",
+            "microsoft",
+          ] as const
+        ) {
+          expect(
+            getPluginProvider(
+              providerId,
+            ).accessTier,
+          ).toBe(
+            "paid",
+          );
+        }
+      },
+    );
+
+    it(
+      "registers the new developer plugin ids",
+      () => {
+        for (
+          const providerId of [
+            "vercel",
+            "supabase",
+            "cloudflare",
+            "resend",
+          ]
+        ) {
+          expect(
+            isPluginProviderId(
+              providerId,
+            ),
+          ).toBe(true);
+        }
+      },
+    );
+
+    it(
       "accepts the split provider ids and rejects the old combined Google id",
       () => {
         expect(
