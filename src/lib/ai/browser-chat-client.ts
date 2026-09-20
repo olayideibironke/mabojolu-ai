@@ -5,6 +5,11 @@ import {
 } from "./browser-context";
 
 import {
+  BROWSER_SYSTEM_PROMPT,
+  mabojoluIdentityResponse,
+} from "./browser-identity";
+
+import {
   latestChromePrompt,
   startChromePromptSession,
   streamChromePrompt,
@@ -40,11 +45,6 @@ const BROWSER_ARTIFACT_MANIFEST_URL =
     .NEXT_PUBLIC_MABOJOLU_ARTIFACT_MANIFEST_URL
     ?.trim() ||
   null;
-
-const SYSTEM_PROMPT =
-  "You are Mabojolu, a helpful on-device AI assistant. " +
-  "Answer accurately and clearly. You are running entirely on the user's device. " +
-  "Do not claim to have live web access or external tools unless the application explicitly provides them.";
 
 interface BrowserChatBody {
   conversationId?:
@@ -449,7 +449,7 @@ function browserContext(
 ) {
   return buildBrowserContext({
     systemPrompt:
-      SYSTEM_PROMPT,
+      BROWSER_SYSTEM_PROMPT,
 
     messages:
       body.messages,
@@ -476,6 +476,11 @@ export async function streamBrowserChat(
       )
         ? body.modelId
         : "mabojolu-fast";
+
+  const identityResponse =
+    mabojoluIdentityResponse(
+      body.messages,
+    );
 
   if (
     body.messages.some(
@@ -506,6 +511,7 @@ export async function streamBrowserChat(
   }
 
   const chromeContext =
+    !identityResponse &&
     selectedMode ===
       "mabojolu-fast"
       ? browserContext(
@@ -597,6 +603,35 @@ export async function streamBrowserChat(
 
   const requestId =
     body.idempotencyKey;
+
+  if (
+    identityResponse
+  ) {
+    callbacks.onDelta(
+      identityResponse,
+    );
+
+    await settlePersistence({
+      conversationId:
+        start.conversationId,
+
+      assistantMessageId:
+        start.messageId,
+
+      content:
+        identityResponse,
+
+      status:
+        "complete",
+    });
+
+    callbacks.onDone({
+      finishReason:
+        "end_turn",
+    });
+
+    return;
+  }
 
   if (
     selectedMode ===
