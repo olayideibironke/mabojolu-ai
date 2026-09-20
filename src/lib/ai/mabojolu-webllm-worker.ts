@@ -7,6 +7,9 @@ import {
   resolveMabojoluArtifactSources,
   type MabojoluArtifactSource,
 } from "./browser-artifacts";
+import {
+  browserModelProgressLabel,
+} from "./browser-progress";
 
 interface GenerateMessage {
   type:
@@ -144,26 +147,16 @@ async function ensureEngine(
           (
             progress,
           ) => {
-            const label =
-              typeof progress
-                .text ===
-                "string" &&
-              progress
-                .text
-                .trim()
-                .length >
-                0
-                ? progress
-                    .text
-                : "Loading on-device model...";
-
             post({
               type:
                 "status",
 
               requestId,
 
-              label,
+              label:
+                browserModelProgressLabel(
+                  progress,
+                ),
             });
           },
       },
