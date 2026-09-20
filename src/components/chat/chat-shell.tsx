@@ -24,6 +24,7 @@ import {
   handoverPressure,
 } from "@/lib/ai/handover";
 import {
+  browserModePlan,
   resolveAvailableBrowserMode,
 } from "@/lib/ai/browser-mode-policy";
 import { useChat } from "@/hooks/use-chat";
@@ -229,6 +230,29 @@ export function ChatShell({
           deviceProfile,
         )
       : selectedModelId;
+
+  const activeModePlan =
+    deviceProfile
+      ? browserModePlan(
+          effectiveModelId,
+          deviceProfile,
+        )
+      : null;
+
+  const computeUnavailable =
+    activeModePlan !== null &&
+    !activeModePlan.available;
+
+  const composerDisabledReason =
+    !isSignedIn
+      ? "Preparing Mabojolu..."
+      : computeUnavailable
+        ? (
+            activeModePlan
+              ?.unavailableReason ??
+            "On-device browser compute is unavailable on this device."
+          )
+        : undefined;
 
   useEffect(() => {
     if (
@@ -1123,9 +1147,15 @@ export function ChatShell({
               conversationEpoch
             }
             disabled={
-              !isSignedIn
+              !isSignedIn ||
+              computeUnavailable
             }
-            disabledReason="Preparing Mabojolu..."
+            disabledReason={
+              composerDisabledReason
+            }
+            imageAttachmentsEnabled={
+              false
+            }
             computeStatus={
               statusLabel
             }
