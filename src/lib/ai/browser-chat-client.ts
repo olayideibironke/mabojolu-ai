@@ -5,7 +5,10 @@ import {
 } from "./browser-context";
 
 import {
+  BROWSER_MODEL_1B,
+  BROWSER_MODEL_3B,
   profileBrowserDevice,
+  type BrowserDeviceProfile,
 } from "./browser-device-profile";
 
 import type {
@@ -23,8 +26,154 @@ const BROWSER_FAILURE_STORAGE_KEY =
 const BROWSER_FAILURE_COOLDOWN_MS =
   30 * 60 * 1_000;
 
-const BROWSER_DISPLAY_MODEL =
-  "mabojolu-browser-fast";
+type BrowserOwnedModelId =
+  | "mabojolu-fast"
+  | "mabojolu-regular"
+  | "mabojolu-local";
+
+interface BrowserModePlan {
+  displayModel:
+    string;
+
+  modelCandidates:
+    string[];
+
+  maxOutputTokens:
+    number;
+
+  unavailableReason?:
+    string;
+}
+
+function isBrowserOwnedModel(
+  value:
+    string |
+    undefined,
+):
+  value is
+    BrowserOwnedModelId {
+  return (
+    value ===
+      "mabojolu-fast" ||
+    value ===
+      "mabojolu-regular" ||
+    value ===
+      "mabojolu-local"
+  );
+}
+
+function browserModePlan(
+  modelId:
+    BrowserOwnedModelId,
+
+  profile:
+    BrowserDeviceProfile,
+):
+  BrowserModePlan {
+  if (
+    profile.tier ===
+      "unavailable"
+  ) {
+    return {
+      displayModel:
+        "mabojolu-browser-" +
+        modelId.replace(
+          "mabojolu-",
+          "",
+        ),
+
+      modelCandidates:
+        [],
+
+      maxOutputTokens:
+        0,
+
+      unavailableReason:
+        "This device cannot run Mabojolu on-device because the required browser compute is unavailable.",
+    };
+  }
+
+  if (
+    modelId ===
+      "mabojolu-fast"
+  ) {
+    return {
+      displayModel:
+        "mabojolu-browser-fast",
+
+      modelCandidates:
+        [
+          ...profile
+            .modelCandidates,
+        ],
+
+      maxOutputTokens:
+        profile
+          .maxOutputTokens,
+    };
+  }
+
+  if (
+    modelId ===
+      "mabojolu-regular"
+  ) {
+    return {
+      displayModel:
+        "mabojolu-browser-regular",
+
+      modelCandidates:
+        profile.tier ===
+          "strong"
+          ? [
+              BROWSER_MODEL_3B,
+              BROWSER_MODEL_1B,
+            ]
+          : [
+              BROWSER_MODEL_1B,
+            ],
+
+      maxOutputTokens:
+        profile.tier ===
+          "constrained"
+          ? 768
+          : profile.tier ===
+              "strong"
+            ? 1536
+            : 1024,
+    };
+  }
+
+  if (
+    profile.tier !==
+      "strong"
+  ) {
+    return {
+      displayModel:
+        "mabojolu-browser-quality",
+
+      modelCandidates:
+        [],
+
+      maxOutputTokens:
+        0,
+
+      unavailableReason:
+        "Mabojolu Quality needs a stronger WebGPU-capable device. Use Fast or Regular on this device.",
+    };
+  }
+
+  return {
+    displayModel:
+      "mabojolu-browser-quality",
+
+    modelCandidates: [
+      BROWSER_MODEL_3B,
+    ],
+
+    maxOutputTokens:
+      1536,
+  };
+}
 
 const BROWSER_ARTIFACT_MANIFEST_URL =
   process.env
@@ -226,37 +375,9 @@ export function shouldUseBrowserChat(
   body:
     BrowserChatBody,
 ): boolean {
-  if (
-    body.modelId !==
-      "mabojolu-fast"
-  ) {
-    return false;
-  }
-
-  if (
-    body.messages.some(
-      (message) =>
-        (
-          message
-            .attachments
-            ?.length ??
-          0
-        ) >
-        0,
-    )
-  ) {
-    return false;
-  }
-
-  /*
-   * Fast text mode is browser-owned.
-   *
-   * Do not silently route to a server provider when WebGPU is unavailable,
-   * browser compute recently failed, or the prompt exceeds the local context.
-   * streamBrowserChat reports those conditions directly so a zero-cost request
-   * never turns into an implicit paid-provider attempt.
-   */
-  return true;
+  return isBrowserOwnedModel(
+    body.modelId,
+  );
 }
 
 async function responseError(
@@ -356,6 +477,13 @@ async function beginPersistence(
             idempotencyKey:
               body
                 .idempotencyKey,
+
+            modelId:
+              isBrowserOwnedModel(
+                body.modelId,
+              )
+                ? body.modelId
+                : "mabojolu-fast",
 
             userMessage: {
               id:
@@ -482,6 +610,42 @@ export async function streamBrowserChat(
     StreamCallbacks,
 ):
   Promise<void> {
+  const selectedMode:
+    BrowserOwnedModelId =
+      isBrowserOwnedModel(
+        body.modelId,
+      )
+        ? body.modelId
+        : "mabojolu-fast";
+
+  if (
+    body.messages.some(
+      (
+        message,
+      ) =>
+        (
+          message
+            .attachments
+            ?.length ??
+          0
+        ) >
+        0,
+    )
+  ) {
+    callbacks.onError({
+      code:
+        "provider_unavailable",
+
+      message:
+        "On-device image understanding is not available yet. Remove the image and send a text request instead.",
+
+      retryable:
+        false,
+    });
+
+    return;
+  }
+
   if (
     browserComputeTemporarilyDisabled()
   ) {
@@ -570,8 +734,14 @@ export async function streamBrowserChat(
   const deviceProfile =
     profileBrowserDevice();
 
+  const modePlan =
+    browserModePlan(
+      selectedMode,
+      deviceProfile,
+    );
+
   if (
-    deviceProfile
+    modePlan
       .modelCandidates
       .length ===
       0
@@ -597,7 +767,9 @@ export async function streamBrowserChat(
         "provider_unavailable",
 
       message:
-        "This device cannot run Mabojolu Fast on-device because the required browser compute is unavailable. Use a WebGPU-capable browser or device.",
+        modePlan
+          .unavailableReason ??
+        "This device cannot run the selected Mabojolu mode on-device.",
 
       retryable:
         true,
@@ -609,7 +781,7 @@ export async function streamBrowserChat(
   const context =
     browserContext(
       body,
-      deviceProfile
+      modePlan
         .maxOutputTokens,
     );
 
@@ -637,7 +809,7 @@ export async function streamBrowserChat(
         "provider_unavailable",
 
       message:
-        "This conversation is too large for the on-device Fast model. Start a new chat, use Mabojolu's handover, or shorten the conversation before retrying.",
+        "This conversation is too large for the selected on-device model. Start a new chat, use Mabojolu's handover, or shorten the conversation before retrying.",
 
       retryable:
         true,
@@ -873,7 +1045,7 @@ export async function streamBrowserChat(
         requestId,
 
         modelCandidates:
-          deviceProfile
+          modePlan
             .modelCandidates,
 
         artifactManifestUrl:
@@ -883,7 +1055,7 @@ export async function streamBrowserChat(
           context.messages,
 
         maxOutputTokens:
-          deviceProfile
+          modePlan
             .maxOutputTokens,
       });
     },
@@ -891,7 +1063,6 @@ export async function streamBrowserChat(
 }
 
 export {
-  BROWSER_DISPLAY_MODEL,
   BROWSER_FAILURE_COOLDOWN_MS,
   BROWSER_FAILURE_STORAGE_KEY,
 };
