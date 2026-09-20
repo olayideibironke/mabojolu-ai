@@ -5,6 +5,7 @@ import {
 } from "vitest";
 
 import {
+  BROWSER_MODEL_FAST,
   BROWSER_MODEL_1B,
   BROWSER_MODEL_3B,
 } from "./browser-device-profile";
