@@ -355,6 +355,105 @@ function recordChallengerFit(
   }
 }
 
+
+function promoteChallenger(
+  model:
+    AdaptiveValidatedPredicateApplicabilityModel,
+): void {
+  for (
+    const input of [
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          false,
+      },
+
+      {
+        history:
+          "2" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          false,
+      },
+    ]
+  ) {
+    record(
+      model,
+      input.history,
+      input.distinct,
+      input.useful,
+    );
+  }
+}
+
+function triggerReturnToBootstrapRegime(
+  model:
+    AdaptiveValidatedPredicateApplicabilityModel,
+): void {
+  for (
+    const input of [
+      {
+        history:
+          "3+" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "2" as const,
+
+        distinct:
+          "2" as const,
+
+        useful:
+          true,
+      },
+
+      {
+        history:
+          "1" as const,
+
+        distinct:
+          "1" as const,
+
+        useful:
+          true,
+      },
+    ]
+  ) {
+    record(
+      model,
+      input.history,
+      input.distinct,
+      input.useful,
+    );
+  }
+}
+
 describe(
   "Mabojolu G fresh-reserve challenger champion predicate adaptation",
   () => {
@@ -897,5 +996,267 @@ describe(
         });
       },
     );
+
+    it(
+      "recalls a previously validated regime after the environment returns without relearning it",
+      () => {
+        const model =
+          new AdaptiveValidatedPredicateApplicabilityModel();
+
+        bootstrapChampion(
+          model,
+        );
+
+        triggerDrift(
+          model,
+        );
+
+        recordChallengerFit(
+          model,
+        );
+
+        promoteChallenger(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          championGeneration:
+            2,
+
+          replacementCount:
+            1,
+
+          archivedChampionCount:
+            1,
+
+          rollbackCount:
+            0,
+        });
+
+        triggerReturnToBootstrapRegime(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "regime-recall-validation",
+
+          championGeneration:
+            2,
+
+          archivedChampionCount:
+            1,
+
+          regimeRecallValidationEvidenceCount:
+            0,
+        });
+
+        for (
+          const input of [
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                false,
+            },
+
+            {
+              history:
+                "2" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+          ]
+        ) {
+          record(
+            model,
+            input.history,
+            input.distinct,
+            input.useful,
+          );
+        }
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          championGeneration:
+            1,
+
+          replacementCount:
+            1,
+
+          archivedChampionCount:
+            1,
+
+          rollbackCount:
+            1,
+
+          regimeRecallValidationEvidenceCount:
+            0,
+
+          lastRegimeRecallAccuracy:
+            1,
+
+          lastRegimeRecallGeneration:
+            1,
+
+          lastRegimeRecallDecision:
+            "rolled-back",
+
+          championOperationalEvidenceCount:
+            0,
+        });
+
+        expect(
+          model.estimate(
+            "principle-a",
+            signature(
+              "3+",
+              "2",
+            ),
+          )
+            ?.adaptation
+            .championPredictsUsefulWhenPredicateIs,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "rejects regime recall when an archived champion does not beat the fresh majority baseline",
+      () => {
+        const model =
+          new AdaptiveValidatedPredicateApplicabilityModel();
+
+        bootstrapChampion(
+          model,
+        );
+
+        triggerDrift(
+          model,
+        );
+
+        recordChallengerFit(
+          model,
+        );
+
+        promoteChallenger(
+          model,
+        );
+
+        triggerReturnToBootstrapRegime(
+          model,
+        );
+
+        for (
+          const input of [
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "2" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "1" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                true,
+            },
+          ]
+        ) {
+          record(
+            model,
+            input.history,
+            input.distinct,
+            input.useful,
+          );
+        }
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "challenger-fit",
+
+          championGeneration:
+            2,
+
+          rollbackCount:
+            0,
+
+          lastRegimeRecallAccuracy:
+            1,
+
+          lastRegimeRecallGeneration:
+            1,
+
+          lastRegimeRecallDecision:
+            "no-match",
+
+          challengerFitEvidenceCount:
+            0,
+
+          regimeRecallValidationEvidenceCount:
+            0,
+        });
+      },
+    );
+
   },
 );
