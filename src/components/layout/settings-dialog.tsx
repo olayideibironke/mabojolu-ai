@@ -521,7 +521,7 @@ export function SettingsDialog({
           <p className="mt-2 text-xs leading-5 text-text-secondary">
             You can permanently delete individual conversations from
             the sidebar. Separate chats stay independent unless you
-            deliberately continue with Mabojolu's handover flow.
+            deliberately continue with Mabojolu’s handover flow.
           </p>
 
           <p className="mt-2 text-xs leading-5 text-text-secondary">
