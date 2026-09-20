@@ -67,6 +67,16 @@ const beginSchema =
       z.string()
         .min(1),
 
+    modelId:
+      z.enum([
+        "mabojolu-fast",
+        "mabojolu-regular",
+        "mabojolu-local",
+      ])
+        .default(
+          "mabojolu-fast",
+        ),
+
     userMessage:
       z.object({
         id:
@@ -343,6 +353,8 @@ export async function POST(
 
       idempotencyKey,
 
+      modelId,
+
       userMessage,
     } = parsed.data;
 
@@ -430,10 +442,16 @@ export async function POST(
             "streaming",
 
           model:
-            "mabojolu-browser-fast",
+            modelId ===
+              "mabojolu-fast"
+              ? "mabojolu-browser-fast"
+              : modelId ===
+                  "mabojolu-regular"
+                ? "mabojolu-browser-regular"
+                : "mabojolu-browser-quality",
 
           promptVersion:
-            "browser-webgpu-v0.1",
+            "browser-webgpu-v0.2",
 
           clientId:
             idempotencyKey +
@@ -448,7 +466,13 @@ export async function POST(
           assistant.id,
 
         model:
-          "mabojolu-browser-fast",
+          modelId ===
+            "mabojolu-fast"
+            ? "mabojolu-browser-fast"
+            : modelId ===
+                "mabojolu-regular"
+              ? "mabojolu-browser-regular"
+              : "mabojolu-browser-quality",
       },
       {
         headers: {
