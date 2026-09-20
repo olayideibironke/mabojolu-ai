@@ -87,7 +87,11 @@ export type PluginProviderId =
   | "google-drive"
   | "google-gmail"
   | "microsoft"
-  | "github";
+  | "github"
+  | "vercel"
+  | "supabase"
+  | "cloudflare"
+  | "resend";
 
 export interface PluginConnection {
   userId:
