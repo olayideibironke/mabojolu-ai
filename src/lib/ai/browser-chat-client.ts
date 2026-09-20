@@ -8,10 +8,6 @@ import {
   profileBrowserDevice,
 } from "./browser-device-profile";
 
-import {
-  selectComputeRoute,
-} from "./compute-router";
-
 import type {
   StreamCallbacks,
 } from "./client-stream";
@@ -218,74 +214,6 @@ function clearBrowserComputeFailure():
   }
 }
 
-function browserRouteAvailable():
-  boolean {
-  if (
-    browserComputeTemporarilyDisabled()
-  ) {
-    return false;
-  }
-
-  const profile =
-    profileBrowserDevice();
-
-  const route =
-    selectComputeRoute([
-      {
-        id:
-          "browser-webgpu",
-
-        backend:
-          "browser-webgpu",
-
-        owner:
-          "user",
-
-        available:
-          profile.tier !==
-            "unavailable",
-
-        supportsStreaming:
-          true,
-
-        requiresCredential:
-          false,
-
-        externalMeteredCost:
-          false,
-      },
-
-      {
-        id:
-          "local-ollama",
-
-        backend:
-          "local-ollama",
-
-        owner:
-          "operator",
-
-        available:
-          true,
-
-        supportsStreaming:
-          true,
-
-        requiresCredential:
-          false,
-
-        externalMeteredCost:
-          false,
-      },
-    ]);
-
-  return (
-    route?.candidate
-      .backend ===
-    "browser-webgpu"
-  );
-}
-
 /**
  * Browser inference v0.1 intentionally activates only for Mabojolu Fast and
  * text-only conversations.
@@ -320,22 +248,15 @@ export function shouldUseBrowserChat(
     return false;
   }
 
-  if (
-    !browserRouteAvailable()
-  ) {
-    return false;
-  }
-
-  const profile =
-    profileBrowserDevice();
-
-  const context =
-    browserContext(
-      body,
-      profile.maxOutputTokens,
-    );
-
-  return context.fits;
+  /*
+   * Fast text mode is browser-owned.
+   *
+   * Do not silently route to a server provider when WebGPU is unavailable,
+   * browser compute recently failed, or the prompt exceeds the local context.
+   * streamBrowserChat reports those conditions directly so a zero-cost request
+   * never turns into an implicit paid-provider attempt.
+   */
+  return true;
 }
 
 async function responseError(
@@ -561,6 +482,23 @@ export async function streamBrowserChat(
     StreamCallbacks,
 ):
   Promise<void> {
+  if (
+    browserComputeTemporarilyDisabled()
+  ) {
+    callbacks.onError({
+      code:
+        "provider_unavailable",
+
+      message:
+        "On-device Fast mode is temporarily paused after a browser-compute failure. Try again shortly or use another WebGPU-capable device.",
+
+      retryable:
+        true,
+    });
+
+    return;
+  }
+
   let start:
     BrowserBeginResponse;
 
@@ -659,7 +597,7 @@ export async function streamBrowserChat(
         "provider_unavailable",
 
       message:
-        "On-device inference is unavailable on this device. Retry to use Mabojolu's local server inference.",
+        "This device cannot run Mabojolu Fast on-device because the required browser compute is unavailable. Use a WebGPU-capable browser or device.",
 
       retryable:
         true,
@@ -699,7 +637,7 @@ export async function streamBrowserChat(
         "provider_unavailable",
 
       message:
-        "This conversation is too large for the on-device model. Retry to use Mabojolu's local server inference without losing your prompt.",
+        "This conversation is too large for the on-device Fast model. Start a new chat, use Mabojolu's handover, or shorten the conversation before retrying.",
 
       retryable:
         true,
