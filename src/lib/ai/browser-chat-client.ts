@@ -5,6 +5,12 @@ import {
 } from "./browser-context";
 
 import {
+  latestChromePrompt,
+  startChromePromptSession,
+  streamChromePrompt,
+} from "./chrome-prompt-client";
+
+import {
   profileBrowserDevice,
 } from "./browser-device-profile";
 
@@ -499,22 +505,30 @@ export async function streamBrowserChat(
     return;
   }
 
-  if (
-    browserComputeTemporarilyDisabled()
-  ) {
-    callbacks.onError({
-      code:
-        "provider_unavailable",
+  const chromeContext =
+    selectedMode ===
+      "mabojolu-fast"
+      ? browserContext(
+          body,
+          768,
+        )
+      : null;
 
-      message:
-        "On-device Mabojolu is temporarily paused after a browser-compute failure. Try again shortly or use another WebGPU-capable device.",
+  const chromeSessionPromise =
+    chromeContext
+      ?.fits
+      ? startChromePromptSession(
+          chromeContext
+            .messages,
 
-      retryable:
-        true,
-    });
+          signal,
 
-    return;
-  }
+          callbacks
+            .onStatus,
+        )
+      : Promise.resolve(
+          null,
+        );
 
   let start:
     BrowserBeginResponse;
@@ -583,6 +597,215 @@ export async function streamBrowserChat(
 
   const requestId =
     body.idempotencyKey;
+
+  if (
+    selectedMode ===
+      "mabojolu-fast" &&
+    chromeContext
+      ?.fits
+  ) {
+    const chromeSession =
+      await chromeSessionPromise;
+
+    if (
+      signal.aborted
+    ) {
+      chromeSession
+        ?.destroy?.();
+
+      await settlePersistence({
+        conversationId:
+          start.conversationId,
+
+        assistantMessageId:
+          start.messageId,
+
+        content:
+          "",
+
+        status:
+          "interrupted",
+      });
+
+      callbacks.onDone({
+        finishReason:
+          "aborted",
+      });
+
+      return;
+    }
+
+    const prompt =
+      latestChromePrompt(
+        chromeContext
+          .messages,
+      );
+
+    if (
+      chromeSession &&
+      prompt
+    ) {
+      let chromeText =
+        "";
+
+      try {
+        callbacks
+          .onStatus?.(
+            "Thinking on this device with Chrome AI...",
+          );
+
+        chromeText =
+          await streamChromePrompt(
+            chromeSession,
+            prompt,
+            signal,
+            (
+              text,
+            ) => {
+              chromeText +=
+                text;
+
+              callbacks.onDelta(
+                text,
+              );
+            },
+          );
+
+        chromeSession
+          .destroy?.();
+
+        await settlePersistence({
+          conversationId:
+            start.conversationId,
+
+          assistantMessageId:
+            start.messageId,
+
+          content:
+            chromeText,
+
+          status:
+            signal.aborted
+              ? "interrupted"
+              : "complete",
+        });
+
+        clearBrowserComputeFailure();
+
+        callbacks.onDone({
+          finishReason:
+            signal.aborted
+              ? "aborted"
+              : "end_turn",
+        });
+
+        return;
+      } catch {
+        chromeSession
+          .destroy?.();
+
+        if (
+          signal.aborted
+        ) {
+          await settlePersistence({
+            conversationId:
+              start.conversationId,
+
+            assistantMessageId:
+              start.messageId,
+
+            content:
+              chromeText,
+
+            status:
+              "interrupted",
+          });
+
+          callbacks.onDone({
+            finishReason:
+              "aborted",
+          });
+
+          return;
+        }
+
+        if (
+          chromeText
+            .length >
+          0
+        ) {
+          await settlePersistence({
+            conversationId:
+              start.conversationId,
+
+            assistantMessageId:
+              start.messageId,
+
+            content:
+              chromeText,
+
+            status:
+              "failed",
+
+            errorCode:
+              "chrome_prompt_failed",
+          });
+
+          callbacks.onError({
+            code:
+              "provider_unavailable",
+
+            message:
+              "Chrome on-device AI stopped unexpectedly after beginning the response.",
+
+            retryable:
+              true,
+          });
+
+          return;
+        }
+
+        callbacks
+          .onStatus?.(
+            "Chrome on-device AI was unavailable. Preparing Mabojolu browser fallback...",
+          );
+      }
+    }
+  }
+
+  if (
+    browserComputeTemporarilyDisabled()
+  ) {
+    await settlePersistence({
+      conversationId:
+        start.conversationId,
+
+      assistantMessageId:
+        start.messageId,
+
+      content:
+        "",
+
+      status:
+        "failed",
+
+      errorCode:
+        "browser_compute_cooldown",
+    });
+
+    callbacks.onError({
+      code:
+        "provider_unavailable",
+
+      message:
+        "Mabojolu's browser fallback is temporarily paused after a compute failure. Try again shortly.",
+
+      retryable:
+        true,
+    });
+
+    return;
+  }
 
   const deviceProfile =
     profileBrowserDevice();
