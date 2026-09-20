@@ -1,0 +1,149 @@
+import {
+  describe,
+  expect,
+  it,
+} from "vitest";
+
+import {
+  browserModePlan,
+} from "./browser-mode-policy";
+
+import type {
+  BrowserDeviceProfile,
+} from "./browser-device-profile";
+
+function profile(
+  tier:
+    BrowserDeviceProfile["tier"],
+):
+  BrowserDeviceProfile {
+  return {
+    tier,
+
+    capabilities: {
+      webGpu:
+        tier !==
+          "unavailable",
+
+      webAssembly:
+        true,
+
+      eligible:
+        tier !==
+          "unavailable",
+
+      reasons:
+        [],
+    },
+
+    hardwareConcurrency:
+      tier === "strong"
+        ? 12
+        : 4,
+
+    deviceMemoryGb:
+      tier === "strong"
+        ? 16
+        : 4,
+
+    modelCandidates:
+      tier === "unavailable"
+        ? []
+        : [
+            "Llama-3.2-1B-Instruct-q4f16_1-MLC",
+          ],
+
+    maxOutputTokens:
+      1024,
+
+    reasons:
+      [],
+  };
+}
+
+describe(
+  "browser response mode policy",
+  () => {
+    it(
+      "keeps Fast available on constrained compatible devices",
+      () => {
+        expect(
+          browserModePlan(
+            "mabojolu-fast",
+            profile(
+              "constrained",
+            ),
+          ).available,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "keeps Regular available on standard compatible devices",
+      () => {
+        expect(
+          browserModePlan(
+            "mabojolu-regular",
+            profile(
+              "standard",
+            ),
+          ).available,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "requires a strong device for Quality",
+      () => {
+        expect(
+          browserModePlan(
+            "mabojolu-local",
+            profile(
+              "standard",
+            ),
+          ).available,
+        ).toBe(false);
+
+        expect(
+          browserModePlan(
+            "mabojolu-local",
+            profile(
+              "strong",
+            ),
+          ).available,
+        ).toBe(true);
+      },
+    );
+
+    it(
+      "marks every mode unavailable without browser compute",
+      () => {
+        const unavailable =
+          profile(
+            "unavailable",
+          );
+
+        expect(
+          browserModePlan(
+            "mabojolu-fast",
+            unavailable,
+          ).available,
+        ).toBe(false);
+
+        expect(
+          browserModePlan(
+            "mabojolu-regular",
+            unavailable,
+          ).available,
+        ).toBe(false);
+
+        expect(
+          browserModePlan(
+            "mabojolu-local",
+            unavailable,
+          ).available,
+        ).toBe(false);
+      },
+    );
+  },
+);
