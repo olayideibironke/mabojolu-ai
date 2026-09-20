@@ -1,0 +1,1080 @@
+import type {
+  PluginProviderId,
+} from "./registry";
+
+export type MarketplaceCategory =
+  | "Mabojolu Tools"
+  | "Popular"
+  | "New & Noteworthy"
+  | "Small Business"
+  | "Productivity"
+  | "Creativity"
+  | "Developer Tools"
+  | "Business & Operations"
+  | "Data & Analytics"
+  | "Communication"
+  | "Education & Research"
+  | "Scientific Research"
+  | "Security"
+  | "Finance"
+  | "Healthcare"
+  | "Travel"
+  | "Entertainment"
+  | "Other";
+
+export interface MarketplacePluginDefinition {
+  id:
+    string;
+
+  name:
+    string;
+
+  description:
+    string;
+
+  category:
+    MarketplaceCategory;
+
+  domain?:
+    string;
+
+  providerId?:
+    PluginProviderId;
+
+  featured?:
+    boolean;
+}
+
+export const MARKETPLACE_CATEGORY_ORDER:
+  readonly MarketplaceCategory[] = [
+    "Popular",
+    "New & Noteworthy",
+    "Small Business",
+    "Productivity",
+    "Creativity",
+    "Developer Tools",
+    "Business & Operations",
+    "Data & Analytics",
+    "Communication",
+    "Education & Research",
+    "Scientific Research",
+    "Security",
+    "Finance",
+    "Healthcare",
+    "Travel",
+    "Entertainment",
+    "Other",
+    "Mabojolu Tools",
+  ] as const;
+
+export const PLUGIN_MARKETPLACE:
+  readonly MarketplacePluginDefinition[] = [
+    {
+      id: "gmail",
+      name: "Gmail",
+      description: "Read and manage Gmail",
+      category: "Popular",
+      domain: "gmail.com",
+      providerId: "google-gmail",
+      featured: true,
+    },
+    {
+      id: "github",
+      name: "GitHub",
+      description: "Triage PRs, issues, CI, and publish flows",
+      category: "Popular",
+      domain: "github.com",
+      providerId: "github",
+      featured: true,
+    },
+    {
+      id: "google-drive",
+      name: "Google Drive",
+      description: "Drive, Docs, Sheets or Slides",
+      category: "Popular",
+      domain: "drive.google.com",
+      providerId: "google-drive",
+      featured: true,
+    },
+    {
+      id: "google-calendar",
+      name: "Google Calendar",
+      description: "Manage Google Calendar events",
+      category: "Popular",
+      domain: "calendar.google.com",
+      providerId: "google-calendar",
+      featured: true,
+    },
+    {
+      id: "notion",
+      name: "Notion",
+      description: "Notion docs and workflows",
+      category: "Popular",
+      domain: "notion.so",
+      featured: true,
+    },
+    {
+      id: "slack",
+      name: "Slack",
+      description: "Read and manage Slack",
+      category: "Popular",
+      domain: "slack.com",
+      featured: true,
+    },
+    {
+      id: "outlook-email",
+      name: "Outlook Email",
+      description: "Triage Outlook inboxes",
+      category: "Popular",
+      domain: "outlook.com",
+    },
+    {
+      id: "granola",
+      name: "Granola",
+      description: "Add your meeting context",
+      category: "Popular",
+      domain: "granola.ai",
+    },
+    {
+      id: "fireflies",
+      name: "Fireflies",
+      description: "Search meeting transcripts",
+      category: "Popular",
+      domain: "fireflies.ai",
+    },
+
+    {
+      id: "data",
+      name: "Data",
+      description: "Answer questions with data",
+      category: "New & Noteworthy",
+      domain: "openai.com",
+    },
+    {
+      id: "tableau",
+      name: "Tableau",
+      description: "See and understand data",
+      category: "New & Noteworthy",
+      domain: "tableau.com",
+    },
+    {
+      id: "power-bi",
+      name: "Microsoft Power BI",
+      description: "Explore and author analytics in your browser",
+      category: "New & Noteworthy",
+      domain: "powerbi.microsoft.com",
+    },
+    {
+      id: "aws-data-analytics",
+      name: "AWS Data Analytics",
+      description: "AWS data analytics workflows",
+      category: "New & Noteworthy",
+      domain: "aws.amazon.com",
+    },
+    {
+      id: "clickhouse",
+      name: "ClickHouse",
+      description: "Explore ClickHouse Cloud",
+      category: "New & Noteworthy",
+      domain: "clickhouse.com",
+    },
+    {
+      id: "firebase",
+      name: "Firebase",
+      description: "Build and manage Firebase apps",
+      category: "New & Noteworthy",
+      domain: "firebase.google.com",
+    },
+    {
+      id: "thoughtspot",
+      name: "ThoughtSpot Spotter",
+      description: "Explore data with AI-assisted analytics",
+      category: "New & Noteworthy",
+      domain: "thoughtspot.com",
+    },
+    {
+      id: "sigma",
+      name: "Sigma",
+      description: "Cloud analytics and business intelligence",
+      category: "New & Noteworthy",
+      domain: "sigmacomputing.com",
+    },
+    {
+      id: "mongodb-atlas",
+      name: "MongoDB Atlas",
+      description: "Work with MongoDB cloud data",
+      category: "New & Noteworthy",
+      domain: "mongodb.com",
+    },
+
+    {
+      id: "dropbox",
+      name: "Dropbox",
+      description: "Find, create, and take action",
+      category: "Small Business",
+      domain: "dropbox.com",
+    },
+    {
+      id: "quickbooks",
+      name: "Intuit QuickBooks",
+      description: "Business finances made simple",
+      category: "Small Business",
+      domain: "quickbooks.intuit.com",
+    },
+    {
+      id: "hubspot-small-business",
+      name: "HubSpot",
+      description: "Insights to action in HubSpot",
+      category: "Small Business",
+      domain: "hubspot.com",
+    },
+    {
+      id: "stripe",
+      name: "Stripe",
+      description: "Accept payments. Grow revenue.",
+      category: "Small Business",
+      domain: "stripe.com",
+    },
+    {
+      id: "canva-small-business",
+      name: "Canva",
+      description: "Create, review, edit designs",
+      category: "Small Business",
+      domain: "canva.com",
+    },
+    {
+      id: "gusto",
+      name: "Gusto",
+      description: "Run payroll and team insights",
+      category: "Small Business",
+      domain: "gusto.com",
+    },
+    {
+      id: "figma-small-business",
+      name: "Figma",
+      description: "Design products and collaborate",
+      category: "Small Business",
+      domain: "figma.com",
+    },
+    {
+      id: "shopify-small-business",
+      name: "Shopify",
+      description: "Run and grow your online store",
+      category: "Small Business",
+      domain: "shopify.com",
+    },
+
+    {
+      id: "granola-productivity",
+      name: "Granola",
+      description: "Add your meeting context",
+      category: "Productivity",
+      domain: "granola.ai",
+    },
+    {
+      id: "fireflies-productivity",
+      name: "Fireflies",
+      description: "Search meeting transcripts",
+      category: "Productivity",
+      domain: "fireflies.ai",
+    },
+    {
+      id: "outlook-calendar",
+      name: "Outlook Calendar",
+      description: "Manage Outlook schedules",
+      category: "Productivity",
+      domain: "outlook.com",
+    },
+    {
+      id: "plaud",
+      name: "Plaud",
+      description: "Retrieve insights from Plaud",
+      category: "Productivity",
+      domain: "plaud.ai",
+    },
+    {
+      id: "otter",
+      name: "Otter.ai",
+      description: "Search meetings from Otter.ai",
+      category: "Productivity",
+      domain: "otter.ai",
+    },
+    {
+      id: "atlassian-rovo",
+      name: "Atlassian Rovo",
+      description: "Manage Jira and Confluence",
+      category: "Productivity",
+      domain: "atlassian.com",
+    },
+    {
+      id: "linear",
+      name: "Linear",
+      description: "Manage issues and projects",
+      category: "Productivity",
+      domain: "linear.app",
+    },
+    {
+      id: "monday",
+      name: "monday.com",
+      description: "Plan projects and team workflows",
+      category: "Productivity",
+      domain: "monday.com",
+    },
+    {
+      id: "todoist",
+      name: "Todoist",
+      description: "To-do lists, tasks, and calendar",
+      category: "Productivity",
+      domain: "todoist.com",
+    },
+
+    {
+      id: "canva",
+      name: "Canva",
+      description: "Create, review, edit designs",
+      category: "Creativity",
+      domain: "canva.com",
+    },
+    {
+      id: "higgsfield",
+      name: "Higgsfield",
+      description: "Every image and video model",
+      category: "Creativity",
+      domain: "higgsfield.ai",
+    },
+    {
+      id: "product-design",
+      name: "Product Design",
+      description: "Explore and prototype ideas",
+      category: "Creativity",
+      domain: "openai.com",
+    },
+    {
+      id: "figma",
+      name: "Figma",
+      description: "Create designs, ship to code",
+      category: "Creativity",
+      domain: "figma.com",
+    },
+    {
+      id: "magnific",
+      name: "Magnific",
+      description: "Create images, video, designs",
+      category: "Creativity",
+      domain: "magnific.ai",
+    },
+    {
+      id: "heygen",
+      name: "HeyGen",
+      description: "Create AI videos and avatars",
+      category: "Creativity",
+      domain: "heygen.com",
+    },
+    {
+      id: "mobbin",
+      name: "Mobbin",
+      description: "Design inspiration and UI research",
+      category: "Creativity",
+      domain: "mobbin.com",
+    },
+    {
+      id: "runway",
+      name: "Runway",
+      description: "Create and edit generative media",
+      category: "Creativity",
+      domain: "runwayml.com",
+    },
+    {
+      id: "b12",
+      name: "B12 Website Generator",
+      description: "Generate and manage websites",
+      category: "Creativity",
+      domain: "b12.io",
+    },
+
+    {
+      id: "datadog",
+      name: "Datadog",
+      description: "Query and visualize data",
+      category: "Developer Tools",
+      domain: "datadoghq.com",
+    },
+    {
+      id: "supabase",
+      name: "Supabase",
+      description: "Manage and query databases",
+      category: "Developer Tools",
+      domain: "supabase.com",
+      providerId: "supabase",
+      featured: true,
+    },
+    {
+      id: "vercel",
+      name: "Vercel",
+      description: "Build and deploy web apps and agents",
+      category: "Developer Tools",
+      domain: "vercel.com",
+      providerId: "vercel",
+      featured: true,
+    },
+    {
+      id: "cloudflare",
+      name: "Cloudflare",
+      description: "Manage domains, DNS, Workers, and edge services",
+      category: "Developer Tools",
+      domain: "cloudflare.com",
+      providerId: "cloudflare",
+      featured: true,
+    },
+    {
+      id: "resend",
+      name: "Resend",
+      description: "Send and manage transactional email",
+      category: "Developer Tools",
+      domain: "resend.com",
+      providerId: "resend",
+      featured: true,
+    },
+    {
+      id: "exa",
+      name: "Exa",
+      description: "Web search for AI agents",
+      category: "Developer Tools",
+      domain: "exa.ai",
+    },
+    {
+      id: "neon",
+      name: "Neon",
+      description: "Manage Neon databases",
+      category: "Developer Tools",
+      domain: "neon.tech",
+    },
+    {
+      id: "devpost",
+      name: "Devpost Hackathons",
+      description: "Find and submit to hackathons",
+      category: "Developer Tools",
+      domain: "devpost.com",
+    },
+    {
+      id: "context7",
+      name: "Context7",
+      description: "Developer documentation context",
+      category: "Developer Tools",
+      domain: "context7.com",
+    },
+    {
+      id: "base44",
+      name: "Base44",
+      description: "Build applications with AI",
+      category: "Developer Tools",
+      domain: "base44.com",
+    },
+
+    {
+      id: "shopify",
+      name: "Shopify",
+      description: "Create and manage your store",
+      category: "Business & Operations",
+      domain: "shopify.com",
+    },
+    {
+      id: "zoho-crm",
+      name: "Zoho CRM",
+      description: "Automate sales operations",
+      category: "Business & Operations",
+      domain: "zoho.com",
+    },
+    {
+      id: "hubspot",
+      name: "HubSpot",
+      description: "Insights to action in HubSpot",
+      category: "Business & Operations",
+      domain: "hubspot.com",
+    },
+    {
+      id: "apollo",
+      name: "Apollo.io",
+      description: "Find buyers and close deals",
+      category: "Business & Operations",
+      domain: "apollo.io",
+    },
+    {
+      id: "webflow",
+      name: "Webflow",
+      description: "Manage Webflow sites",
+      category: "Business & Operations",
+      domain: "webflow.com",
+    },
+    {
+      id: "zoominfo",
+      name: "ZoomInfo",
+      description: "B2B data and GTM insights",
+      category: "Business & Operations",
+      domain: "zoominfo.com",
+    },
+    {
+      id: "attio",
+      name: "Attio",
+      description: "Flexible AI-native CRM",
+      category: "Business & Operations",
+      domain: "attio.com",
+    },
+    {
+      id: "ahrefs",
+      name: "Ahrefs",
+      description: "SEO research and competitive intelligence",
+      category: "Business & Operations",
+      domain: "ahrefs.com",
+    },
+    {
+      id: "wix",
+      name: "Wix",
+      description: "Build and manage websites",
+      category: "Business & Operations",
+      domain: "wix.com",
+    },
+
+    {
+      id: "posthog",
+      name: "PostHog",
+      description: "Analyze your product data",
+      category: "Data & Analytics",
+      domain: "posthog.com",
+    },
+    {
+      id: "data-analytics",
+      name: "Data",
+      description: "Answer questions with data",
+      category: "Data & Analytics",
+      domain: "openai.com",
+    },
+    {
+      id: "amplitude",
+      name: "Amplitude",
+      description: "Analyze your product data",
+      category: "Data & Analytics",
+      domain: "amplitude.com",
+    },
+    {
+      id: "mixpanel",
+      name: "Mixpanel",
+      description: "Query and analyze Mixpanel",
+      category: "Data & Analytics",
+      domain: "mixpanel.com",
+    },
+    {
+      id: "bigquery",
+      name: "BigQuery",
+      description: "Query and manage BigQuery",
+      category: "Data & Analytics",
+      domain: "cloud.google.com",
+    },
+    {
+      id: "motherduck",
+      name: "MotherDuck",
+      description: "Get answers from your data",
+      category: "Data & Analytics",
+      domain: "motherduck.com",
+    },
+    {
+      id: "coupler",
+      name: "Coupler.io",
+      description: "Automate data integrations",
+      category: "Data & Analytics",
+      domain: "coupler.io",
+    },
+    {
+      id: "hex",
+      name: "Hex",
+      description: "Collaborative analytics and notebooks",
+      category: "Data & Analytics",
+      domain: "hex.tech",
+    },
+
+    {
+      id: "outlook-email-communication",
+      name: "Outlook Email",
+      description: "Triage Outlook inboxes",
+      category: "Communication",
+      domain: "outlook.com",
+    },
+    {
+      id: "superhuman",
+      name: "Superhuman Mail",
+      description: "Email and calendar assistant",
+      category: "Communication",
+      domain: "superhuman.com",
+    },
+    {
+      id: "teams",
+      name: "Microsoft Teams",
+      description: "Summarize Teams and follow up",
+      category: "Communication",
+      domain: "microsoft.com",
+      providerId: "microsoft",
+    },
+    {
+      id: "zoom",
+      name: "Zoom",
+      description: "Smart meeting insights from Zoom",
+      category: "Communication",
+      domain: "zoom.us",
+    },
+    {
+      id: "hostinger-mail",
+      name: "Hostinger Mail",
+      description: "Use Hostinger Mail",
+      category: "Communication",
+      domain: "hostinger.com",
+    },
+    {
+      id: "mailopoly",
+      name: "Mailopoly Inbox",
+      description: "Search, send emails, and messages",
+      category: "Communication",
+      domain: "mailopoly.com",
+    },
+    {
+      id: "brevo",
+      name: "Brevo",
+      description: "Email, SMS, and customer messaging",
+      category: "Communication",
+      domain: "brevo.com",
+    },
+    {
+      id: "breakreach",
+      name: "Breakreach",
+      description: "Customer outreach workflows",
+      category: "Communication",
+      domain: "breakreach.com",
+    },
+
+    {
+      id: "readwise",
+      name: "Readwise",
+      description: "Save, read, search, and learn",
+      category: "Education & Research",
+      domain: "readwise.io",
+    },
+    {
+      id: "acumen",
+      name: "Acumen by Talarion",
+      description: "Keep your AI up to date",
+      category: "Education & Research",
+      domain: "talarian.io",
+    },
+    {
+      id: "consensus",
+      name: "Consensus",
+      description: "Explore scientific research",
+      category: "Education & Research",
+      domain: "consensus.app",
+    },
+    {
+      id: "sider-scholar",
+      name: "Sider Scholar",
+      description: "Search papers, save, and chat",
+      category: "Education & Research",
+      domain: "sider.ai",
+    },
+    {
+      id: "elicit",
+      name: "Elicit",
+      description: "Search scientific literature",
+      category: "Education & Research",
+      domain: "elicit.com",
+    },
+    {
+      id: "scispace",
+      name: "SciSpace",
+      description: "For science and research",
+      category: "Education & Research",
+      domain: "scispace.com",
+    },
+    {
+      id: "scite",
+      name: "Scite",
+      description: "Research citation intelligence",
+      category: "Education & Research",
+      domain: "scite.ai",
+    },
+
+    {
+      id: "rosalind",
+      name: "Rosalind Workbench",
+      description: "Explore life-science workflows",
+      category: "Scientific Research",
+      domain: "rosalind.bio",
+    },
+    {
+      id: "adaptyv",
+      name: "Adaptyv Bio",
+      description: "Plan and manage protein experiments with review gates",
+      category: "Scientific Research",
+      domain: "adaptyvbio.com",
+    },
+    {
+      id: "boltz",
+      name: "Boltz",
+      description: "Predict structures, screen molecules, and design binders",
+      category: "Scientific Research",
+      domain: "boltz.bio",
+    },
+    {
+      id: "ngs-workbench",
+      name: "NGS Analysis Workbench",
+      description: "Analyze sequencing data",
+      category: "Scientific Research",
+      domain: "openai.com",
+    },
+    {
+      id: "pendar",
+      name: "Pendar",
+      description: "Map and measure research fields",
+      category: "Scientific Research",
+      domain: "pendar.ai",
+    },
+    {
+      id: "rowan",
+      name: "Rowan",
+      description: "Chemistry and biology simulation",
+      category: "Scientific Research",
+      domain: "rowansci.com",
+    },
+
+    {
+      id: "codex-security",
+      name: "Codex Security",
+      description: "Security scanning for your codebase",
+      category: "Security",
+      domain: "openai.com",
+    },
+    {
+      id: "malwarebytes",
+      name: "Malwarebytes",
+      description: "Verify links, domains, and phones",
+      category: "Security",
+      domain: "malwarebytes.com",
+    },
+    {
+      id: "above-security",
+      name: "Above Security",
+      description: "Investigate insider threats",
+      category: "Security",
+      domain: "abovesecurity.com",
+    },
+    {
+      id: "endor-labs",
+      name: "Endor Labs Agent Kit",
+      description: "Agentic AppSec workflows",
+      category: "Security",
+      domain: "endorlabs.com",
+    },
+    {
+      id: "minimus",
+      name: "Minimus",
+      description: "Dockerfiles on hardened images",
+      category: "Security",
+      domain: "minimus.io",
+    },
+
+    {
+      id: "longbridge",
+      name: "Longbridge",
+      description: "Stock quotes and financial data",
+      category: "Finance",
+      domain: "longbridge.com",
+    },
+    {
+      id: "ibkr",
+      name: "Interactive Brokers (IBKR)",
+      description: "Analyze global markets",
+      category: "Finance",
+      domain: "interactivebrokers.com",
+    },
+    {
+      id: "public-equity",
+      name: "Public Equity Investing",
+      description: "Public equity research",
+      category: "Finance",
+      domain: "openai.com",
+    },
+    {
+      id: "quickbooks-finance",
+      name: "Intuit QuickBooks",
+      description: "Business finances made simple",
+      category: "Finance",
+      domain: "quickbooks.intuit.com",
+    },
+    {
+      id: "quartr",
+      name: "Quartr",
+      description: "Company research data",
+      category: "Finance",
+      domain: "quartr.com",
+    },
+    {
+      id: "alpaca",
+      name: "Alpaca",
+      description: "Market data for stocks and crypto",
+      category: "Finance",
+      domain: "alpaca.markets",
+    },
+    {
+      id: "binance",
+      name: "Binance",
+      description: "Digital asset market data",
+      category: "Finance",
+      domain: "binance.com",
+    },
+    {
+      id: "pitchbook",
+      name: "PitchBook",
+      description: "Private-market company intelligence",
+      category: "Finance",
+      domain: "pitchbook.com",
+    },
+
+    {
+      id: "health",
+      name: "Health",
+      description: "Explore your health data",
+      category: "Healthcare",
+      domain: "openai.com",
+    },
+    {
+      id: "fitness-ai",
+      name: "Fitness AI Connector",
+      description: "AI coaching for fitness data",
+      category: "Healthcare",
+      domain: "garmin.com",
+    },
+    {
+      id: "coros",
+      name: "COROS",
+      description: "Workout data insights",
+      category: "Healthcare",
+      domain: "coros.com",
+    },
+    {
+      id: "tredict",
+      name: "Tredict",
+      description: "Analyze workouts and create plans",
+      category: "Healthcare",
+      domain: "tredict.com",
+    },
+    {
+      id: "calorie-tracker",
+      name: "Calorie Tracker",
+      description: "Track your food and calories",
+      category: "Healthcare",
+      domain: "myfitnesspal.com",
+    },
+    {
+      id: "myfitnesspal",
+      name: "MyFitnessPal",
+      description: "Nutrition and activity tracking",
+      category: "Healthcare",
+      domain: "myfitnesspal.com",
+    },
+
+    {
+      id: "skyscanner",
+      name: "Skyscanner",
+      description: "Find cheap flights",
+      category: "Travel",
+      domain: "skyscanner.com",
+    },
+    {
+      id: "expedia",
+      name: "Expedia",
+      description: "Plan travel, flights, and hotels",
+      category: "Travel",
+      domain: "expedia.com",
+    },
+    {
+      id: "trip",
+      name: "Trip.com",
+      description: "All-in-one travel companion",
+      category: "Travel",
+      domain: "trip.com",
+    },
+    {
+      id: "flight-network",
+      name: "Flight Network",
+      description: "Search and book flights",
+      category: "Travel",
+      domain: "flightnetwork.com",
+    },
+    {
+      id: "edreams",
+      name: "eDreams",
+      description: "Find flights and hotels",
+      category: "Travel",
+      domain: "edreams.com",
+    },
+    {
+      id: "wikiloc",
+      name: "Wikiloc",
+      description: "Your perfect trail. Just ask.",
+      category: "Travel",
+      domain: "wikiloc.com",
+    },
+    {
+      id: "komoot",
+      name: "komoot",
+      description: "Plan routes and outdoor adventures",
+      category: "Travel",
+      domain: "komoot.com",
+    },
+    {
+      id: "trivago",
+      name: "trivago",
+      description: "Compare hotels and travel stays",
+      category: "Travel",
+      domain: "trivago.com",
+    },
+
+    {
+      id: "apple-music",
+      name: "Apple Music",
+      description: "Build playlists and find music",
+      category: "Entertainment",
+      domain: "music.apple.com",
+    },
+    {
+      id: "podcast-app",
+      name: "Podcast App",
+      description: "Find great podcasts",
+      category: "Entertainment",
+      domain: "podcast.app",
+    },
+    {
+      id: "chessy",
+      name: "Chessy",
+      description: "Play chess with Mabojolu",
+      category: "Entertainment",
+      domain: "chess.com",
+    },
+    {
+      id: "ticketmaster",
+      name: "Ticketmaster",
+      description: "Search Ticketmaster for events",
+      category: "Entertainment",
+      domain: "ticketmaster.com",
+    },
+    {
+      id: "shazam",
+      name: "Shazam",
+      description: "Identify songs instantly",
+      category: "Entertainment",
+      domain: "shazam.com",
+    },
+    {
+      id: "flixor",
+      name: "Flixor",
+      description: "Movie and TV recommendations",
+      category: "Entertainment",
+      domain: "imdb.com",
+    },
+    {
+      id: "spotify",
+      name: "Spotify",
+      description: "Search and play music",
+      category: "Entertainment",
+      domain: "spotify.com",
+    },
+
+    {
+      id: "indeed",
+      name: "Indeed",
+      description: "Find jobs tailored for you",
+      category: "Other",
+      domain: "indeed.com",
+    },
+    {
+      id: "linkedin",
+      name: "LinkedIn",
+      description: "Find the right professional",
+      category: "Other",
+      domain: "linkedin.com",
+    },
+    {
+      id: "etsy",
+      name: "Etsy",
+      description: "Shop home, style, and more",
+      category: "Other",
+      domain: "etsy.com",
+    },
+    {
+      id: "idealista",
+      name: "idealista",
+      description: "Find properties to buy or rent",
+      category: "Other",
+      domain: "idealista.com",
+    },
+
+    {
+      id: "documents",
+      name: "Documents",
+      description: "Work with documents and text files",
+      category: "Mabojolu Tools",
+      domain: "mabojolu.com",
+    },
+    {
+      id: "pdf",
+      name: "PDF",
+      description: "Read and reason over PDF files",
+      category: "Mabojolu Tools",
+      domain: "adobe.com",
+    },
+    {
+      id: "presentations",
+      name: "Presentations",
+      description: "Create and edit presentations",
+      category: "Mabojolu Tools",
+      domain: "mabojolu.com",
+    },
+    {
+      id: "spreadsheets",
+      name: "Spreadsheets",
+      description: "Work with spreadsheet data",
+      category: "Mabojolu Tools",
+      domain: "mabojolu.com",
+    },
+    {
+      id: "semrush",
+      name: "Semrush",
+      description: "SEO and traffic intelligence",
+      category: "Mabojolu Tools",
+      domain: "semrush.com",
+    },
+    {
+      id: "plugin-management",
+      name: "Plugin Management",
+      description: "Manage workspace plugins",
+      category: "Mabojolu Tools",
+      domain: "mabojolu.com",
+    },
+  ] as const;
+
+export function marketplaceLogoUrl(
+  domain:
+    string |
+    undefined,
+):
+  string |
+  undefined {
+  if (!domain) {
+    return undefined;
+  }
+
+  return (
+    "https://www.google.com/s2/favicons?domain=" +
+    encodeURIComponent(
+      domain,
+    ) +
+    "&sz=64"
+  );
+}
