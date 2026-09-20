@@ -198,34 +198,43 @@ export function buildPluginAuthorizationUrl(input: {
     return url.toString();
   }
 
-  url.searchParams.set(
-    "client_id",
-    input.config.clientId,
-  );
+  if (
+    input.providerId ===
+      "github"
+  ) {
+    url.searchParams.set(
+      "client_id",
+      input.config.clientId,
+    );
 
-  url.searchParams.set(
-    "redirect_uri",
-    input.config.redirectUri,
-  );
+    url.searchParams.set(
+      "redirect_uri",
+      input.config.redirectUri,
+    );
 
-  url.searchParams.set(
-    "scope",
-    input.config.scopes.join(
-      " ",
-    ),
-  );
+    url.searchParams.set(
+      "scope",
+      input.config.scopes.join(
+        " ",
+      ),
+    );
 
-  url.searchParams.set(
-    "state",
-    input.state,
-  );
+    url.searchParams.set(
+      "state",
+      input.state,
+    );
 
-  url.searchParams.set(
-    "allow_signup",
-    "true",
-  );
+    url.searchParams.set(
+      "allow_signup",
+      "true",
+    );
 
-  return url.toString();
+    return url.toString();
+  }
+
+  throw new Error(
+    "OAuth is not implemented for this plugin provider yet.",
+  );
 }
 
 async function requireJson<T>(
@@ -613,8 +622,17 @@ export async function exchangePluginAuthorizationCode(input: {
     );
   }
 
-  return exchangeGitHub(
-    input.code,
-    input.config,
+  if (
+    input.providerId ===
+      "github"
+  ) {
+    return exchangeGitHub(
+      input.code,
+      input.config,
+    );
+  }
+
+  throw new Error(
+    "OAuth token exchange is not implemented for this plugin provider yet.",
   );
 }
