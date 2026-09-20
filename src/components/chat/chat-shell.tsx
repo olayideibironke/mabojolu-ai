@@ -18,10 +18,14 @@ import { Sidebar } from "@/components/layout/sidebar";
 import { IconButton } from "@/components/ui/button";
 import { MenuIcon } from "@/components/ui/icons";
 import { useAutoScroll } from "@/hooks/use-auto-scroll";
+import { useBrowserDeviceProfile } from "@/hooks/use-browser-device-profile";
 import {
   buildHandoverPacket,
   handoverPressure,
 } from "@/lib/ai/handover";
+import {
+  resolveAvailableBrowserMode,
+} from "@/lib/ai/browser-mode-policy";
 import { useChat } from "@/hooks/use-chat";
 import { useConversations } from "@/hooks/use-conversations";
 import type { ChatImageAttachment } from "@/types/chat";
@@ -215,6 +219,35 @@ export function ChatShell({
       getServerModelPreferenceSnapshot,
     );
 
+  const deviceProfile =
+    useBrowserDeviceProfile();
+
+  const effectiveModelId =
+    deviceProfile
+      ? resolveAvailableBrowserMode(
+          selectedModelId,
+          deviceProfile,
+        )
+      : selectedModelId;
+
+  useEffect(() => {
+    if (
+      !deviceProfile ||
+      effectiveModelId ===
+        selectedModelId
+    ) {
+      return;
+    }
+
+    saveModelPreference(
+      effectiveModelId,
+    );
+  }, [
+    deviceProfile,
+    effectiveModelId,
+    selectedModelId,
+  ]);
+
   const changeModel =
     useCallback(
       (
@@ -263,7 +296,7 @@ export function ChatShell({
   const chat =
     useChat({
       modelId:
-        selectedModelId,
+        effectiveModelId,
 
       onConversationChanged:
         handleConversationChanged,
@@ -743,13 +776,13 @@ export function ChatShell({
         handoverPressure({
           messages,
           modelId:
-            selectedModelId,
+            effectiveModelId,
 
           contextTokenBudget,
         }),
       [
         messages,
-        selectedModelId,
+        effectiveModelId,
         contextTokenBudget,
       ],
     );
@@ -1097,7 +1130,7 @@ export function ChatShell({
               statusLabel
             }
             selectedModelId={
-              selectedModelId
+              effectiveModelId
             }
             onModelChange={
               changeModel
