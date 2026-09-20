@@ -29,12 +29,12 @@ import {
 } from "@/lib/database";
 
 import {
-  inspectServerEnv,
-} from "@/lib/env";
-
-import {
   checkUsageLimits,
 } from "@/lib/security/limits";
+
+import {
+  usageRuntimeConfig,
+} from "@/lib/security/runtime-config";
 
 import {
   getRateLimiter,
@@ -275,18 +275,8 @@ export async function POST(
       });
     }
 
-    const envResult =
-      inspectServerEnv();
-
-    if (
-      !envResult.ok
-    ) {
-      return errorResponse(
-        chatError(
-          "provider_not_configured",
-        ),
-      );
-    }
+    const runtimeConfig =
+      usageRuntimeConfig();
 
     const usage =
       await checkUsageLimits(
@@ -314,12 +304,12 @@ export async function POST(
           "browser-chat-persistence",
 
         max:
-          envResult.env
-            .MABOJOLU_RATE_LIMIT_MAX,
+          runtimeConfig
+            .rateLimitMax,
 
         windowMs:
-          envResult.env
-            .MABOJOLU_RATE_LIMIT_WINDOW_MS,
+          runtimeConfig
+            .rateLimitWindowMs,
       }).check(
         rateLimitIdentity({
           userId:
