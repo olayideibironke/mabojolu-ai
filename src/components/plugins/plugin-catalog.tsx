@@ -336,14 +336,17 @@ export function PluginCatalog({
   const runtimeByProvider =
     useMemo(
       () =>
-        new Map(
+        new Map<
+          PluginProviderId,
+          PluginCatalogItem
+        >(
           items.map(
             (
               item,
             ) => [
               item.id,
               item,
-            ],
+            ] as const,
           ),
         ),
       [
