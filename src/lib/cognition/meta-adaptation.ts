@@ -52,8 +52,7 @@ export interface MetaAdaptationSelection {
   reason:
     | "family-exploration"
     | "family-evidence"
-    | "cross-family-transfer"
-    | "safe-fallback";
+    | "cross-family-transfer";
   score?: number;
 }
 
@@ -432,25 +431,9 @@ export class MetaAdaptationController {
       safePolicies.length ===
         0
     ) {
-      const fallback =
-        this.policies[0];
-
-      if (
-        !fallback
-      ) {
-        throw new Error(
-          "No meta-adaptation policies are available.",
-        );
-      }
-
-      return {
-        family,
-        policy: {
-          ...fallback,
-        },
-        reason:
-          "safe-fallback",
-      };
+      throw new Error(
+        "All meta-adaptation policies are quarantined; refusing unsafe self-adaptation.",
+      );
     }
 
     const untried =
