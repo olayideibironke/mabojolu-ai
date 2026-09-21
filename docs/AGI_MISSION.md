@@ -153,7 +153,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   fail-closed safety rules;
 - bounded self-calibration across alternative observation representations and
   structural thresholds, using protected validation, champion/challenger
-  promotion, unsafe-profile quarantine, and explicit rollback on regression.
+  promotion, unsafe-profile quarantine, and explicit rollback on regression;
+- outcome-grounded synthesis of new bounded representation primitives from
+  abstract structural roles, with explicit complexity penalties, protected
+  validation, cross-domain transfer under renamed variables, reusable-primitive
+  promotion, negative-transfer retirement, and unsafe-primitive quarantine.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -162,92 +166,94 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: self-calibrating representation and structure
+### Current milestone: bounded representation synthesis and transfer
 
-Mabojolu G can now evaluate bounded alternatives for how it represents regime
-evidence and how sensitively it draws structural boundaries.
+Mabojolu G can now synthesize a new bounded representation primitive from
+outcome evidence instead of selecting only from a predefined encoder catalog.
 
-The v1.6 controller learned feature relevance inside one fixed observation
-representation, but its raw signal encoding and several key structural
-thresholds were still selected by hand. The v1.7 self-calibration layer turns
-those choices into auditable champion/challenger candidates.
+The v1.8 synthesizer receives examples containing normalized observations and
+the measured utilities of bounded adaptation policies. It is not given a class
+label describing the environment. It searches a deliberately small auditable
+program language over abstract structural roles.
 
-Each bounded representation profile specifies:
+The current primitive grammar contains:
 
-- an observation encoder;
-- regime-assignment distance threshold;
-- ambiguity margin for abstention;
-- minimum utility gap required to justify a split;
-- minimum feature separation required to justify a split.
+- one-role atomic projections;
+- bounded means over two or three roles;
+- two-role absolute gaps.
 
-The current candidate library includes raw representations with different
-structural sensitivity and compressed derived representations that combine
-multiple observable drift signals into higher-level quantities such as drift
-pressure and temporal instability.
+Each candidate is paired with a learned threshold and the best low-side and
+high-side policies found from outcome utility. Candidate selection minimizes
+training regret plus an explicit complexity penalty, so a higher-arity primitive
+must earn its additional structure.
 
-Candidate evaluation uses protected episodes. Each protected episode is tested
-from a freshly trained controller instance so a candidate cannot learn from one
-validation episode and use that information on the next. Evaluation therefore
-measures the state produced by calibration rather than adaptation to the
-validation set itself.
+The controlled synthesis task is designed so no single raw signal and no
+two-signal mean is sufficient. A three-role mean is the simplest candidate that
+separates the two policy-demand regions without regret. This prevents the
+benchmark from rewarding a renamed copy of an already sufficient feature.
 
-The current representation champion is promoted only when a safe challenger
-produces a material reduction in protected cumulative regret. Any candidate
-associated with unsafe irreversible behavior or false promotion is quarantined.
-If the current champion itself becomes unsafe, it must be replaced by a safe
-evaluated profile even when its numerical regret appears lower.
+The synthesized primitive is frozen before protected source validation. A
+separate atomic-only search provides the simpler baseline. The synthesized
+primitive must improve protected regret despite paying a larger complexity
+penalty.
 
-The previous champion is archived. After promotion, a shifted final holdout is
-used as a second protection layer. If the promoted representation regresses
-beyond a bounded tolerance relative to the archived champion, Mabojolu rolls
-back and quarantines the failed representation.
+Transfer is structural rather than name-based. The learned primitive stores
+abstract roles such as signal-a, signal-b, and signal-c instead of source
+variable names. A second task family binds those roles to differently named
+variables and uses different utility magnitudes. The source-trained primitive,
+threshold, and policy association are then evaluated without refitting on the
+target examples.
 
-The controlled v1.7 benchmark intentionally places final observations near a
-regime boundary. The raw representation remains uncertain and abstains, while a
-derived drift-compressed representation combines the relevant signals and uses a
-calibrated ambiguity threshold to preserve the useful distinction. The final
-holdout shifts those boundary observations again to test whether the promoted
-representation generalizes beyond the protected validation points.
+The reusable-primitive library requires positive transfer evidence from multiple
+domains before a candidate becomes reusable. Repeated negative transfer retires
+a primitive. Unsafe irreversible behavior or false promotion quarantines it.
+Transfer-improvement claims are recomputed from baseline and primitive regret,
+and terminally retired or quarantined primitives cannot be revived by later
+evidence.
 
-The benchmark keeps environment truth invariant across policy counterfactuals.
-A different adaptation policy may change detection, recovery, false promotion,
-delay, or evidence cost, but it does not change whether the underlying
-environment actually changed.
+The current v1.8 benchmark therefore compares:
 
-This remains bounded self-calibration rather than unrestricted representation
-invention. The candidate encoder library, allowed derived operations, policy
-catalog, safety criteria, promotion rule, rollback tolerance, and evaluation
-protocol remain human-specified.
+1. the synthesized bounded representation rule;
+2. the best atomic-only rule learned from the same source training evidence;
+3. protected source validation;
+4. a renamed unfamiliar target family with shifted utility magnitudes.
+
+The target result measures whether a primitive learned from one task family can
+retain its usefulness under symbol renaming and changed reward scale.
+
+This remains bounded representation synthesis rather than open-ended concept
+invention. The operator grammar, maximum arity, abstract role vocabulary,
+source-to-role and target-to-role bindings, policy catalog, normalization range,
+complexity penalty, and protected evaluation protocol remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. generating new bounded representation candidates from observed failure modes
-   instead of choosing only from a fixed encoder catalog;
-2. learning calibration thresholds continuously from outcome evidence while
-   preserving protected validation partitions;
-3. complexity penalties so a more elaborate representation must earn its extra
-   structure through held-out improvement;
-4. compositional derived-feature search over bounded arithmetic, relational, and
-   temporal operators;
-5. whether useful derived features transfer across renamed state variables and
-   different task families;
-6. protected multi-stage validation so representation changes cannot overfit one
-   narrow benchmark sequence;
-7. memory consolidation that promotes repeatedly useful representation
-   primitives into reusable abstractions;
-8. automatic retirement of derived features that stop improving prediction,
-   planning, or adaptation utility;
-9. cross-domain evaluation where one learned representation primitive improves
-   performance in an unfamiliar causal task family;
-10. whether increasing representation autonomy preserves rollback, auditability,
-    zero unsafe irreversible actions, and reproducible evaluation.
+1. autonomous induction of structural role correspondences instead of supplying
+   source and target role bindings;
+2. confidence over competing role mappings with abstention when correspondence
+   evidence is weak;
+3. composition of previously useful primitives into deeper bounded
+   representation programs;
+4. search over temporal operators that summarize change, persistence, lag, and
+   recurrence from raw episode sequences;
+5. complexity regularization for multi-stage representation programs;
+6. protected validation across three or more task families before broad
+   promotion of a reusable abstraction;
+7. automatic specialization when one reusable primitive transfers well to only
+   a subset of domains;
+8. causal tests distinguishing genuinely structural transfer from accidental
+   statistical correlation;
+9. integration of reusable representation primitives into planning, world-model
+   learning, and autonomous experiment selection rather than adaptation alone;
+10. whether additional representation autonomy preserves rollback, auditability,
+    bounded external action, and zero unsafe irreversible behavior.
 
-The next central milestone is bounded representation synthesis and transfer:
-Mabojolu should begin proposing new reusable representation primitives from
-experience, validate them against protected tasks, and transfer successful
-primitives across domains without changing its safety or approval boundaries.
+The next central milestone is autonomous structural role induction and
+representation composition: Mabojolu should infer how unfamiliar variables map
+onto learned structural roles, compose reusable primitives when one primitive is
+insufficient, and abstain when the mapping is not justified by evidence.
 
 ## Safety and audit principle
 
