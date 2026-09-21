@@ -176,5 +176,19 @@ describe(
         ).toBe(false);
       },
     );
+
+    it(
+      "marks Supabase as a live OAuth connector",
+      () => {
+        expect(
+          getPluginProvider(
+            "supabase",
+          ).connectionMode,
+        ).toBe(
+          "oauth",
+        );
+      },
+    );
+
   },
 );
