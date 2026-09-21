@@ -146,7 +146,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   calibrated abstention and fail-closed uncertainty fallbacks;
 - bounded online latent-regime discovery that creates unnamed environment
   clusters from experience, learns policy evidence separately inside each
-  cluster, recognizes recurring regimes, and abstains on ambiguous membership.
+  cluster, recognizes recurring regimes, and abstains on ambiguous membership;
+- adaptive latent-regime structure revision that splits behaviorally overloaded
+  regimes, merges redundant regimes only when policy profiles agree, and learns
+  outcome-linked feature relevance while preserving fresh-evidence and
+  fail-closed safety rules.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -155,94 +159,96 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: bounded latent regime discovery
+### Current milestone: adaptive latent-regime structure
 
-Mabojolu G now removes the human-supplied environment-family taxonomy from its
-active adaptation path.
+Mabojolu G can now revise the structure of its own discovered environment
+categories instead of treating the v1.5 latent taxonomy as permanent.
 
-The v1.4 controller inferred among predefined names such as stationary-noisy,
-gradual-drift, abrupt-drift, and recurring-regime. The v1.5 latent-regime
-controller receives the same bounded observable signal vector but no family
-name and no fixed family prototype table.
+The v1.6 controller maintains unnamed latent regimes, bounded adaptation-policy
+evidence, and an auditable history of structural revisions. It adds three
+controlled mechanisms.
 
-It maintains an online memory of unnamed regimes:
+First, a latent regime can split when outcome evidence shows that the same
+adaptation policy behaves materially differently across two separable regions
+of the regime's observation history. A split therefore requires behavioral
+evidence, not geometric variation alone. The split feature, threshold, affected
+policy, utility gap, and feature separation are recorded in the audit trail.
 
-regime-001
-regime-002
-regime-003
-...
+Second, separately discovered regimes can merge only when they are close in the
+current learned metric, agree on their preferred policy, and have sufficiently
+similar policy-outcome profiles. Geometric similarity alone is not enough to
+erase a distinction that matters for behavior.
 
-A new observation is compared against learned regime centroids. If it is close
-to one learned regime and clearly separated from alternatives, Mabojolu reuses
-that regime and updates its centroid online. If it is sufficiently novel,
-Mabojolu creates a new bounded regime. If it lies ambiguously between learned
-regimes, Mabojolu abstains from assigning it rather than contaminating either
-cluster.
+Third, feature relevance is relearned from policy-outcome differences between
+regimes. Signal dimensions whose variation does not correspond to a behavioral
+difference are down-weighted toward a bounded floor, while dimensions associated
+with meaningful policy differences receive more weight. All learned weights
+remain bounded.
 
-Each latent regime maintains its own adaptation-policy evidence. Safe policies
-are explored locally, then selected using posterior success evidence, bounded
-episode utility, and a bounded exploration bonus. A regime that returns after
-intervening regimes reuses its accumulated policy evidence instead of relearning
-from scratch.
+After a split, child regimes retain the historical observations needed for
+audit and structure analysis but their adaptation-policy evidence is reset.
+Each child must earn fresh policy evidence rather than inheriting conclusions
+from the mixed parent regime.
 
-Regime creation is capacity-bounded. Novel observations arriving after the
-regime budget is exhausted use a bounded uncertainty fallback rather than
-silently overwriting an existing regime. Unsafe irreversible outcomes still
-quarantine the responsible policy globally. If safe uncertainty fallbacks are
-exhausted, the controller fails closed.
+The controlled v1.6 benchmark intentionally creates one broad latent regime
+containing two observational modes with incompatible adaptation needs. A frozen
+v1.5 controller continues treating them as one category. The adaptive v1.6
+controller detects that one policy's utility changes sharply across
+change-point-strength regions, splits the regime, relearns policy evidence in
+each child, and is then evaluated on a mixed held-out sequence.
 
-The controlled v1.5 benchmark compares:
+The benchmark compares:
 
-1. a fixed balanced policy;
-2. the label-supplied v1.3 meta-adaptive controller;
-3. the unnamed latent-regime controller;
+1. adaptive latent-regime structure;
+2. the frozen v1.5 latent-regime controller using the same broad initial
+   assignment threshold;
+3. a fixed balanced adaptation policy;
 4. the bounded-policy hindsight oracle used only for evaluation.
 
-The evaluator retains family labels solely for measurement of cluster purity and
-comparison against prior controls. Those labels are not passed into latent
-regime selection or latent policy learning.
+The target held-out behavior is that the revised structure selects conservative
+adaptation in the low-change mode and responsive adaptation in the high-change
+mode, reaches the bounded-policy oracle on those held-out episodes, and
+outperforms both the frozen taxonomy and the fixed balanced baseline.
 
-The target benchmark behavior is:
+Separate controlled tests verify autonomous merge behavior for redundant nearby
+regimes, refusal to merge behaviorally incompatible regimes, bounded learned
+feature weights, fresh evidence after splits, and continued global quarantine
+of policies associated with unsafe irreversible outcomes.
 
-- four distinct unnamed regimes discovered during calibration;
-- no new regime creation on the shifted held-out sequence;
-- recurrence recognition when learned regimes return;
-- held-out policy choices matching the label-supplied control;
-- a deliberate ambiguous case triggering abstention rather than forced
-  membership;
-- no increase in false promotions, missed changes, or unsafe irreversible
-  actions.
-
-This is stronger scaffold removal, but it is still bounded research rather than
-open-ended category invention. The observable feature set, feature weights,
-distance function, novelty threshold, ambiguity margin, maximum regime count,
-and policy catalog remain human-specified. Those remaining assumptions define
-the next experiments.
+This is still bounded structure learning rather than unrestricted self-
+redesign. The observable feature vocabulary, initial distance function,
+split/merge thresholds, maximum regime budget, policy catalog, and structural
+revision algorithm remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. latent-regime stability under noisy and continuously drifting observations;
-2. learned rather than fixed regime-creation thresholds;
-3. autonomous split decisions when one latent regime develops incompatible
-   policy-outcome modes;
-4. autonomous merge decisions when two separately discovered regimes become
-   behaviorally equivalent;
-5. learned feature relevance so nuisance signal dimensions can be ignored;
-6. representation learning that can propose new regime features instead of using
-   only the supplied drift statistics;
-7. nonparametric regime growth with explicit complexity penalties and bounded
-   memory;
-8. long-horizon recurrence after many intervening regimes and centroid shifts;
-9. whether learned split/merge behavior lowers held-out policy regret versus the
-   fixed-cluster v1.5 controller;
-10. whether additional scaffold removal preserves auditability, rollback,
-    bounded irreversible action, and zero unsafe-policy reuse.
+1. learning split and merge thresholds from held-out regret rather than fixing
+   them manually;
+2. learning novelty and ambiguity thresholds from calibration error and
+   abstention utility;
+3. replacing hand-weighted observation dimensions with a learned compact
+   representation;
+4. autonomous discovery of derived regime features from temporal patterns
+   rather than using only supplied summary statistics;
+5. whether representation changes improve held-out regret without destabilizing
+   previously useful regimes;
+6. explicit rollback when a structural or representation revision performs worse
+   on protected validation episodes;
+7. bounded proposal, validation, promotion, and retirement of representation
+   revisions using the existing champion/challenger pattern;
+8. long-horizon consolidation so repeatedly useful latent structures become
+   reusable abstractions across task families;
+9. cross-domain tests where the same learned structural principle transfers to
+   differently named state variables and action spaces;
+10. whether further scaffold removal preserves auditability, bounded external
+    action, zero unsafe-policy reuse, and reproducible evaluation.
 
-The next central milestone is adaptive latent-regime structure: Mabojolu should
-learn when its own discovered categories are too broad, redundant, or based on
-irrelevant features, then revise that internal taxonomy from outcome evidence.
+The next central milestone is self-calibrating representation and structure
+learning: Mabojolu should learn not only which regimes exist, but also which
+observations, derived features, and structural thresholds are useful for
+discovering them.
 
 ## Safety and audit principle
 
