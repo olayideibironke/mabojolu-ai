@@ -94,6 +94,15 @@ export interface RecedingHorizonDecision {
     | "no-safe-goal-plan";
 }
 
+export interface ContingentBranchSelection {
+  representativeMechanismId: string;
+  representativeObservation: number;
+  observedEffect: number;
+  distance: number;
+  nextExperimentId?: string;
+}
+
+
 function validateUnitInterval(
   name:
     string,
@@ -1516,6 +1525,94 @@ export function chooseContingentExperimentPolicy(
       reason:
         "no-safe-contingent-policy",
     };
+}
+
+export function selectContingentExperimentBranch(
+  policy:
+    ContingentExperimentPolicy,
+
+  observedEffect:
+    number,
+): ContingentBranchSelection {
+  validateNonNegativeFinite(
+    "observedEffect",
+    observedEffect,
+  );
+
+  if (
+    policy.decision !==
+      "policy" ||
+    policy.branches.length ===
+      0
+  ) {
+    throw new Error(
+      "Cannot select a contingent branch from an abstained or empty policy.",
+    );
+  }
+
+  const ranked =
+    policy.branches
+      .map(
+        (branch) => ({
+          branch,
+
+          distance:
+            Math.abs(
+              branch
+                .representativeObservation -
+              observedEffect,
+            ),
+        }),
+      )
+      .sort(
+        (
+          left,
+          right,
+        ) =>
+          left.distance -
+            right.distance ||
+          left.branch
+            .representativeMechanismId
+            .localeCompare(
+              right.branch
+                .representativeMechanismId,
+            ),
+      );
+
+  const selected =
+    ranked[
+      0
+    ];
+
+  if (
+    !selected
+  ) {
+    throw new Error(
+      "Contingent policy has no executable branch.",
+    );
+  }
+
+  return {
+    representativeMechanismId:
+      selected
+        .branch
+        .representativeMechanismId,
+
+    representativeObservation:
+      selected
+        .branch
+        .representativeObservation,
+
+    observedEffect,
+
+    distance:
+      selected.distance,
+
+    nextExperimentId:
+      selected
+        .branch
+        .nextExperimentId,
+  };
 }
 
 export function chooseRecedingHorizonDecision(
