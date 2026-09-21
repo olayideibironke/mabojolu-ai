@@ -874,6 +874,356 @@ describe(
     );
 
     it(
+      "resets sequential change-point evidence when isolated errors are followed by stable outcomes",
+      () => {
+        const model =
+          new AdaptiveValidatedPredicateApplicabilityModel();
+
+        bootstrapChampion(
+          model,
+        );
+
+        record(
+          model,
+          "3+",
+          "1",
+          true,
+        );
+
+        const suspected =
+          model.getSummary(
+            "principle-a",
+          );
+
+        expect(
+          suspected.phase,
+        ).toBe(
+          "champion",
+        );
+
+        expect(
+          suspected
+            .changePointEvidenceCount,
+        ).toBe(
+          1,
+        );
+
+        expect(
+          suspected
+            .changePointOperationalEvidenceIndex,
+        ).toBe(
+          1,
+        );
+
+        expect(
+          suspected
+            .changePointScore,
+        ).toBeGreaterThan(
+          0,
+        );
+
+        record(
+          model,
+          "3+",
+          "2",
+          true,
+        );
+
+        record(
+          model,
+          "2",
+          "2",
+          true,
+        );
+
+        const recovered =
+          model.getSummary(
+            "principle-a",
+          );
+
+        expect(
+          recovered,
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          changePointScore:
+            0,
+
+          changePointEvidenceCount:
+            0,
+
+          challengerAttemptCount:
+            0,
+
+          challengerSearchExhausted:
+            false,
+        });
+
+        expect(
+          recovered
+            .changePointOperationalEvidenceIndex,
+        ).toBeUndefined();
+      },
+    );
+
+    it(
+      "grows fresh validation reserves across repeated challenger searches and stops at the regime budget",
+      () => {
+        const model =
+          new AdaptiveValidatedPredicateApplicabilityModel();
+
+        bootstrapChampion(
+          model,
+        );
+
+        triggerDrift(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "challenger-fit",
+
+          challengerAttemptCount:
+            1,
+
+          challengerAttemptBudget:
+            2,
+
+          challengerSearchExhausted:
+            false,
+        });
+
+        recordChallengerFit(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "challenger-validation",
+
+          challengerValidationTarget:
+            3,
+        });
+
+        for (
+          const input of [
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                false,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "2" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+          ]
+        ) {
+          record(
+            model,
+            input.history,
+            input.distinct,
+            input.useful,
+          );
+        }
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          challengerAttemptCount:
+            1,
+
+          challengerSearchExhausted:
+            false,
+
+          lastReplacementDecision:
+            "retained",
+        });
+
+        triggerDrift(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "challenger-fit",
+
+          challengerAttemptCount:
+            2,
+
+          challengerSearchExhausted:
+            false,
+        });
+
+        recordChallengerFit(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "challenger-validation",
+
+          challengerValidationTarget:
+            5,
+
+          challengerValidationEvidenceCount:
+            0,
+        });
+
+        for (
+          const input of [
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                false,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "2" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                false,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                true,
+            },
+          ]
+        ) {
+          record(
+            model,
+            input.history,
+            input.distinct,
+            input.useful,
+          );
+        }
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          challengerAttemptCount:
+            2,
+
+          challengerAttemptBudget:
+            2,
+
+          challengerSearchExhausted:
+            true,
+
+          lastReplacementDecision:
+            "retained",
+        });
+
+        triggerDrift(
+          model,
+        );
+
+        expect(
+          model.getSummary(
+            "principle-a",
+          ),
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          challengerAttemptCount:
+            2,
+
+          challengerSearchExhausted:
+            true,
+        });
+      },
+    );
+
+    it(
       "replaces the champion only after a fresh challenger beats champion and baseline on fresh holdout",
       () => {
         const model =
