@@ -1,7 +1,5 @@
 "use client";
 
-import { createBrowserClient } from "@supabase/ssr";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   type FormEvent,
   useState,
@@ -17,34 +15,6 @@ type Notice =
       message: string;
     }
   | null;
-
-let browserClient: SupabaseClient | null = null;
-
-function getSupabaseBrowserClient(): SupabaseClient {
-  if (browserClient) {
-    return browserClient;
-  }
-
-  const url =
-    process.env.NEXT_PUBLIC_SUPABASE_URL;
-
-  const key =
-    process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-
-  if (!url || !key) {
-    throw new Error(
-      "Mabojolu authentication is not configured.",
-    );
-  }
-
-  browserClient = createBrowserClient(
-    url,
-    key,
-  );
-
-  return browserClient;
-}
 
 export function ResetPasswordForm() {
   const [
@@ -97,17 +67,22 @@ export function ResetPasswordForm() {
     setIsSubmitting(true);
 
     try {
-      const client =
-        getSupabaseBrowserClient();
+      const response =
+        await fetch(
+          "/api/auth/reset-password",
+          {
+            method: "POST",
+            headers: {
+              "Content-Type":
+                "application/json",
+            },
+            body: JSON.stringify({
+              password,
+            }),
+          },
+        );
 
-      const {
-        error,
-      } =
-        await client.auth.updateUser({
-          password,
-        });
-
-      if (error) {
+      if (!response.ok) {
         setNotice({
           kind: "error",
           message:
@@ -123,12 +98,14 @@ export function ResetPasswordForm() {
       setNotice({
         kind: "success",
         message:
-          "Your password has been updated successfully. Redirecting you to Mabojolu...",
+          "Your password has been updated successfully. Redirecting you to sign in...",
       });
 
       window.setTimeout(() => {
-        window.location.assign("/");
-      }, 1200);
+        window.location.replace(
+          "/sign-in",
+        );
+      }, 900);
     } catch {
       setNotice({
         kind: "error",
