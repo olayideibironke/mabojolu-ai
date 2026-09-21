@@ -49,7 +49,7 @@ export function BrandLockup({ className = "" }: { className?: string }) {
           Mabojolu
         </span>
         <span className="block truncate text-xs text-text-muted">
-          by Westforge
+          Westforge Holdings Inc.
         </span>
       </span>
     </span>
