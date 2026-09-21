@@ -1564,7 +1564,13 @@ export function Sidebar({
               </Link>
 
               <Link
-                href="/plugins"
+                href={
+                  activeConversationId
+                    ? `/plugins?returnTo=${encodeURIComponent(
+                        `/?c=${activeConversationId}`,
+                      )}`
+                    : "/plugins?returnTo=%2F"
+                }
                 className={
                   navigationItemClass
                 }
