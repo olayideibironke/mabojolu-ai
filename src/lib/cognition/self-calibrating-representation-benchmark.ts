@@ -241,13 +241,13 @@ function lowOutcomeForPolicy(
     case "responsive":
       return {
         trueRegimeChange:
-          true,
-        changeDetected:
           false,
+        changeDetected:
+          true,
         recoverySucceeded:
           false,
         falsePromotion:
-          false,
+          true,
         validationEvidenceCost:
           0,
       };
