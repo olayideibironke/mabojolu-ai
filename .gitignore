@@ -20,6 +20,11 @@
 # production
 /build
 
+# generated deployment-adapter artifacts
+/.vinext/
+/.wrangler/
+/dist/
+
 # misc
 .DS_Store
 *.pem
