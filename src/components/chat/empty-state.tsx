@@ -54,7 +54,7 @@ export function EmptyState({
           </div>
 
           <p className="mb-2 text-sm font-medium text-text-secondary">
-            Mabojolu by Westforge
+            A Westforge Holdings Inc. Product
           </p>
 
           {/* The single h1 for this view. The header wordmark is not a heading,
@@ -109,8 +109,8 @@ export function EmptyState({
         )}
 
         <p className="mt-8 text-center text-xs leading-5 text-text-muted">
-          Mabojolu does not remember previous conversations, and it cannot browse
-          the web or run code. Review important information before relying on it.
+          Mabojolu is a product of Westforge Holdings Inc. Review important
+          information before relying on it.
         </p>
       </div>
     </div>
