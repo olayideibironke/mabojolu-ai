@@ -3,10 +3,6 @@
 
 import Link from "next/link";
 import {
-  useRouter,
-} from "next/navigation";
-import {
-  useEffect,
   useMemo,
   useState,
 } from "react";
@@ -59,71 +55,6 @@ export interface PluginCatalogItem {
   accountLabel?:
     string |
     null;
-}
-
-interface CustomPluginDraft {
-  id:
-    string;
-
-  name:
-    string;
-
-  website:
-    string;
-
-  auth:
-    "oauth" |
-    "api-key" |
-    "public";
-
-  access:
-    "read" |
-    "read-write";
-
-  purpose:
-    string;
-
-  createdAt:
-    string;
-}
-
-const CUSTOM_PLUGIN_STORAGE_KEY =
-  "mabojolu.custom-plugin-drafts.v1";
-
-function normalizeDomain(
-  website:
-    string,
-):
-  string |
-  undefined {
-  const trimmed =
-    website.trim();
-
-  if (!trimmed) {
-    return undefined;
-  }
-
-  try {
-    const url =
-      new URL(
-        trimmed.includes(
-          "://",
-        )
-          ? trimmed
-          : `https://${trimmed}`,
-      );
-
-    return url.hostname;
-  } catch {
-    return trimmed
-      .replace(
-        /^https?:\/\//,
-        "",
-      )
-      .split(
-        "/",
-      )[0];
-  }
 }
 
 function PluginLogo({
@@ -224,84 +155,20 @@ export function PluginCatalog({
   returnTo:
     string;
 }) {
-  const router =
-    useRouter();
-
-  const connectReturnQuery =
-    `?returnTo=${encodeURIComponent(
-      returnTo,
-    )}`;
-
   const [
     query,
     setQuery,
   ] = useState("");
 
   const [
-    wizardOpen,
-    setWizardOpen,
+    installOpen,
+    setInstallOpen,
   ] = useState(false);
 
   const [
-    wizardStep,
-    setWizardStep,
-  ] = useState(1);
-
-  const [
-    draftName,
-    setDraftName,
+    installQuery,
+    setInstallQuery,
   ] = useState("");
-
-  const [
-    draftWebsite,
-    setDraftWebsite,
-  ] = useState("");
-
-  const [
-    draftAuth,
-    setDraftAuth,
-  ] = useState<
-    CustomPluginDraft[
-      "auth"
-    ]
-  >(
-    "oauth",
-  );
-
-  const [
-    draftAccess,
-    setDraftAccess,
-  ] = useState<
-    CustomPluginDraft[
-      "access"
-    ]
-  >(
-    "read",
-  );
-
-  const [
-    draftPurpose,
-    setDraftPurpose,
-  ] = useState("");
-
-  const [
-    customDrafts,
-    setCustomDrafts,
-  ] = useState<
-    CustomPluginDraft[]
-  >(
-    [],
-  );
-
-  const [
-    savedMessage,
-    setSavedMessage,
-  ] = useState<
-    string |
-    null
-  >(
-    null,
-  );
 
   const [
     manageProvider,
@@ -311,108 +178,6 @@ export function PluginCatalog({
     null
   >(
     null,
-  );
-
-  useEffect(
-    () => {
-      const timeoutId =
-        window.setTimeout(
-          () => {
-            try {
-              const raw =
-                window.localStorage
-                  .getItem(
-                    CUSTOM_PLUGIN_STORAGE_KEY,
-                  );
-
-              if (!raw) {
-                return;
-              }
-
-              const parsed =
-                JSON.parse(
-                  raw,
-                );
-
-              if (
-                Array.isArray(
-                  parsed,
-                )
-              ) {
-                const drafts =
-                  parsed as
-                    CustomPluginDraft[];
-
-                const customOnly =
-                  drafts.filter(
-                    (
-                      draft,
-                    ) => {
-                      const draftName =
-                        draft.name
-                          .trim()
-                          .toLowerCase();
-
-                      const draftDomain =
-                        normalizeDomain(
-                          draft.website,
-                        )
-                          ?.toLowerCase();
-
-                      return !PLUGIN_MARKETPLACE
-                        .some(
-                          (
-                            entry,
-                          ) =>
-                            Boolean(
-                              entry.providerId &&
-                              (
-                                entry.name
-                                  .toLowerCase() ===
-                                  draftName ||
-                                (
-                                  draftDomain &&
-                                  entry.domain
-                                    ?.toLowerCase() ===
-                                    draftDomain
-                                )
-                              ),
-                            ),
-                        );
-                    },
-                  );
-
-                setCustomDrafts(
-                  customOnly,
-                );
-
-                if (
-                  customOnly.length !==
-                  drafts.length
-                ) {
-                  window.localStorage
-                    .setItem(
-                      CUSTOM_PLUGIN_STORAGE_KEY,
-                      JSON.stringify(
-                        customOnly,
-                      ),
-                    );
-                }
-              }
-            } catch {
-              // Ignore malformed local drafts and keep the marketplace usable.
-            }
-          },
-          0,
-        );
-
-      return () => {
-        window.clearTimeout(
-          timeoutId,
-        );
-      };
-    },
-    [],
   );
 
   const runtimeByProvider =
@@ -511,176 +276,81 @@ export function PluginCatalog({
       ],
     );
 
-  function openWizard(
-    entry?:
-      MarketplacePluginDefinition,
-  ) {
-    setWizardStep(
-      1,
-    );
+  const installableEntries =
+    useMemo(
+      () => {
+        const normalized =
+          installQuery
+            .trim()
+            .toLowerCase();
 
-    setDraftName(
-      entry?.name ??
-        "",
-    );
+        return PLUGIN_MARKETPLACE
+          .filter(
+            (
+              entry,
+            ) => {
+              if (
+                !entry.providerId
+              ) {
+                return false;
+              }
 
-    setDraftWebsite(
-      entry?.domain
-        ? `https://${entry.domain}`
-        : "",
-    );
+              const runtime =
+                runtimeByProvider
+                  .get(
+                    entry.providerId,
+                  );
 
-    setDraftAuth(
-      "oauth",
-    );
+              if (
+                !runtime ||
+                !runtime.configured ||
+                runtime.connectionMode !==
+                  "oauth" ||
+                runtime.accountLabel
+              ) {
+                return false;
+              }
 
-    setDraftAccess(
-      "read",
-    );
+              if (!normalized) {
+                return true;
+              }
 
-    setDraftPurpose(
-      "",
-    );
-
-    setWizardOpen(
-      true,
-    );
-
-    setSavedMessage(
-      null,
-    );
-  }
-
-  function closeWizard() {
-    setWizardOpen(
-      false,
-    );
-
-    setWizardStep(
-      1,
-    );
-  }
-
-  function savePluginDraft() {
-    const name =
-      draftName
-        .trim();
-
-    if (!name) {
-      return;
-    }
-
-    const normalizedName =
-      name.toLowerCase();
-
-    const normalizedWebsite =
-      normalizeDomain(
-        draftWebsite,
-      )
-        ?.toLowerCase();
-
-    const knownPlugin =
-      PLUGIN_MARKETPLACE
-        .find(
-          (
-            entry,
-          ) => {
-            if (
-              !entry.providerId
-            ) {
-              return false;
-            }
-
-            const nameMatches =
-              entry.name
-                .toLowerCase() ===
-              normalizedName;
-
-            const domainMatches =
-              Boolean(
-                normalizedWebsite &&
-                entry.domain &&
-                entry.domain
-                  .toLowerCase() ===
-                  normalizedWebsite,
+              return searchBlob(
+                entry,
+              ).includes(
+                normalized,
               );
-
-            return (
-              nameMatches ||
-              domainMatches
-            );
-          },
-        );
-
-    if (
-      knownPlugin
-        ?.providerId
-    ) {
-      closeWizard();
-
-      router.push(
-        `/api/plugins/${knownPlugin.providerId}/connect${connectReturnQuery}`,
-      );
-
-      return;
-    }
-
-    const draft:
-      CustomPluginDraft = {
-        id:
-          crypto
-            .randomUUID(),
-
-        name,
-
-        website:
-          draftWebsite
-            .trim(),
-
-        auth:
-          draftAuth,
-
-        access:
-          draftAccess,
-
-        purpose:
-          draftPurpose
-            .trim(),
-
-        createdAt:
-          new Date()
-            .toISOString(),
-      };
-
-    const next = [
-      ...customDrafts,
-      draft,
-    ];
-
-    setCustomDrafts(
-      next,
+            },
+          )
+          .filter(
+            (
+              entry,
+              index,
+              array,
+            ) =>
+              array.findIndex(
+                (
+                  candidate,
+                ) =>
+                  candidate
+                    .providerId ===
+                  entry.providerId,
+              ) ===
+              index,
+          );
+      },
+      [
+        installQuery,
+        runtimeByProvider,
+      ],
     );
 
-    try {
-      window.localStorage
-        .setItem(
-          CUSTOM_PLUGIN_STORAGE_KEY,
-          JSON.stringify(
-            next,
-          ),
-        );
-    } catch {
-      // Saving the request is best-effort; never block the marketplace.
-    }
+  const connectReturnQuery =
+    `?returnTo=${encodeURIComponent(
+      returnTo,
+    )}`;
 
-    setSavedMessage(
-      `${name} setup request saved on this browser.`,
-    );
-
-    closeWizard();
-  }
-
-  function pluginAction(
+  function providerAction(
     entry:
       MarketplacePluginDefinition,
   ) {
@@ -760,6 +430,7 @@ export function PluginCatalog({
         <Link
           href="/pricing"
           aria-label={`View plan for ${entry.name}`}
+          title={`${entry.name} requires a Mabojolu plan`}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-default text-xl font-light text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary"
         >
           +
@@ -769,7 +440,9 @@ export function PluginCatalog({
 
     if (
       providerId &&
-      runtime
+      runtime?.configured &&
+      runtime.connectionMode ===
+        "oauth"
     ) {
       return (
         <Link
@@ -784,19 +457,12 @@ export function PluginCatalog({
     }
 
     return (
-      <button
-        type="button"
-        aria-label={`Add custom plugin ${entry.name}`}
-        title={`Set up ${entry.name}`}
-        onClick={() =>
-          openWizard(
-            entry,
-          )
-        }
-        className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-default text-xl font-light text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary"
+      <span
+        title={`${entry.name} integration is not available yet`}
+        className="inline-flex h-8 min-w-8 items-center justify-center rounded-full px-2 text-[11px] font-medium text-text-muted"
       >
-        +
-      </button>
+        Soon
+      </span>
     );
   }
 
@@ -882,9 +548,15 @@ export function PluginCatalog({
 
             <button
               type="button"
-              onClick={() =>
-                openWizard()
-              }
+              onClick={() => {
+                setInstallQuery(
+                  "",
+                );
+
+                setInstallOpen(
+                  true,
+                );
+              }}
               aria-label="Add a plugin"
               title="Add a plugin"
               className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-border-default bg-surface-base text-2xl font-light text-text-primary transition-colors hover:bg-surface-sunken"
@@ -893,12 +565,6 @@ export function PluginCatalog({
             </button>
           </div>
         </div>
-
-        {savedMessage ? (
-          <div className="rounded-xl border border-border-default bg-surface-raised px-4 py-3 text-sm text-text-secondary">
-            {savedMessage}
-          </div>
-        ) : null}
 
         <div>
           <div className="flex items-center gap-1 text-sm font-semibold text-text-primary">
@@ -1039,7 +705,7 @@ export function PluginCatalog({
                         </div>
 
                         <div className="shrink-0">
-                          {pluginAction(
+                          {providerAction(
                             entry,
                           )}
                         </div>
@@ -1061,67 +727,12 @@ export function PluginCatalog({
           </p>
 
           <p className="mt-1 text-sm text-text-muted">
-            Try another search or use the + button to add one.
+            Try another search.
           </p>
         </div>
       ) : null}
 
-      {customDrafts.length >
-      0 ? (
-        <section className="border-t border-border-subtle py-7">
-          <h2 className="text-sm font-semibold text-text-primary">
-            Your plugin setup requests
-          </h2>
-
-          <div className="mt-3 grid gap-x-12 lg:grid-cols-2">
-            {customDrafts.map(
-              (
-                draft,
-              ) => (
-                <div
-                  key={
-                    draft.id
-                  }
-                  className="flex min-h-18 items-center gap-3 rounded-xl py-2.5"
-                >
-                  <PluginLogo
-                    name={
-                      draft.name
-                    }
-                    domain={
-                      normalizeDomain(
-                        draft.website,
-                      )
-                    }
-                  />
-
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-text-primary">
-                      {draft.name}
-                    </p>
-
-                    <p className="mt-0.5 truncate text-xs text-text-muted">
-                      {draft.auth ===
-                      "oauth"
-                        ? "OAuth"
-                        : draft.auth ===
-                            "api-key"
-                          ? "API key"
-                          : "Public API"}{" "}
-                      · {draft.access ===
-                      "read"
-                        ? "Read only"
-                        : "Read and write"} · Setup pending
-                    </p>
-                  </div>
-                </div>
-              ),
-            )}
-          </div>
-        </section>
-      ) : null}
-
-      {wizardOpen ? (
+      {installOpen ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4"
           role="presentation"
@@ -1132,40 +743,38 @@ export function PluginCatalog({
               event.target ===
                 event.currentTarget
             ) {
-              closeWizard();
+              setInstallOpen(
+                false,
+              );
             }
           }}
         >
           <div
             role="dialog"
             aria-modal="true"
-            aria-labelledby="plugin-wizard-title"
+            aria-labelledby="add-plugin-title"
             className="w-full max-w-lg rounded-2xl border border-border-default bg-surface-raised p-6 shadow-2xl"
           >
             <div className="flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                  Add a plugin · Step {wizardStep} of 3
-                </p>
-
                 <h2
-                  id="plugin-wizard-title"
-                  className="mt-1 text-xl font-semibold text-text-primary"
+                  id="add-plugin-title"
+                  className="text-xl font-semibold text-text-primary"
                 >
-                  {wizardStep ===
-                  1
-                    ? "Which tool do you want to add?"
-                    : wizardStep ===
-                        2
-                      ? "How should Mabojolu connect?"
-                      : "What should Mabojolu be allowed to do?"}
+                  Add a plugin
                 </h2>
+
+                <p className="mt-1 text-sm text-text-secondary">
+                  Choose a service and authorize Mabojolu with that provider.
+                </p>
               </div>
 
               <button
                 type="button"
-                onClick={
-                  closeWizard
+                onClick={() =>
+                  setInstallOpen(
+                    false,
+                  )
                 }
                 aria-label="Close add plugin"
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-xl text-text-muted hover:bg-surface-sunken hover:text-text-primary"
@@ -1174,244 +783,93 @@ export function PluginCatalog({
               </button>
             </div>
 
-            {wizardStep ===
-            1 ? (
-              <div className="mt-6 space-y-4">
-                <label className="block">
-                  <span className="text-sm font-medium text-text-primary">
-                    Plugin name
-                  </span>
+            <label className="relative mt-5 block">
+              <span className="sr-only">
+                Search available plugins
+              </span>
 
-                  <input
-                    value={
-                      draftName
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setDraftName(
-                        event
-                          .currentTarget
-                          .value,
-                      )
-                    }
-                    placeholder="e.g. Vercel"
-                    className="mt-2 h-11 w-full rounded-xl border border-border-default bg-surface-base px-3 text-sm outline-none focus:border-border-strong"
-                  />
-                </label>
+              <span
+                aria-hidden="true"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-text-muted"
+              >
+                &#128269;
+              </span>
 
-                <label className="block">
-                  <span className="text-sm font-medium text-text-primary">
-                    Website or API URL
-                  </span>
+              <input
+                autoFocus
+                type="search"
+                value={
+                  installQuery
+                }
+                onChange={(
+                  event,
+                ) =>
+                  setInstallQuery(
+                    event
+                      .currentTarget
+                      .value,
+                  )
+                }
+                placeholder="Search available plugins"
+                className="h-11 w-full rounded-xl border border-border-default bg-surface-base pl-9 pr-4 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-border-strong"
+              />
+            </label>
 
-                  <input
-                    value={
-                      draftWebsite
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setDraftWebsite(
-                        event
-                          .currentTarget
-                          .value,
-                      )
-                    }
-                    placeholder="https://example.com"
-                    className="mt-2 h-11 w-full rounded-xl border border-border-default bg-surface-base px-3 text-sm outline-none focus:border-border-strong"
-                  />
-                </label>
-              </div>
-            ) : wizardStep ===
-              2 ? (
-              <div className="mt-6 space-y-3">
-                {(
-                  [
-                    [
-                      "oauth",
-                      "OAuth",
-                      "Sign in through the provider. Recommended when available.",
-                    ],
-                    [
-                      "api-key",
-                      "API key",
-                      "Use a provider-issued key. Mabojolu will not collect the secret in this browser form.",
-                    ],
-                    [
-                      "public",
-                      "Public API",
-                      "No account credential is required.",
-                    ],
-                  ] as const
-                ).map(
-                  (
-                    [
-                      value,
-                      title,
-                      detail,
-                    ],
-                  ) => (
-                    <button
-                      key={
-                        value
-                      }
-                      type="button"
-                      onClick={() =>
-                        setDraftAuth(
-                          value,
-                        )
-                      }
-                      className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                        draftAuth ===
-                          value
-                          ? "border-border-strong bg-surface-sunken"
-                          : "border-border-default hover:bg-surface-sunken"
-                      }`}
-                    >
-                      <p className="text-sm font-semibold text-text-primary">
-                        {title}
-                      </p>
+            <div className="mt-4 max-h-80 overflow-y-auto">
+              {installableEntries.length >
+              0 ? (
+                <div className="space-y-1">
+                  {installableEntries.map(
+                    (
+                      entry,
+                    ) => (
+                      <Link
+                        key={
+                          entry.id
+                        }
+                        href={`/api/plugins/${entry.providerId}/connect${connectReturnQuery}`}
+                        className="flex items-center gap-3 rounded-xl px-2 py-3 hover:bg-surface-sunken"
+                      >
+                        <PluginLogo
+                          name={
+                            entry.name
+                          }
+                          domain={
+                            entry.domain
+                          }
+                          size="sm"
+                        />
 
-                      <p className="mt-1 text-xs leading-5 text-text-muted">
-                        {detail}
-                      </p>
-                    </button>
-                  ),
-                )}
-              </div>
-            ) : (
-              <div className="mt-6 space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-text-primary">
-                    Access level
+                        <div className="min-w-0 flex-1">
+                          <p className="truncate text-sm font-semibold text-text-primary">
+                            {entry.name}
+                          </p>
+
+                          <p className="truncate text-xs text-text-muted">
+                            {entry.description}
+                          </p>
+                        </div>
+
+                        <span
+                          aria-hidden="true"
+                          className="text-xl font-light text-text-secondary"
+                        >
+                          +
+                        </span>
+                      </Link>
+                    ),
+                  )}
+                </div>
+              ) : (
+                <div className="py-10 text-center">
+                  <p className="text-sm font-semibold text-text-primary">
+                    No available plugins found
                   </p>
 
-                  <div className="mt-2 grid grid-cols-2 gap-2">
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDraftAccess(
-                          "read",
-                        )
-                      }
-                      className={`rounded-xl border p-3 text-sm font-medium ${
-                        draftAccess ===
-                          "read"
-                          ? "border-border-strong bg-surface-sunken"
-                          : "border-border-default"
-                      }`}
-                    >
-                      Read only
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setDraftAccess(
-                          "read-write",
-                        )
-                      }
-                      className={`rounded-xl border p-3 text-sm font-medium ${
-                        draftAccess ===
-                          "read-write"
-                          ? "border-border-strong bg-surface-sunken"
-                          : "border-border-default"
-                      }`}
-                    >
-                      Read & write
-                    </button>
-                  </div>
+                  <p className="mt-1 text-xs leading-5 text-text-muted">
+                    Only integrations already configured by Mabojolu appear here. Users never need to create OAuth apps or enter provider secrets.
+                  </p>
                 </div>
-
-                <label className="block">
-                  <span className="text-sm font-medium text-text-primary">
-                    What should Mabojolu use this plugin for?
-                  </span>
-
-                  <textarea
-                    value={
-                      draftPurpose
-                    }
-                    onChange={(
-                      event,
-                    ) =>
-                      setDraftPurpose(
-                        event
-                          .currentTarget
-                          .value,
-                      )
-                    }
-                    rows={
-                      4
-                    }
-                    placeholder="Describe the workflows you want Mabojolu to handle."
-                    className="mt-2 w-full resize-none rounded-xl border border-border-default bg-surface-base px-3 py-2 text-sm outline-none focus:border-border-strong"
-                  />
-                </label>
-
-                <p className="text-xs leading-5 text-text-muted">
-                  This setup flow never asks for passwords, OAuth secrets, or API keys. It records the connector request so the integration can be wired safely.
-                </p>
-              </div>
-            )}
-
-            <div className="mt-6 flex items-center justify-between gap-3">
-              <button
-                type="button"
-                onClick={() =>
-                  wizardStep ===
-                    1
-                    ? closeWizard()
-                    : setWizardStep(
-                        (
-                          current,
-                        ) =>
-                          current -
-                          1,
-                      )
-                }
-                className="inline-flex h-10 items-center justify-center rounded-xl border border-border-default px-4 text-sm font-medium text-text-primary hover:bg-surface-sunken"
-              >
-                {wizardStep ===
-                1
-                  ? "Cancel"
-                  : "Back"}
-              </button>
-
-              {wizardStep <
-              3 ? (
-                <button
-                  type="button"
-                  disabled={
-                    wizardStep ===
-                      1 &&
-                    !draftName
-                      .trim()
-                  }
-                  onClick={() =>
-                    setWizardStep(
-                      (
-                        current,
-                      ) =>
-                        current +
-                        1,
-                    )
-                  }
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-surface-inverse px-5 text-sm font-semibold text-text-inverse disabled:cursor-not-allowed disabled:opacity-40"
-                >
-                  Continue
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={
-                    savePluginDraft
-                  }
-                  className="inline-flex h-10 items-center justify-center rounded-xl bg-surface-inverse px-5 text-sm font-semibold text-text-inverse"
-                >
-                  Add plugin
-                </button>
               )}
             </div>
           </div>
