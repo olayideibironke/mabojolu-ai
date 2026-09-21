@@ -1504,6 +1504,7 @@ export class AdaptiveLatentRegimeStructureController {
                         .observation[
                           feature
                         ],
+                  ),
                 ),
             );
 
