@@ -172,7 +172,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   multi-step experiment lookahead, and posterior-aware multi-step goal planning;
 - adaptive mechanism discovery with online effect estimation, predictive-misfit
   detection, bounded challenger proposal, protected challenger promotion,
-  contingent experiment branching, and receding-horizon action replanning.
+  contingent experiment branching, and receding-horizon action replanning;
+- bounded mechanism-structure synthesis that can add linear, pairwise
+  interaction, or latent-bias terms when coefficient adjustment is
+  insufficient, with protected structural validation and dual-control selection
+  between information gathering and goal-directed action.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -181,91 +185,102 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: adaptive mechanism discovery and contingent scientific planning
+### Current milestone: autonomous mechanism-structure synthesis and dual-control planning
 
-Mabojolu G can now revise parts of its causal mechanism family when observed
-intervention effects are inconsistent with every incumbent model.
+Mabojolu G can now propose a bounded change to causal model structure when an
+additive mechanism family cannot explain protected evidence.
 
-The v1.12 mechanism learner adds bounded online parameter estimation for
-single-variable interventions. Repeated noisy measurements update an effect mean
-and sample variance incrementally. This provides a direct learned parameter
-estimate rather than requiring every causal coefficient to be supplied in
-advance.
+The v1.12 challenger path adjusted one existing coefficient at a time. v1.13
+adds a small auditable structural grammar:
 
-A separate predictive-adequacy test evaluates the incumbent mechanism family
-against new observations. If the best incumbent predictive likelihood falls
-below a configured threshold, Mabojolu marks the current model family
-inadequate.
+- an additional bounded linear term;
+- a pairwise interaction term;
+- a latent-bias term representing residual effect not attached to an observed
+  intervention variable.
 
-Model inadequacy does not trigger unrestricted model creation. The challenger
-generator is bounded to the discrepant intervention and proposes a small number
-of mechanism variants whose affected causal coefficient is grounded in the
-observed intervention effect. Incumbent models are not mutated.
+Structural synthesis starts from an incumbent mechanism and discovery residuals.
+For each candidate structural term, Mabojolu fits a bounded coefficient from the
+residual evidence and creates a separate challenger mechanism. The incumbent is
+never mutated in place.
 
-The discovery observation that creates a challenger cannot also promote it.
-Promotion requires a separate protected observation reserve. The incumbent and
-challengers are compared on protected mean squared prediction error, and a
-challenger is promoted only if it exceeds a minimum validated improvement.
+The discovery evidence that creates a structural challenger is not sufficient
+for promotion. All challengers are evaluated on a separate protected
+observation reserve. Protected prediction error plus an explicit structural
+complexity penalty determines whether any challenger has earned promotion.
 
-v1.12 also replaces open-loop two-step experiment execution with a bounded
-contingent experiment policy. Mabojolu chooses a first safe experiment and
-precomputes a second-step decision for each representative first-step outcome.
-At runtime, the actual noisy observation is assigned to the nearest
-representative branch.
+The controlled v1.13 structure benchmark uses an environment whose true response
+contains a pairwise x*y interaction. The additive incumbent contains only
+independent x and y effects. Extra linear terms and a latent-bias term can
+partially explain the discovery residual, but only the learned interaction term
+generalizes across protected x-only, y-only, partial-joint, and full-joint
+interventions.
 
-The controlled benchmark compares:
+The promoted structural term is:
 
-- the v1.11 open-loop sequence cheap-x -> cheap-y, cost 0.10;
-- the v1.12 contingent policy, which begins with cheap-x and conditionally
-  executes cheap-y only when the first result leaves ambiguity.
+interaction(x,y), coefficient 0.60
 
-For the benchmark's decisive high-x observation, the contingent policy stops
-after cheap-x, reducing executed experiment cost from 0.10 to 0.05 while
-preserving the same safety ceiling.
+and the discovery and protected evidence sets are explicitly disjoint.
 
-Action planning is also receding-horizon. Mabojolu executes only the first action
-of a multi-step plan, observes the resulting state, and replans. In the
-controlled benchmark the initial model predicts that boost-x and boost-y are
-both required. The observed transition after boost-x already crosses the goal,
-so replanning terminates instead of executing the unnecessary second action.
+v1.13 also introduces bounded dual-control choice. Mabojolu compares the value of
+learning more about the current causal mechanism against the value of acting
+toward the current goal.
 
-This milestone therefore adds three kinds of adaptation: causal parameter
-learning, bounded mechanism-family revision, and closed-loop experiment/action
-execution.
+For candidate experiments, the score contains expected posterior entropy
+reduction minus experiment cost. For candidate actions, the score contains
+posterior-weighted expected goal progress, probability of reaching the goal, and
+action cost. Experiments and actions must both satisfy the same reversibility and
+hard risk-ceiling constraints.
 
-It is still a controlled scaffold. Parameter learning currently supports
-single-variable interventions, challengers modify one bounded coefficient at a
-time, mechanism topology is fixed, protected validation is supplied explicitly,
-contingent experiment planning uses representative mechanism means rather than
-full observation integration, and receding-horizon planning still uses a
-human-specified action catalog and goal state.
+The controlled dual-control benchmark begins with two competing mechanisms. The
+same goal action succeeds under one mechanism but not the other. Under the
+initial 50/50 belief, the best safe action has only 0.50 goal-success probability,
+so a low-cost causal probe has higher value than acting immediately.
+
+After the probe returns evidence concentrated on the fast mechanism, the value
+of further information collapses and Mabojolu switches to the goal action. The
+benchmark therefore demonstrates an explicit sequence:
+
+uncertain model -> experiment -> belief update -> act
+
+rather than an experiment-only or action-only controller.
+
+Unsafe zero-cost probes and unsafe zero-cost actions are present in the
+benchmark but remain excluded by hard risk and reversibility boundaries.
+
+This is bounded structural self-revision, not unrestricted model invention. The
+structural grammar, maximum one-term revision per challenger, variable list,
+coefficient bounds, protected validation reserve, Gaussian mechanism family,
+dual-control scoring weights, action/experiment catalogs, and safety ceilings
+remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. bounded synthesis of new mechanism topology, not only adjustment of an
-   existing coefficient;
-2. discovery of interaction and nonlinear terms when additive models fail;
-3. hidden-state hypotheses for delayed or partially observed causal effects;
-4. Bayesian parameter posteriors rather than point estimates for learned causal
-   coefficients;
-5. protected challenger validation across multiple intervention contexts;
-6. contingent experiment policy trees integrated over noisy observation
-   distributions rather than representative means;
-7. joint experiment-versus-action planning so information gathering and goal
-   progress compete in one objective;
-8. receding-horizon replanning after every action and experiment outcome;
-9. mechanism-fragment transfer across differently named domains;
-10. whether increased mechanism autonomy preserves hard risk ceilings,
-    abstention, rollback, protected validation, auditability, and zero unsafe
-    irreversible execution.
+1. multi-term structural challengers where one interaction is not enough;
+2. nonlinear bounded terms such as thresholds, saturation, and piecewise
+   responses;
+3. hidden-state mechanisms that explain delayed or hysteretic effects rather
+   than only a static latent bias;
+4. Bayesian posterior uncertainty over synthesized structure and coefficients;
+5. protected validation across multiple intervention distributions before
+   structural promotion;
+6. automatic rollback when a promoted structural mechanism later regresses;
+7. dual-control planning over multi-step experiment/action sequences instead of
+   one-step experiment-versus-action choice;
+8. joint information and reward planning where actions can themselves be
+   informative about uncertain mechanisms;
+9. transfer of learned structural mechanism fragments into differently named
+   domains;
+10. whether deeper model synthesis preserves hard risk ceilings, abstention,
+    rollback, protected validation, auditability, and zero unsafe irreversible
+    execution.
 
-The next central milestone is autonomous mechanism-structure synthesis and
-dual-control planning: Mabojolu should propose bounded new causal structures
-when coefficient adjustment is insufficient, infer hidden or interaction
-mechanisms from evidence, and decide whether to experiment or act based on both
-information value and goal progress.
+The next central milestone is hierarchical causal program synthesis and
+long-horizon dual control: Mabojolu should compose multiple validated mechanism
+fragments into deeper causal programs, maintain uncertainty over those programs,
+and plan mixed experiment/action sequences over longer horizons while continuing
+to prefer reversible, auditable, low-risk information gathering.
 
 ## Safety and audit principle
 
