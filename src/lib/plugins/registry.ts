@@ -161,7 +161,7 @@ export const PLUGIN_PROVIDERS:
         "developer",
 
       connectionMode:
-        "setup-required",
+        "oauth",
 
       permissionNote:
         "Supabase Management API permissions are configured on the OAuth application. Mabojolu will use the minimum read-oriented permissions needed for each workflow.",
