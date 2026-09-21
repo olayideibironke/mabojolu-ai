@@ -1,4 +1,5 @@
 import {
+  createHash,
   randomBytes,
 } from "node:crypto";
 
@@ -24,6 +25,9 @@ import {
 import {
   isPluginProviderId,
 } from "@/lib/plugins/registry";
+import {
+  normalizePluginReturnPath,
+} from "@/lib/plugins/return-path";
 
 export const runtime =
   "nodejs";
@@ -112,27 +116,77 @@ export async function GET(
       "base64url",
     );
 
+  const returnPath =
+    normalizePluginReturnPath(
+      request.nextUrl
+        .searchParams
+        .get(
+          "returnTo",
+        ),
+    );
+
+  const codeVerifier =
+    provider ===
+      "supabase"
+      ? randomBytes(
+          32,
+        ).toString(
+          "base64url",
+        )
+      : null;
+
+  const codeChallenge =
+    codeVerifier
+      ? createHash(
+          "sha256",
+        )
+          .update(
+            codeVerifier,
+          )
+          .digest(
+            "base64url",
+          )
+      : undefined;
+
   const store =
     await cookies();
+
+  const cookieOptions = {
+    httpOnly:
+      true,
+    secure:
+      process.env.NODE_ENV ===
+      "production",
+    sameSite:
+      "lax" as const,
+    path:
+      `/api/plugins/${provider}`,
+    maxAge:
+      10 *
+      60,
+  };
 
   store.set(
     `mabojolu-plugin-oauth-${provider}`,
     state,
-    {
-      httpOnly:
-        true,
-      secure:
-        process.env.NODE_ENV ===
-        "production",
-      sameSite:
-        "lax",
-      path:
-        `/api/plugins/${provider}`,
-      maxAge:
-        10 *
-        60,
-    },
+    cookieOptions,
   );
+
+  store.set(
+    `mabojolu-plugin-return-${provider}`,
+    returnPath,
+    cookieOptions,
+  );
+
+  if (
+    codeVerifier
+  ) {
+    store.set(
+      `mabojolu-plugin-pkce-${provider}`,
+      codeVerifier,
+      cookieOptions,
+    );
+  }
 
   return Response.redirect(
     buildPluginAuthorizationUrl({
@@ -140,6 +194,11 @@ export async function GET(
         provider,
       config,
       state,
+      ...(codeChallenge
+        ? {
+            codeChallenge,
+          }
+        : {}),
     }),
   );
 }
