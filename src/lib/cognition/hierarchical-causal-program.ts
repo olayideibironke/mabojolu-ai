@@ -399,6 +399,7 @@ export function synthesizeHierarchicalCausalPrograms(
     maximumFragments?: number;
     complexityPenaltyPerTerm?: number;
     maximumCandidates?: number;
+    maximumFragmentValidationMeanSquaredError?: number;
   },
 ): HierarchicalProgramCandidate[] {
   validateFragments(
@@ -414,12 +415,38 @@ export function synthesizeHierarchicalCausalPrograms(
     );
   }
 
+  const maximumFragmentValidationMeanSquaredError =
+    options
+      ?.maximumFragmentValidationMeanSquaredError ??
+    0.01;
+
+  validateNonNegativeFinite(
+    "maximumFragmentValidationMeanSquaredError",
+    maximumFragmentValidationMeanSquaredError,
+  );
+
+  const eligibleFragments =
+    fragments.filter(
+      (fragment) =>
+        fragment.validationMeanSquaredError <=
+          maximumFragmentValidationMeanSquaredError,
+    );
+
+  if (
+    eligibleFragments.length ===
+      0
+  ) {
+    throw new Error(
+      "No causal fragments passed the hierarchical composition validation threshold.",
+    );
+  }
+
   const maximumFragments =
     Math.min(
       options
         ?.maximumFragments ??
         2,
-      fragments.length,
+      eligibleFragments.length,
     );
 
   if (
@@ -476,7 +503,7 @@ export function synthesizeHierarchicalCausalPrograms(
     for (
       const selected of
         combinations(
-          fragments,
+          eligibleFragments,
           fragmentCount,
         )
     ) {
@@ -897,20 +924,6 @@ function updateBelief(
 
   return normalizeBelief(
     weighted,
-  );
-}
-
-function beliefEntropy(
-  belief:
-    ReadonlyMap<
-      string,
-      number
-    >,
-): number {
-  return entropy(
-    Array.from(
-      belief.values(),
-    ),
   );
 }
 
