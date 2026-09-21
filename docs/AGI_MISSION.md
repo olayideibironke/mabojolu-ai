@@ -137,7 +137,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   reserves on repeated attempts;
 - bounded cross-episode meta-adaptation that selects among explicit adaptation
   policies using family-specific evidence, cross-family transfer, and policy
-  quarantine after unsafe irreversible outcomes.
+  quarantine after unsafe irreversible outcomes;
+- controlled counterfactual benchmarking of meta-adaptive policy selection
+  against a fixed balanced baseline and a per-episode bounded-policy oracle,
+  including cumulative regret and held-out regime-sequence evaluation.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -146,95 +149,80 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: bounded meta-adaptation across regime episodes
+### Current milestone: controlled meta-adaptation benchmark and regret learning
 
-Mabojolu G now adds a second learning layer above the validated
-challenger/champion loop. The task-level learner still discovers and validates
-symbolic predicates. The new meta-adaptation controller learns which bounded
-adaptation policy should govern that process in different environment families.
+Mabojolu G now has a controlled benchmark for testing whether its bounded
+meta-adaptation layer improves with experience instead of merely accumulating
+episode statistics.
 
-The controller does not rewrite arbitrary code, prompts, tools, or safety rules.
-It chooses only among explicit audited policies whose detector thresholds,
-validation reserves, challenger budgets, and evidence windows are bounded in
-advance.
+The benchmark compares three systems on the same ordered regime episodes:
 
-Each completed adaptation episode records:
+1. a static baseline that always uses the balanced adaptation policy;
+2. Mabojolu's sequential meta-adaptive selector, which chooses only from evidence
+   available before the current episode;
+3. a hindsight oracle that evaluates every bounded policy only after the episode
+   choice has been fixed.
 
-1. whether a real regime change occurred;
-2. whether change was detected;
-3. detection delay when applicable;
-4. whether recovery succeeded;
-5. whether a false promotion occurred;
-6. fresh validation evidence cost;
-7. whether an unsafe irreversible action occurred.
+The oracle is never exposed to the selector. Its only purpose is measurement.
+For each episode, regret is defined as:
 
-Episode utility is bounded to [-1, 1]. Successful recovery, correct suppression
-of false alarms, and efficient detection contribute positive evidence. Missed
-changes, false alarms, false promotions, excessive validation cost, and unsafe
-irreversible outcomes contribute negative evidence.
+oracle utility - Mabojolu selected-policy utility
 
-For each environment family, Mabojolu maintains auditable per-policy evidence.
-It first performs controlled exploration of safe policies, then uses posterior
-success evidence plus bounded utility and an exploration bonus to select the
-next policy. When an unfamiliar environment family appears, the controller may
-transfer global cross-family evidence after enough completed episodes rather than
-starting from an entirely uninformed prior.
+with a floor of zero for numerical stability.
 
-The initial bounded policy catalog contains:
+The controlled benchmark includes calibration episodes followed by a held-out
+mixed sequence spanning stationary noise, gradual drift, abrupt drift, and
+recurring regimes. Every episode contains counterfactual outcomes for all
+bounded policies so the static baseline and oracle can be evaluated on exactly
+the same episode without changing Mabojolu's observed learning history.
 
-- conservative adaptation for noisy but mostly stationary environments;
-- balanced adaptation matching the current v1.1 defaults;
-- responsive adaptation for abrupt structural change.
+The report measures:
 
-These policies differ only in bounded adaptation parameters. The underlying
-champion/challenger validation rules remain authoritative.
+- cumulative and mean utility;
+- false alarms;
+- missed changes;
+- false promotions;
+- recovery successes;
+- validation evidence cost;
+- detected-change count and mean detection delay;
+- per-episode regret;
+- cumulative regret;
+- calibration versus held-out regret.
 
-Safety remains fail-closed. Any policy associated with an unsafe irreversible
-outcome is quarantined globally and excluded from subsequent policy selection.
-If every policy becomes quarantined, meta-adaptation refuses to select a policy
-rather than silently reusing an unsafe one.
+The current synthetic benchmark is deliberately constructed so different
+environment families reward different bounded policies. Early calibration
+therefore incurs exploration regret. The research target is that, after enough
+family-specific evidence, Mabojolu selects the appropriate policy on the held-out
+mixed sequence, reduces regret, suppresses avoidable false alarms, and detects
+abrupt changes faster than the fixed balanced baseline.
 
-The controlled target behavior is:
-
-stationary noisy family
-→ conservative policy accumulates stronger evidence
-→ false adaptations decrease
-
-abrupt-change family
-→ responsive policy accumulates stronger evidence
-→ detection delay decreases
-
-new unfamiliar family
-→ previously earned global evidence supplies a transfer prior
-→ local family evidence can later override that prior
-
-unsafe irreversible outcome under a policy
-→ policy is quarantined
-→ future selection excludes it
-
-This is a controlled form of learning how to adapt. It is still not evidence of
-AGI by itself. The required next step is empirical comparison against a static
-adapter across held-out sequences of noisy stability, gradual drift, abrupt
-change, recurring regimes, and mixed unfamiliar families.
+This benchmark remains a controlled synthetic evaluation. It does not yet prove
+that Mabojolu can infer environment families from raw experience or that the same
+advantage will survive richer real-world dynamics. Its value is that it creates
+an auditable falsifiable measurement protocol before removing those scaffolds.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. false-alarm rate under stationary but noisy environments;
-2. detection delay under abrupt regime changes;
-3. sensitivity to gradual drift rather than a single sharp change point;
-4. challenger false-discovery rate across repeated search attempts;
-5. recovery speed when a previously learned regime returns;
-6. whether meta-adaptive policy selection outperforms the fixed balanced policy
-   at equal evidence cost;
-7. whether family-specific policy learning beats one global policy across mixed
-   regime sequences;
-8. transfer quality when an unseen environment family begins from cross-family
-   evidence and later accumulates local evidence;
-9. policy regret versus an oracle that knows the best bounded policy per family;
-10. whether meta-adaptation improves held-out task performance without increasing
-    unsafe, irreversible, or false-promotion rates.
+1. regret curves across longer held-out regime sequences and different episode
+   orderings;
+2. robustness when policy utilities are noisy rather than deterministic;
+3. whether the same learned policy preferences survive shifted counterfactual
+   outcome distributions;
+4. online environment-family induction from observed drift statistics rather
+   than supplied family labels;
+5. calibration quality for uncertainty over the inferred environment family;
+6. whether family induction plus meta-adaptation beats both the fixed balanced
+   baseline and the label-supplied meta-adaptive control;
+7. safe abstention when family confidence is too low to justify a policy change;
+8. transfer quality when an unseen family is structurally similar but not
+   identical to prior families;
+9. end-to-end integration where benchmark episode outcomes are generated by the
+   actual adaptive champion/challenger runtime rather than a synthetic outcome
+   table;
+10. whether these gains persist without increasing unsafe, irreversible, or
+    false-promotion rates.
 
 ## Safety and audit principle
 
