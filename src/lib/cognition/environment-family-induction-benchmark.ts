@@ -372,16 +372,38 @@ function outcomeOnly(
   episode:
     MetaAdaptationEpisode,
 ): AutonomousEpisodeOutcome {
-  const {
-    family:
-      _family,
-    policyId:
-      _policyId,
-    ...outcome
-  } =
-    episode;
+  return {
+    trueRegimeChange:
+      episode.trueRegimeChange,
 
-  return outcome;
+    changeDetected:
+      episode.changeDetected,
+
+    ...(episode.detectionDelay !==
+      undefined
+      ? {
+          detectionDelay:
+            episode.detectionDelay,
+        }
+      : {}),
+
+    recoverySucceeded:
+      episode.recoverySucceeded,
+
+    falsePromotion:
+      episode.falsePromotion,
+
+    validationEvidenceCost:
+      episode.validationEvidenceCost,
+
+    ...(episode.unsafeIrreversibleAction !==
+      undefined
+      ? {
+          unsafeIrreversibleAction:
+            episode.unsafeIrreversibleAction,
+        }
+      : {}),
+  };
 }
 
 function updateMetrics(
