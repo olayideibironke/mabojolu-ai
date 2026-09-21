@@ -79,10 +79,19 @@ export interface AdaptivePredicateSummary {
   driftWindowAccuracy?:
     number;
 
+  driftPosteriorProbability?:
+    number;
+
+  driftConfidenceThreshold:
+    number;
+
   lastDriftTriggerEvidenceCount?:
     number;
 
   lastDriftTriggerAccuracy?:
+    number;
+
+  lastDriftTriggerPosteriorProbability?:
     number;
 
   challengerFitEvidenceCount:
@@ -205,6 +214,9 @@ interface PrincipleState {
   lastDriftTriggerAccuracy?:
     number;
 
+  lastDriftTriggerPosteriorProbability?:
+    number;
+
   lastChallengerValidationAccuracy?:
     number;
 
@@ -229,6 +241,129 @@ const EPSILON =
 
 const MAX_ARCHIVED_CHAMPIONS =
   8;
+
+/**
+ * Exact Beta-Bernoulli posterior probability that a champion's true
+ * correctness rate is at or below the configured drift threshold.
+ *
+ * A uniform Beta(1, 1) prior keeps the detector conservative when only a few
+ * outcomes are available. For integer posterior parameters, the Beta CDF can
+ * be evaluated exactly through the equivalent binomial tail, avoiding a
+ * numerical integration dependency.
+ */
+function driftPosteriorProbability(
+  correctness:
+    readonly boolean[],
+
+  accuracyThreshold:
+    number,
+):
+  number {
+  const successes =
+    correctness.filter(
+      Boolean,
+    ).length;
+
+  const failures =
+    correctness.length -
+    successes;
+
+  const alpha =
+    successes +
+    1;
+
+  const beta =
+    failures +
+    1;
+
+  const trials =
+    alpha +
+    beta -
+    1;
+
+  function binomialCoefficient(
+    n:
+      number,
+
+    k:
+      number,
+  ):
+    number {
+    if (
+      k <
+        0 ||
+      k >
+        n
+    ) {
+      return 0;
+    }
+
+    const reduced =
+      Math.min(
+        k,
+        n -
+          k,
+      );
+
+    let value =
+      1;
+
+    for (
+      let index =
+        1;
+      index <=
+        reduced;
+      index +=
+        1
+    ) {
+      value *=
+        (
+          n -
+          reduced +
+          index
+        ) /
+        index;
+    }
+
+    return value;
+  }
+
+  let probability =
+    0;
+
+  for (
+    let successesInTail =
+      alpha;
+    successesInTail <=
+      trials;
+    successesInTail +=
+      1
+  ) {
+    probability +=
+      binomialCoefficient(
+        trials,
+        successesInTail,
+      ) *
+      accuracyThreshold **
+        successesInTail *
+      (
+        1 -
+        accuracyThreshold
+      ) **
+        (
+          trials -
+          successesInTail
+        );
+  }
+
+  return Math.max(
+    0,
+    Math.min(
+      1,
+      probability,
+    ),
+  );
+}
 
 function cloneSignature(
   signature:
@@ -662,11 +797,17 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     private readonly penaltyPerExtraOperation =
       0.05,
 
-    private readonly driftWindowSize =
+    private readonly driftMinimumEvidence =
       3,
 
     private readonly driftAccuracyThreshold =
       0.5,
+
+    private readonly driftConfidenceThreshold =
+      0.9,
+
+    private readonly driftMaximumEvidence =
+      12,
   ) {
     if (
       !Number.isInteger(
@@ -708,13 +849,13 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     if (
       !Number.isInteger(
-        driftWindowSize,
+        driftMinimumEvidence,
       ) ||
-      driftWindowSize <
+      driftMinimumEvidence <
         2
     ) {
       throw new Error(
-        "driftWindowSize must be at least 2.",
+        "driftMinimumEvidence must be at least 2.",
       );
     }
 
@@ -729,6 +870,32 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     ) {
       throw new Error(
         "driftAccuracyThreshold must be below minimumValidationAccuracy.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        driftConfidenceThreshold,
+      ) ||
+      driftConfidenceThreshold <=
+        0.5 ||
+      driftConfidenceThreshold >=
+        1
+    ) {
+      throw new Error(
+        "driftConfidenceThreshold must be in (0.5, 1).",
+      );
+    }
+
+    if (
+      !Number.isInteger(
+        driftMaximumEvidence,
+      ) ||
+      driftMaximumEvidence <
+        driftMinimumEvidence
+    ) {
+      throw new Error(
+        "driftMaximumEvidence must be at least driftMinimumEvidence.",
       );
     }
   }
@@ -970,7 +1137,7 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     if (
       state.recentChampionCorrectness
         .length >
-        this.driftWindowSize
+        this.driftMaximumEvidence
     ) {
       state.recentChampionCorrectness
         .shift();
@@ -978,12 +1145,12 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     if (
       state.recentChampionCorrectness
-        .length ===
-        this.driftWindowSize &&
-      this.recentAccuracy(
+        .length >=
+        this.driftMinimumEvidence &&
+      this.recentDriftPosteriorProbability(
         state,
-      ) <=
-        this.driftAccuracyThreshold
+      ) >=
+        this.driftConfidenceThreshold
     ) {
       this.startAdaptation(
         state,
@@ -1140,6 +1307,9 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
         driftWindowEvidenceCount:
           0,
+
+        driftConfidenceThreshold:
+          this.driftConfidenceThreshold,
 
         challengerFitEvidenceCount:
           0,
@@ -1345,6 +1515,11 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     state.lastDriftTriggerAccuracy =
       this.recentAccuracy(
+        state,
+      );
+
+    state.lastDriftTriggerPosteriorProbability =
+      this.recentDriftPosteriorProbability(
         state,
       );
 
@@ -1812,6 +1987,17 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         : "bootstrap-rejected";
   }
 
+  private recentDriftPosteriorProbability(
+    state:
+      PrincipleState,
+  ):
+    number {
+    return driftPosteriorProbability(
+      state.recentChampionCorrectness,
+      this.driftAccuracyThreshold,
+    );
+  }
+
   private recentAccuracy(
     state:
       PrincipleState,
@@ -1937,8 +2123,16 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
               this.recentAccuracy(
                 state,
               ),
+
+            driftPosteriorProbability:
+              this.recentDriftPosteriorProbability(
+                state,
+              ),
           }
         : {}),
+
+      driftConfidenceThreshold:
+        this.driftConfidenceThreshold,
 
       ...(state
           .lastDriftTriggerEvidenceCount !==
@@ -1957,6 +2151,16 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
             lastDriftTriggerAccuracy:
               state
                 .lastDriftTriggerAccuracy,
+          }
+        : {}),
+
+      ...(state
+          .lastDriftTriggerPosteriorProbability !==
+        undefined
+        ? {
+            lastDriftTriggerPosteriorProbability:
+              state
+                .lastDriftTriggerPosteriorProbability,
           }
         : {}),
 
