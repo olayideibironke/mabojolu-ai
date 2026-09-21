@@ -9,6 +9,7 @@ import {
   chooseContingentExperimentPolicy,
   chooseRecedingHorizonDecision,
   evaluateMechanismFamilyAdequacy,
+  selectContingentExperimentBranch,
   proposeBoundedMechanismChallengers,
   selectValidatedMechanismChampion,
   type MechanismLearningObservation,
@@ -620,6 +621,52 @@ describe(
             .expectedTotalCost,
         ).toBeLessThan(
           0.1,
+        );
+      },
+    );
+
+    it(
+      "selects the runtime branch from the actual noisy first observation",
+      () => {
+        const prior =
+          new Map(
+            MECHANISMS.map(
+              (mechanism) => [
+                mechanism.id,
+                1 /
+                  MECHANISMS.length,
+              ],
+            ),
+          );
+
+        const policy =
+          chooseContingentExperimentPolicy(
+            MECHANISMS,
+            prior,
+            experiments,
+          );
+
+        const highObservationBranch =
+          selectContingentExperimentBranch(
+            policy,
+            0.79,
+          );
+
+        expect(
+          highObservationBranch,
+        ).toMatchObject({
+          representativeMechanismId:
+            "mechanism-3",
+
+          nextExperimentId:
+            undefined,
+        });
+
+        expect(
+          highObservationBranch
+            .distance,
+        ).toBeCloseTo(
+          0.01,
         );
       },
     );
