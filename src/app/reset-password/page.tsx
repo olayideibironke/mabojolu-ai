@@ -1,10 +1,11 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { BrandMark } from "@/components/ui/brand-mark";
-import { hasRecentRecoveryRequest } from "@/lib/auth/recovery";
+import { RECOVERY_SESSION_COOKIE } from "@/lib/auth/recovery";
 import { createServerSupabaseClient } from "@/lib/auth/supabase-server";
 
 export const metadata: Metadata = {
@@ -14,10 +15,24 @@ export const metadata: Metadata = {
 /**
  * Password-reset page.
  *
- * A normal signed-in session is not sufficient here. The user must have a
- * recent Supabase password-recovery session created by the emailed reset link.
+ * The form is shown only after Mabojolu has exchanged a valid emailed auth code
+ * and marked this browser as being inside a short-lived password-setup flow.
  */
 export default async function ResetPasswordPage() {
+  const cookieStore =
+    await cookies();
+
+  if (
+    cookieStore.get(
+      RECOVERY_SESSION_COOKIE,
+    )?.value !==
+      "1"
+  ) {
+    redirect(
+      "/sign-in?error=invalid_reset_session",
+    );
+  }
+
   const client =
     await createServerSupabaseClient();
 
@@ -35,10 +50,7 @@ export default async function ResetPasswordPage() {
 
   if (
     error ||
-    !data.user ||
-    !hasRecentRecoveryRequest(
-      data.user.recovery_sent_at,
-    )
+    !data.user
   ) {
     redirect(
       "/sign-in?error=invalid_reset_session",
