@@ -119,15 +119,20 @@ describe(
           expectedGoalSuccessProbability:
             1,
 
-          expectedCost:
-            0.13,
-
           maximumRisk:
             0.1,
 
           reason:
             "safe-long-horizon-policy",
         });
+
+        expect(
+          report
+            .longHorizonPlan
+            .expectedCost,
+        ).toBeCloseTo(
+          0.13,
+        );
 
         expect(
           report
