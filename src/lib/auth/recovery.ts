@@ -1,3 +1,9 @@
+export const RECOVERY_SESSION_COOKIE =
+  "mabojolu-recovery-session";
+
+export const RECOVERY_SESSION_MAX_AGE_SECONDS =
+  30 * 60;
+
 const RECOVERY_MAX_AGE_MS =
   2 *
   60 *
