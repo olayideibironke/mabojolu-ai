@@ -31,6 +31,7 @@ export interface RepresentationCalibrationDecision {
   reason:
     | "initial-champion-retained"
     | "validated-improvement"
+    | "unsafe-champion-replaced"
     | "no-safe-improvement";
   improvement: number;
 }
@@ -610,7 +611,9 @@ export class SelfCalibratingRepresentationSelector {
         true,
 
       reason:
-        "validated-improvement",
+        championUnsafe
+          ? "unsafe-champion-replaced"
+          : "validated-improvement",
 
       improvement,
     };
