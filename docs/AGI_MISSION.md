@@ -134,7 +134,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - sequential likelihood-ratio change-point evidence that resets after recovered
   stable performance instead of treating isolated errors as regime changes;
 - bounded challenger search per regime with progressively larger fresh validation
-  reserves on repeated attempts.
+  reserves on repeated attempts;
+- bounded cross-episode meta-adaptation that selects among explicit adaptation
+  policies using family-specific evidence, cross-family transfer, and policy
+  quarantine after unsafe irreversible outcomes.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -143,63 +146,76 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: sequential regime-change detection and controlled search
+### Current milestone: bounded meta-adaptation across regime episodes
 
-Mabojolu G now moves beyond a fixed-size error window. A validated symbolic
-champion is monitored only on fresh operational outcomes using two independent
-signals:
+Mabojolu G now adds a second learning layer above the validated
+challenger/champion loop. The task-level learner still discovers and validates
+symbolic predicates. The new meta-adaptation controller learns which bounded
+adaptation policy should govern that process in different environment families.
 
-1. a Beta-Bernoulli posterior estimates the probability that the champion's
-   true correctness rate has fallen to or below the configured drift threshold;
-2. a one-sided sequential likelihood-ratio score accumulates evidence for a
-   degraded regime against the validated-stable accuracy model.
+The controller does not rewrite arbitrary code, prompts, tools, or safety rules.
+It chooses only among explicit audited policies whose detector thresholds,
+validation reserves, challenger budgets, and evidence windows are bounded in
+advance.
 
-A challenger cycle opens only when both signals are strong enough and the
-minimum fresh-evidence requirement has been met. If stable outcomes erase the
-sequential evidence, the suspected change point is discarded rather than
-forcing adaptation. This gives Mabojolu an explicit distinction between an
-isolated mistake and sustained evidence that its learned rule no longer matches
-the environment.
+Each completed adaptation episode records:
 
-The drift trigger still obeys the fresh-reserve rule. Trigger observations remain
-incumbent operational evidence and are never recycled as challenger training
-data. Challenger fitting starts only after the trigger, the challenger is frozen
-before validation, and promotion still requires beating the incumbent and the
-fresh majority baseline on the same held-out reserve.
+1. whether a real regime change occurred;
+2. whether change was detected;
+3. detection delay when applicable;
+4. whether recovery succeeded;
+5. whether a false promotion occurred;
+6. fresh validation evidence cost;
+7. whether an unsafe irreversible action occurred.
 
-Repeated challenger search is now bounded per active regime. The first
-challenger uses the normal validation reserve. Later attempts require a larger
-fresh reserve, and search stops when the regime budget is exhausted. Successful
-promotion or validated rollback to an archived regime starts a new regime budget.
-This is a first safeguard against repeatedly searching until a hypothesis passes
-by chance.
+Episode utility is bounded to [-1, 1]. Successful recovery, correct suppression
+of false alarms, and efficient detection contribute positive evidence. Missed
+changes, false alarms, false promotions, excessive validation cost, and unsafe
+irreversible outcomes contribute negative evidence.
+
+For each environment family, Mabojolu maintains auditable per-policy evidence.
+It first performs controlled exploration of safe policies, then uses posterior
+success evidence plus bounded utility and an exploration bonus to select the
+next policy. When an unfamiliar environment family appears, the controller may
+transfer global cross-family evidence after enough completed episodes rather than
+starting from an entirely uninformed prior.
+
+The initial bounded policy catalog contains:
+
+- conservative adaptation for noisy but mostly stationary environments;
+- balanced adaptation matching the current v1.1 defaults;
+- responsive adaptation for abrupt structural change.
+
+These policies differ only in bounded adaptation parameters. The underlying
+champion/challenger validation rules remain authoritative.
+
+Safety remains fail-closed. Any policy associated with an unsafe irreversible
+outcome is quarantined globally and excluded from subsequent policy selection.
+If every policy becomes quarantined, meta-adaptation refuses to select a policy
+rather than silently reusing an unsafe one.
 
 The controlled target behavior is:
 
-stable regime A
-→ isolated errors
-→ sequential evidence returns to zero
-→ no adaptation
+stationary noisy family
+→ conservative policy accumulates stronger evidence
+→ false adaptations decrease
 
-stable regime A
-→ sustained structural change
-→ posterior confidence and sequential evidence rise
-→ challenger search opens
+abrupt-change family
+→ responsive policy accumulates stronger evidence
+→ detection delay decreases
 
-new regime B
-→ challenger fits on fresh outcomes
-→ challenger validates on a separate reserve
-→ promotion only if it beats incumbent and baseline
+new unfamiliar family
+→ previously earned global evidence supplies a transfer prior
+→ local family evidence can later override that prior
 
-environment returns to regime A
-→ archived champion is evaluated on fresh evidence
-→ validated rollback without relearning
+unsafe irreversible outcome under a policy
+→ policy is quarantined
+→ future selection excludes it
 
-Even when this protocol is verified, it remains controlled research rather than
-evidence of AGI. The next frontier is meta-adaptation: learning which detector
-thresholds, experiment choices, search budgets, and validation allocations are
-appropriate for different environment families while controlling false
-discoveries and catastrophic forgetting.
+This is a controlled form of learning how to adapt. It is still not evidence of
+AGI by itself. The required next step is empirical comparison against a static
+adapter across held-out sequences of noisy stability, gradual drift, abrupt
+change, recurring regimes, and mixed unfamiliar families.
 
 ### Next experiments
 
@@ -210,11 +226,15 @@ The next experiments should measure:
 3. sensitivity to gradual drift rather than a single sharp change point;
 4. challenger false-discovery rate across repeated search attempts;
 5. recovery speed when a previously learned regime returns;
-6. whether adaptive validation budgets outperform fixed reserves at equal
-   evidence cost;
-7. transfer of learned adaptation policy across unfamiliar environment families;
-8. whether meta-learned adaptation improves held-out task performance without
-   increasing unsafe or irreversible action rates.
+6. whether meta-adaptive policy selection outperforms the fixed balanced policy
+   at equal evidence cost;
+7. whether family-specific policy learning beats one global policy across mixed
+   regime sequences;
+8. transfer quality when an unseen environment family begins from cross-family
+   evidence and later accumulates local evidence;
+9. policy regret versus an oracle that knows the best bounded policy per family;
+10. whether meta-adaptation improves held-out task performance without increasing
+    unsafe, irreversible, or false-promotion rates.
 
 ## Safety and audit principle
 
