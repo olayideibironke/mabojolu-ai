@@ -309,7 +309,7 @@ export function EmailPasswordAuth() {
               normalizedEmail,
               {
                 redirectTo:
-                  `${window.location.origin}/`,
+                  `${window.location.origin}/auth/callback?next=/reset-password`,
               },
             );
 
