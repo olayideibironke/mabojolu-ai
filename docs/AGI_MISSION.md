@@ -161,7 +161,12 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - autonomous structural role induction that searches target variable sets from
   protected outcome evidence, groups mathematically equivalent role
   permutations, abstains on ambiguous correspondences, and composes
-  independently synthesized primitives when no single primitive is sufficient.
+  independently synthesized primitives when no single primitive is sufficient;
+- active causal correspondence learning that chooses reversible low-risk
+  interventions by expected information gain, updates uncertainty from measured
+  causal effects rather than target counterfactual utility tables, blocks unsafe
+  experiments, and uses resolved correspondences for transferred goal-directed
+  planning.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -170,96 +175,97 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: autonomous structural role induction and representation composition
+### Current milestone: active causal correspondence learning
 
-Mabojolu G can now infer how an unfamiliar domain's observed variables map onto
-the abstract roles required by a transferred representation primitive.
+Mabojolu G can now resolve an unfamiliar structural correspondence by choosing
+its own bounded causal experiments instead of receiving a target role binding or
+a complete target counterfactual policy-utility table.
 
-The v1.8 transfer benchmark still supplied a target role binding explicitly. In
-v1.9 the transferred primitive is frozen, the target variable names are exposed,
-and Mabojolu searches bounded variable-set hypotheses using protected target
-outcome evidence.
+The v1.10 learner begins with a bounded hypothesis set over which unfamiliar
+target variables might instantiate the abstract roles of a transferred
+representation primitive. In the controlled benchmark, five target variables
+produce ten competing three-variable correspondence hypotheses.
 
-For the current representation grammar, mean and absolute-gap primitives are
-symmetric under permutation of their argument roles. The role-induction search
-therefore groups mathematically equivalent permutations into one variable-set
-hypothesis instead of falsely treating role-order symmetry as uncertainty.
+Each candidate experiment specifies:
 
-Each candidate target mapping is evaluated by the regret of the frozen
-transferred rule. The winning mapping is accepted only when:
+- the target variables to perturb;
+- intervention magnitude;
+- estimated risk;
+- cost;
+- reversibility.
 
-- its protected regret is below the configured acceptance bound; and
-- it has a sufficient regret margin over the next genuinely different variable
-  set.
+For every active correspondence hypothesis, Mabojolu predicts the representation
+effect that an experiment would produce. It groups hypotheses by predicted
+effect and computes expected entropy reduction. Experiment choice maximizes
+information gain minus a bounded cost penalty while enforcing a hard experiment
+risk ceiling and reversibility requirement.
 
-If multiple target variable sets explain the protected outcomes equally well,
-Mabojolu abstains and returns no binding. Missing variables, inconsistent target
-schemas, and malformed values fail closed.
+Unsafe or irreversible experiments are blocked before scoring can turn them into
+actions. The benchmark includes an unsafe intervention that is among the most
+informative experiments available, so safety constraints are exercised rather
+than remaining inert.
 
-The v1.9 transfer benchmark removes the supplied target mapping used in v1.8.
-Mabojolu receives the previously synthesized three-role mean, target examples
-with unfamiliar variable names, and target policy-outcome evidence. It correctly
-selects the three-variable structural set while excluding a nuisance variable,
-then reaches the same protected transfer result as the earlier supplied-binding
-control.
+After each safe intervention, Mabojolu receives only the measured causal effect.
+Hypotheses inconsistent with that effect are removed and the remaining belief is
+renormalized. A mapping is resolved only when both posterior confidence and the
+margin over the runner-up exceed explicit thresholds. If no safe informative
+experiment remains, Mabojolu abstains.
 
-This is calibrated target adaptation rather than zero-shot correspondence:
-protected target outcome evidence is used to infer the mapping. The target
-binding itself is not supplied.
+The controlled active benchmark compares this experiment-selection loop against
+a fixed passive sequence of safe single-variable probes. The active learner
+resolves the hidden three-variable correspondence in three interventions while
+the passive sequence requires four. In the current deterministic benchmark, the
+active experiment cost is 0.18 versus 0.86 for the passive baseline, and the
+maximum executed experiment risk is 0.20 under a 0.30 safety ceiling.
 
-v1.9 also adds bounded representation composition. Two independently
-synthesized primitives can be combined through a small auditable gate grammar:
+The learned correspondence is then used outside correspondence identification.
+A transferred representation primitive and its learned target mapping are passed
+to a bounded planner. The planner evaluates reversible target actions and selects
+the cheapest safe action predicted to move the transferred representation beyond
+its goal threshold.
 
-- AND;
-- OR;
-- XOR.
+The planning benchmark includes a cheaper nuisance-variable action that does not
+affect the true transferred representation. A cost-only baseline therefore fails
+the goal, while the correspondence-aware planner rejects the irrelevant action
+and selects a more expensive but genuinely goal-reaching intervention.
 
-The controlled composition task is constructed so neither primitive alone can
-select the correct adaptation policy across all contexts. The composition search
-must discover that responsive behavior is appropriate only when both primitive
-conditions are high. The resulting AND composition reaches the bounded-policy
-oracle across all protected composition cases, while either primitive used
-alone incurs regret.
-
-The composition layer does not invent arbitrary code. Primitive programs,
-thresholds, bindings, gate operators, policy choices, complexity penalties, and
-evaluation evidence remain inspectable.
-
-This milestone therefore removes the explicit target role-binding scaffold and
-adds bounded compositional reuse, but it still relies on target outcome evidence,
-a human-specified role vocabulary, a small mapping search space, and a fixed
-composition grammar.
+This is a stronger move from passive transfer toward autonomous scientific
+interaction, but it remains a controlled scaffold. The hypothesis class,
+experiment catalog, effect model, risk estimates, primitive arity, deterministic
+observation model, intervention magnitudes, planning action catalog, and safety
+thresholds remain human-specified. The current simulator also provides noiseless
+causal effects, so robust inference under stochastic and partially observed
+environments remains open.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. role induction from interaction and causal intervention rather than direct
-   counterfactual policy-utility tables;
-2. zero-shot structural correspondence from relational and causal signatures
-   before any target reward feedback;
-3. active experiment selection that chooses the safest observation or
-   intervention for resolving mapping ambiguity;
-4. posterior uncertainty over structural correspondences instead of a single
-   regret-margin confidence rule;
-5. deeper composition of more than two reusable primitives under explicit
-   complexity and validation budgets;
-6. temporal representation programs that learn lag, trend, persistence, and
-   recurrence from raw episode sequences;
-7. transfer of composed representations into planning and world-model inference
-   rather than adaptation-policy selection alone;
-8. autonomous creation of new abstract roles when existing role vocabularies
-   cannot explain protected outcomes;
-9. multi-domain consolidation so repeated structural mappings become reusable
-   correspondence priors without leaking task-specific variable names;
-10. whether further scaffold removal preserves abstention, rollback,
-    auditability, bounded external action, and zero unsafe irreversible behavior.
+1. Bayesian or likelihood-based correspondence updates under noisy causal
+   observations instead of deterministic hypothesis elimination;
+2. autonomous generation of candidate interventions rather than selection from a
+   fixed experiment catalog;
+3. learned experiment-risk models calibrated from outcomes while retaining hard
+   external action limits;
+4. multi-step experiment planning where the best first intervention is chosen
+   for downstream information value rather than one-step entropy reduction;
+5. partially observed environments where causal correspondence must be inferred
+   from delayed or confounded effects;
+6. integration of active correspondence learning with the existing causal world
+   model so hypotheses concern mechanisms, not only variable membership;
+7. transferred planning over multi-step state transitions and subgoals using
+   newly inferred causal correspondences;
+8. active falsification of previously learned reusable representation primitives
+   when they fail in a new domain;
+9. cross-domain experiment reuse so successful intervention strategies become
+   transferable scientific skills;
+10. whether greater experimental autonomy preserves hard safety ceilings,
+    abstention, rollback, auditability, and zero unsafe irreversible execution.
 
-The next central milestone is active causal correspondence learning: Mabojolu
-should resolve unfamiliar structural mappings by choosing informative safe
-experiments, update uncertainty over competing causal correspondences, and
-transfer learned representations into planning and world-model reasoning rather
-than relying primarily on supplied counterfactual utility tables.
+The next central milestone is uncertainty-aware causal world-model transfer:
+Mabojolu should maintain probabilistic competing mechanism models under noisy
+observations, design safe multi-step experiments to discriminate them, and use
+the learned causal structure for multi-step planning in an unfamiliar domain.
 
 ## Safety and audit principle
 
