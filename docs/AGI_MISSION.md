@@ -166,7 +166,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   interventions by expected information gain, updates uncertainty from measured
   causal effects rather than target counterfactual utility tables, blocks unsafe
   experiments, and uses resolved correspondences for transferred goal-directed
-  planning.
+  planning;
+- uncertainty-aware causal world-model transfer with Gaussian likelihood
+  updates, persistent posterior mass over competing mechanisms, bounded
+  multi-step experiment lookahead, and posterior-aware multi-step goal planning.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -175,97 +178,90 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: active causal correspondence learning
+### Current milestone: uncertainty-aware causal world-model transfer
 
-Mabojolu G can now resolve an unfamiliar structural correspondence by choosing
-its own bounded causal experiments instead of receiving a target role binding or
-a complete target counterfactual policy-utility table.
+Mabojolu G can now maintain probabilistic competing causal mechanisms under
+noisy observations instead of eliminating hypotheses deterministically after
+each experiment.
 
-The v1.10 learner begins with a bounded hypothesis set over which unfamiliar
-target variables might instantiate the abstract roles of a transferred
-representation primitive. In the controlled benchmark, five target variables
-produce ten competing three-variable correspondence hypotheses.
+Each bounded mechanism specifies a causal effect map over unfamiliar variables
+and an observation-noise scale. Experiments produce noisy measurements of the
+effect predicted by a mechanism. Mabojolu updates its belief with Gaussian
+likelihoods, so mechanisms that become unlikely retain nonzero posterior mass
+rather than disappearing after one imperfect observation.
 
-Each candidate experiment specifies:
+The world-model experiment planner supports bounded lookahead. Candidate
+experiment sequences are evaluated by expected terminal belief entropy under the
+current posterior, with explicit experiment cost penalties, reversibility
+requirements, and hard risk ceilings.
 
-- the target variables to perturb;
-- intervention magnitude;
-- estimated risk;
-- cost;
-- reversibility.
+The controlled v1.11 experiment benchmark is deliberately arranged so a
+one-step information planner prefers an expensive direct probe, while a
+two-step planner discovers that two cheaper complementary interventions provide
+essentially complete identification at lower total cost.
 
-For every active correspondence hypothesis, Mabojolu predicts the representation
-effect that an experiment would produce. It groups hypotheses by predicted
-effect and computes expected entropy reduction. Experiment choice maximizes
-information gain minus a bounded cost penalty while enforcing a hard experiment
-risk ceiling and reversibility requirement.
+The deterministic benchmark values are:
 
-Unsafe or irreversible experiments are blocked before scoring can turn them into
-actions. The benchmark includes an unsafe intervention that is among the most
-informative experiments available, so safety constraints are exercised rather
-than remaining inert.
+- one-step direct probe cost: 0.50;
+- two-step complementary probe cost: 0.10;
+- two-step experiment maximum risk: 0.10;
+- hard experiment risk ceiling: 0.30.
 
-After each safe intervention, Mabojolu receives only the measured causal effect.
-Hypotheses inconsistent with that effect are removed and the remaining belief is
-renormalized. A mapping is resolved only when both posterior confidence and the
-margin over the runner-up exceed explicit thresholds. If no safe informative
-experiment remains, Mabojolu abstains.
+The observations delivered during execution are perturbed away from the exact
+mechanism means. Posterior updating therefore exercises the noisy likelihood
+path. The correct mechanism becomes dominant without assigning exact zero
+probability to alternatives.
 
-The controlled active benchmark compares this experiment-selection loop against
-a fixed passive sequence of safe single-variable probes. The active learner
-resolves the hidden three-variable correspondence in three interventions while
-the passive sequence requires four. In the current deterministic benchmark, the
-active experiment cost is 0.18 versus 0.86 for the passive baseline, and the
-maximum executed experiment risk is 0.20 under a 0.30 safety ceiling.
+The mechanism belief is then used for multi-step planning. Candidate actions are
+evaluated under every mechanism still represented in the posterior. A plan is
+accepted only when the posterior-weighted probability of reaching the goal
+meets a configured success threshold.
 
-The learned correspondence is then used outside correspondence identification.
-A transferred representation primitive and its learned target mapping are passed
-to a bounded planner. The planner evaluates reversible target actions and selects
-the cheapest safe action predicted to move the transferred representation beyond
-its goal threshold.
+The current planning benchmark begins from a state where no safe single action
+can reach the goal with sufficient probability. Horizon-one planning therefore
+abstains. Horizon-two planning finds a two-action sequence that reaches the goal
+across the posterior mechanism belief while remaining below the action-risk
+ceiling.
 
-The planning benchmark includes a cheaper nuisance-variable action that does not
-affect the true transferred representation. A cost-only baseline therefore fails
-the goal, while the correspondence-aware planner rejects the irrelevant action
-and selects a more expensive but genuinely goal-reaching intervention.
+This milestone moves Mabojolu from deterministic correspondence resolution
+toward uncertainty-aware causal world modeling and planning, but it remains a
+bounded experimental scaffold. The mechanism catalog, causal effect maps,
+Gaussian noise family, observation variance, intervention catalog, action
+catalog, planning horizon, cost penalty, risk estimates, and state abstraction
+remain human-specified.
 
-This is a stronger move from passive transfer toward autonomous scientific
-interaction, but it remains a controlled scaffold. The hypothesis class,
-experiment catalog, effect model, risk estimates, primitive arity, deterministic
-observation model, intervention magnitudes, planning action catalog, and safety
-thresholds remain human-specified. The current simulator also provides noiseless
-causal effects, so robust inference under stochastic and partially observed
-environments remains open.
+The current experiment planner uses open-loop sequence evaluation rather than a
+fully contingent policy tree, and the mechanism transition model is linear and
+additive. Learning new mechanisms, nonlinear dynamics, hidden state, and
+closed-loop replanning remain open.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. Bayesian or likelihood-based correspondence updates under noisy causal
-   observations instead of deterministic hypothesis elimination;
-2. autonomous generation of candidate interventions rather than selection from a
-   fixed experiment catalog;
-3. learned experiment-risk models calibrated from outcomes while retaining hard
-   external action limits;
-4. multi-step experiment planning where the best first intervention is chosen
-   for downstream information value rather than one-step entropy reduction;
-5. partially observed environments where causal correspondence must be inferred
-   from delayed or confounded effects;
-6. integration of active correspondence learning with the existing causal world
-   model so hypotheses concern mechanisms, not only variable membership;
-7. transferred planning over multi-step state transitions and subgoals using
-   newly inferred causal correspondences;
-8. active falsification of previously learned reusable representation primitives
-   when they fail in a new domain;
-9. cross-domain experiment reuse so successful intervention strategies become
-   transferable scientific skills;
-10. whether greater experimental autonomy preserves hard safety ceilings,
+1. contingent multi-step experiment policies that choose the second experiment
+   based on the first noisy observation rather than committing to an open-loop
+   sequence;
+2. online learning of mechanism parameters and observation variance instead of
+   selecting only among fixed mechanism models;
+3. bounded proposal of new mechanism structures when every current model has low
+   posterior predictive likelihood;
+4. nonlinear and interaction effects between causal variables;
+5. hidden-state inference and delayed causal effects;
+6. posterior predictive calibration under repeated noisy observations;
+7. receding-horizon action planning that replans after each observed state
+   transition;
+8. joint value-of-information and goal-progress planning, where Mabojolu chooses
+   when to experiment versus when to act;
+9. transfer of learned mechanism fragments across differently named domains;
+10. whether increased world-model autonomy preserves hard risk ceilings,
     abstention, rollback, auditability, and zero unsafe irreversible execution.
 
-The next central milestone is uncertainty-aware causal world-model transfer:
-Mabojolu should maintain probabilistic competing mechanism models under noisy
-observations, design safe multi-step experiments to discriminate them, and use
-the learned causal structure for multi-step planning in an unfamiliar domain.
+The next central milestone is adaptive mechanism discovery and contingent
+scientific planning: Mabojolu should learn causal parameters online, detect when
+its current mechanism family is inadequate, propose bounded challengers, choose
+experiments conditionally on observed outcomes, and replan actions as its world
+model changes.
 
 ## Safety and audit principle
 
