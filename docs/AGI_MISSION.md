@@ -180,7 +180,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - hierarchical causal-program synthesis that composes separately validated
   mechanism fragments under protected holdout evaluation, plus depth-limited
   mixed experiment/action policy trees whose branches select different
-  multi-action programs after informative causal probes.
+  multi-action programs after informative causal probes;
+- uncertainty-aware hierarchical-program belief with Bayesian evidence updates,
+  leave-one-fragment-out failure attribution, posterior-gated autonomous
+  subgoal formation, and materialization of generated subgoals into the existing
+  dependency-aware goal hierarchy.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -189,118 +193,112 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: hierarchical causal program synthesis and long-horizon dual control
+### Current milestone: uncertainty-aware hierarchical programs and autonomous subgoal formation
 
-Mabojolu G can now compose multiple separately validated causal fragments into a
-deeper causal program when no single reusable fragment explains the target
-environment adequately.
+Mabojolu G can now maintain uncertainty over multiple competing hierarchical
+causal programs instead of immediately collapsing to one deterministic program.
 
-A causal fragment contains one or more previously validated structural terms,
-its source validation error, and its source evidence count. Hierarchical
-composition refuses fragments above a validation-error ceiling before target
-program search begins.
+Each candidate hierarchical program retains its validated causal fragments,
+base effects, complexity, depth, and observation-noise scale. New intervention
+evidence updates a posterior over complete programs using Gaussian predictive
+likelihoods.
 
-The v1.14 program synthesizer searches bounded combinations of eligible
-fragments. Every candidate retains the incumbent base causal effects and adds a
-small hierarchy of validated fragments. Candidate ranking uses target discovery
-prediction error plus an explicit per-term complexity penalty.
+The controlled v1.15 benchmark begins with equal probability over:
 
-The controlled hierarchy benchmark begins with two independently validated
-interaction fragments:
+- a full hierarchical program containing validated xy and yz interaction
+  fragments;
+- a partial program containing only the xy fragment.
 
-- interaction(x,y), coefficient 0.40;
-- interaction(y,z), coefficient 0.30.
+Before any discriminating evidence arrives, the posterior is 50/50 and normalized
+entropy is maximal. Under that unresolved uncertainty, Mabojolu refuses to form a
+high-confidence subgoal chain whose terminal success probability would depend on
+assuming the full program is correct.
 
-The target environment requires both interactions. Either fragment alone leaves
-systematic residual error. Their two-fragment composition exactly explains the
-discovery evidence.
+A noisy yz intervention then provides evidence favoring the full program.
+Mabojolu concentrates strongly on the better program while retaining nonzero
+posterior mass on the alternative rather than deleting it.
 
-Discovery fit is not enough for promotion. The candidate programs are evaluated
-again on a disjoint protected reserve containing x-only, y-only, z-only,
-partial-joint, and full-joint interventions. The composed program reaches zero
-protected prediction error and beats the best single-fragment baseline after the
-protected complexity penalty.
+v1.15 also adds fragment-level failure attribution. When a hierarchical program
+later makes a bad prediction, Mabojolu evaluates the same observation with each
+fragment removed in turn. A fragment is blamed only when removing it materially
+reduces squared prediction error.
 
-The resulting program has depth three:
+The controlled failure benchmark deliberately corrupts the yz fragment while
+leaving the xy fragment unchanged. Leave-one-fragment-out evaluation identifies
+only the faulty yz fragment as explanatory for the failure.
 
-base causal program
--> validated xy interaction fragment
--> validated yz interaction fragment
+The subgoal layer uses the complete current program posterior, not only the
+highest-probability program. Mabojolu searches bounded safe action sequences and
+accepts a sequence only when the posterior-weighted probability of reaching the
+terminal goal exceeds the configured confidence threshold.
 
-This is hierarchical reuse of already validated causal structure rather than a
-fresh unbounded search over arbitrary code.
+Once the program posterior is sufficiently concentrated, Mabojolu autonomously
+creates intermediate numeric goals from the expected state reached after each
+selected action.
 
-v1.14 also extends dual control from one-step experiment-versus-action choice to
-a bounded long-horizon mixed policy tree.
+In the controlled benchmark the resulting sequence is:
 
-The controlled planning benchmark starts with equal belief over two mechanisms,
-slow and fast. Each mechanism requires a different two-action program to reach
-the same goal within the available horizon:
+01-prepare-xy
+-> intermediate state target about 0.70
+-> 02-bridge-yz
+-> terminal state target 1.00
 
-slow:
-slow-a -> slow-b
+These subgoals are not stored as a separate planning annotation. They are
+materialized into the existing HierarchicalGoalReasoner as dependency-linked
+child goals beneath the terminal objective.
 
-fast:
-fast-a -> fast-b
+The first generated subgoal becomes actionable first. After an observed state of
+0.75, Mabojolu marks the first subgoal complete and the second generated subgoal
+becomes the next actionable goal.
 
-Without information gathering, the unresolved belief makes every action produce
-only moderate expected progress. Even three action slots cannot reach the goal.
+This milestone therefore connects causal-program uncertainty, diagnosis, action
+planning, and the existing hierarchical goal system:
 
-A cheap reversible probe separates the two mechanisms. With horizon three,
-Mabojolu therefore chooses:
+competing causal programs
+-> posterior update
+-> confidence-gated plan
+-> autonomous intermediate goals
+-> dependency-aware execution
+-> observed progress
+-> goal-hierarchy update
 
-probe-z
--> if slow: slow-a -> slow-b
--> if fast: fast-a -> fast-b
+The benchmark also contains a cheaper nuisance action and an unsafe zero-cost
+shortcut. Neither enters the autonomous subgoal sequence because one provides no
+causal progress and the other violates the hard reversibility/risk boundary.
 
-The mixed policy reaches the goal with expected success probability 1.0, expected
-cost 0.13, and maximum risk 0.10.
-
-The action-only control receives the same depth budget but no experiments. Its
-goal-success probability remains zero. This isolates the value of information
-inside a longer-horizon plan rather than rewarding extra action steps alone.
-
-Unsafe zero-cost experiments and unsafe zero-cost actions are present in the
-candidate catalogs but are excluded by the same hard risk and reversibility
-constraints used by earlier milestones.
-
-This remains bounded hierarchical program synthesis and bounded lookahead. The
-fragment library, fragment validation threshold, maximum fragment count,
-composition grammar, planning horizon, representative observation branches,
-action and experiment catalogs, scalar goal state, additive mechanism effects,
-cost weights, and risk ceilings remain human-specified.
+This remains bounded autonomous subgoal formation rather than unrestricted goal
+creation. The terminal objective, candidate action catalog, maximum action
+count, success-probability threshold, scalar state representation, program
+catalog, likelihood model, fragment-removal diagnostic, and safety ceilings
+remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. hierarchical programs with three or more reusable fragments and explicit
-   depth/description-length regularization;
-2. nonlinear reusable fragments such as thresholds, saturation, and piecewise
-   causal responses;
-3. hidden-state fragments that persist across time rather than static
-   observation-only terms;
-4. Bayesian uncertainty over alternative hierarchical causal programs instead
-   of selecting one deterministic champion;
-5. automatic rollback and fragment blame assignment when a composed program
-   regresses on later protected evidence;
-6. long-horizon policy trees with noisy observation integration instead of one
-   representative branch per mechanism;
-7. mixed plans where actions themselves generate information and update the
-   causal posterior;
-8. explicit subgoal generation so long plans can create and revise intermediate
-   goals rather than optimizing one scalar terminal threshold;
-9. transfer of hierarchical causal programs and long-horizon policies across
-   differently named domains;
-10. whether deeper composition and planning preserve hard risk ceilings,
-    abstention, protected validation, rollback, auditability, and zero unsafe
+1. posterior uncertainty over newly synthesized hierarchical programs rather than
+   only a supplied competing-program catalog;
+2. Bayesian fragment reliability that accumulates failure attribution across
+   episodes instead of diagnosing one observation at a time;
+3. automatic fragment repair or rollback after repeated blame evidence;
+4. dynamic subgoal revision when observed progress differs substantially from
+   predicted progress;
+5. subgoal generation over multidimensional states rather than one scalar target;
+6. prerequisite discovery where Mabojolu infers which intermediate conditions
+   must hold before an action becomes effective;
+7. mixed information-seeking and goal subgoals inside one dependency hierarchy;
+8. transfer of learned subgoal schemas to differently named domains;
+9. longer episodic evaluation where stale subgoals are retired and replaced as
+   the causal posterior changes;
+10. whether autonomous goal formation preserves parent-goal intent, inherited
+    constraints, hard risk ceilings, abstention, auditability, and zero unsafe
     irreversible execution.
 
-The next central milestone is uncertainty-aware hierarchical programs and
-autonomous subgoal formation: Mabojolu should maintain competing causal-program
-hypotheses, identify which fragment caused a prediction failure, generate
-intermediate goals during long-horizon planning, and revise both its program and
-plan as evidence accumulates.
+The next central milestone is self-revising hierarchical goals and causal
+programs: Mabojolu should accumulate reliability evidence for individual causal
+fragments, repair or roll back failing program components, revise intermediate
+goals when reality diverges from prediction, and preserve the terminal objective
+and safety constraints throughout the revision cycle.
 
 ## Safety and audit principle
 
