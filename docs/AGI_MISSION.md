@@ -140,7 +140,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   quarantine after unsafe irreversible outcomes;
 - controlled counterfactual benchmarking of meta-adaptive policy selection
   against a fixed balanced baseline and a per-episode bounded-policy oracle,
-  including cumulative regret and held-out regime-sequence evaluation.
+  including cumulative regret and held-out regime-sequence evaluation;
+- uncertainty-aware environment-family induction from observable drift signals
+  without supplying the true family label at policy-selection time, including
+  calibrated abstention and fail-closed uncertainty fallbacks.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -149,80 +152,91 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: controlled meta-adaptation benchmark and regret learning
+### Current milestone: observation-only environment-family induction
 
-Mabojolu G now has a controlled benchmark for testing whether its bounded
-meta-adaptation layer improves with experience instead of merely accumulating
-episode statistics.
+Mabojolu G now removes the true environment-family label from the policy
+selection path.
 
-The benchmark compares three systems on the same ordered regime episodes:
+The previous meta-adaptation controller could learn different policy preferences
+for stationary noise, gradual drift, abrupt drift, and recurring regimes, but the
+correct family name was supplied directly to the controller. The current
+environment-family inducer instead receives only bounded observable signals:
 
-1. a static baseline that always uses the balanced adaptation policy;
-2. Mabojolu's sequential meta-adaptive selector, which chooses only from evidence
-   available before the current episode;
-3. a hindsight oracle that evaluates every bounded policy only after the episode
-   choice has been fixed.
+- recent error rate;
+- error burstiness;
+- posterior drift confidence;
+- normalized change-point strength;
+- similarity to a previously seen regime;
+- trend persistence.
 
-The oracle is never exposed to the selector. Its only purpose is measurement.
-For each episode, regret is defined as:
+Those signals are compared against explicit bounded family prototypes. The
+inducer produces a normalized belief distribution over the known family
+taxonomy, together with top-family confidence, separation from the runner-up,
+and normalized entropy.
 
-oracle utility - Mabojolu selected-policy utility
+The true benchmark family remains available only to the evaluator. It is not
+passed into the autonomous policy-selection call.
 
-with a floor of zero for numerical stability.
+High-confidence observations are routed into the existing family-specific
+meta-adaptation controller. The inferred family also becomes the evidence
+partition used for subsequent learning, so the autonomous path does not require
+the evaluator to repair its learning history with hidden labels.
 
-The controlled benchmark includes calibration episodes followed by a held-out
-mixed sequence spanning stationary noise, gradual drift, abrupt drift, and
-recurring regimes. Every episode contains counterfactual outcomes for all
-bounded policies so the static baseline and oracle can be evaluated on exactly
-the same episode without changing Mabojolu's observed learning history.
+Uncertain observations trigger abstention rather than forced classification.
+The default uncertainty path uses the balanced policy, then the conservative
+policy if balanced has been quarantined. If those bounded uncertainty fallbacks
+are exhausted, the controller fails closed instead of silently switching to a
+more aggressive policy.
 
-The report measures:
+The controlled benchmark now compares:
 
-- cumulative and mean utility;
-- false alarms;
-- missed changes;
-- false promotions;
-- recovery successes;
-- validation evidence cost;
-- detected-change count and mean detection delay;
-- per-episode regret;
-- cumulative regret;
-- calibration versus held-out regret.
+1. a fixed balanced policy;
+2. the v1.3 meta-adaptive controller with the true family label supplied;
+3. the observation-only v1.4 controller;
+4. the bounded-policy hindsight oracle used only for evaluation.
 
-The current synthetic benchmark is deliberately constructed so different
-environment families reward different bounded policies. Early calibration
-therefore incurs exploration regret. The research target is that, after enough
-family-specific evidence, Mabojolu selects the appropriate policy on the held-out
-mixed sequence, reduces regret, suppresses avoidable false alarms, and detects
-abrupt changes faster than the fixed balanced baseline.
+Calibration episodes use canonical observable profiles. Held-out episodes use
+shifted profiles rather than exact prototype copies. One held-out
+gradual-versus-abrupt case is deliberately ambiguous and is expected to abstain.
 
-This benchmark remains a controlled synthetic evaluation. It does not yet prove
-that Mabojolu can infer environment families from raw experience or that the same
-advantage will survive richer real-world dynamics. Its value is that it creates
-an auditable falsifiable measurement protocol before removing those scaffolds.
+The benchmark measures held-out utility, regret, false alarms, missed changes,
+false promotions, detection delay, inference confidence, entropy, coverage,
+abstention count, and resolved-family accuracy.
+
+This is a meaningful reduction in hand-supplied scaffolding, but it is not yet
+fully autonomous latent regime discovery. The family names, feature set,
+prototype locations, confidence threshold, and uncertainty fallback hierarchy
+remain bounded research scaffolds. Those limits are explicit so the next
+milestone can test whether Mabojolu can remove them rather than hiding them.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. regret curves across longer held-out regime sequences and different episode
-   orderings;
-2. robustness when policy utilities are noisy rather than deterministic;
-3. whether the same learned policy preferences survive shifted counterfactual
-   outcome distributions;
-4. online environment-family induction from observed drift statistics rather
-   than supplied family labels;
-5. calibration quality for uncertainty over the inferred environment family;
-6. whether family induction plus meta-adaptation beats both the fixed balanced
-   baseline and the label-supplied meta-adaptive control;
-7. safe abstention when family confidence is too low to justify a policy change;
-8. transfer quality when an unseen family is structurally similar but not
-   identical to prior families;
-9. end-to-end integration where benchmark episode outcomes are generated by the
-   actual adaptive champion/challenger runtime rather than a synthetic outcome
-   table;
-10. whether these gains persist without increasing unsafe, irreversible, or
-    false-promotion rates.
+1. family-inference accuracy and abstention calibration under progressively
+   noisier signal distributions;
+2. robustness when the observable feature distributions shift away from the
+   predefined prototypes;
+3. whether confidence remains calibrated when two or more regime families
+   overlap substantially;
+4. whether prototype locations can be learned from experience instead of fixed
+   in advance;
+5. whether the system can discover useful latent regime clusters without
+   receiving family names at any stage;
+6. whether latent clusters can acquire distinct adaptation-policy preferences
+   through outcome evidence alone;
+7. split and merge behavior when one discovered cluster contains multiple
+   incompatible adaptation dynamics;
+8. recurrence recognition when a previously discovered latent regime returns
+   after several unrelated episodes;
+9. comparison of latent-regime meta-adaptation against both fixed balanced and
+   label-supplied controls on held-out sequences;
+10. whether scaffold removal preserves zero unsafe irreversible outcomes and
+    controlled false-promotion rates.
+
+The next central milestone is latent regime discovery: Mabojolu should learn its
+own useful environment categories from experience instead of selecting among
+human-named families.
 
 ## Safety and audit principle
 
