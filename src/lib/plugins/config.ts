@@ -112,7 +112,17 @@ export function pluginOAuthConfig(
                 process.env
                   .GITHUB_OAUTH_CLIENT_SECRET,
             }
-          : null;
+          : providerId ===
+              "supabase"
+            ? {
+                clientId:
+                  process.env
+                    .SUPABASE_OAUTH_CLIENT_ID,
+                clientSecret:
+                  process.env
+                    .SUPABASE_OAUTH_CLIENT_SECRET,
+              }
+            : null;
 
   if (
     !credentials
