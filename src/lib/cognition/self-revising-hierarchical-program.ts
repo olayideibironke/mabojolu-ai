@@ -766,18 +766,34 @@ export function reviseHierarchicalProgramFromReliability(
     (
       left,
       right,
-    ) =>
-      left.error -
-        right.error ||
-      (
-        left.kind ===
+    ) => {
+      const errorDifference =
+        left.error -
+        right.error;
+
+      if (
+        Math.abs(
+          errorDifference,
+        ) >
+          Number.EPSILON
+      ) {
+        return errorDifference;
+      }
+
+      if (
+        left.kind !==
+          right.kind
+      ) {
+        return left.kind ===
           "repair"
           ? -1
-          : 1
-      ) ||
-      left.program.id.localeCompare(
+          : 1;
+      }
+
+      return left.program.id.localeCompare(
         right.program.id,
-      ),
+      );
+    },
   );
 
   const best =
