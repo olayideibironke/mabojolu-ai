@@ -1,5 +1,4 @@
 import {
-  DEFAULT_META_ADAPTATION_POLICIES,
   MetaAdaptationController,
   type MetaAdaptationEnvironmentFamily,
   type MetaAdaptationEpisode,
