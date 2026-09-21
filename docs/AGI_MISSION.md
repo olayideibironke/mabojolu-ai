@@ -143,7 +143,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   including cumulative regret and held-out regime-sequence evaluation;
 - uncertainty-aware environment-family induction from observable drift signals
   without supplying the true family label at policy-selection time, including
-  calibrated abstention and fail-closed uncertainty fallbacks.
+  calibrated abstention and fail-closed uncertainty fallbacks;
+- bounded online latent-regime discovery that creates unnamed environment
+  clusters from experience, learns policy evidence separately inside each
+  cluster, recognizes recurring regimes, and abstains on ambiguous membership.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -152,91 +155,94 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: observation-only environment-family induction
+### Current milestone: bounded latent regime discovery
 
-Mabojolu G now removes the true environment-family label from the policy
-selection path.
+Mabojolu G now removes the human-supplied environment-family taxonomy from its
+active adaptation path.
 
-The previous meta-adaptation controller could learn different policy preferences
-for stationary noise, gradual drift, abrupt drift, and recurring regimes, but the
-correct family name was supplied directly to the controller. The current
-environment-family inducer instead receives only bounded observable signals:
+The v1.4 controller inferred among predefined names such as stationary-noisy,
+gradual-drift, abrupt-drift, and recurring-regime. The v1.5 latent-regime
+controller receives the same bounded observable signal vector but no family
+name and no fixed family prototype table.
 
-- recent error rate;
-- error burstiness;
-- posterior drift confidence;
-- normalized change-point strength;
-- similarity to a previously seen regime;
-- trend persistence.
+It maintains an online memory of unnamed regimes:
 
-Those signals are compared against explicit bounded family prototypes. The
-inducer produces a normalized belief distribution over the known family
-taxonomy, together with top-family confidence, separation from the runner-up,
-and normalized entropy.
+regime-001
+regime-002
+regime-003
+...
 
-The true benchmark family remains available only to the evaluator. It is not
-passed into the autonomous policy-selection call.
+A new observation is compared against learned regime centroids. If it is close
+to one learned regime and clearly separated from alternatives, Mabojolu reuses
+that regime and updates its centroid online. If it is sufficiently novel,
+Mabojolu creates a new bounded regime. If it lies ambiguously between learned
+regimes, Mabojolu abstains from assigning it rather than contaminating either
+cluster.
 
-High-confidence observations are routed into the existing family-specific
-meta-adaptation controller. The inferred family also becomes the evidence
-partition used for subsequent learning, so the autonomous path does not require
-the evaluator to repair its learning history with hidden labels.
+Each latent regime maintains its own adaptation-policy evidence. Safe policies
+are explored locally, then selected using posterior success evidence, bounded
+episode utility, and a bounded exploration bonus. A regime that returns after
+intervening regimes reuses its accumulated policy evidence instead of relearning
+from scratch.
 
-Uncertain observations trigger abstention rather than forced classification.
-The default uncertainty path uses the balanced policy, then the conservative
-policy if balanced has been quarantined. If those bounded uncertainty fallbacks
-are exhausted, the controller fails closed instead of silently switching to a
-more aggressive policy.
+Regime creation is capacity-bounded. Novel observations arriving after the
+regime budget is exhausted use a bounded uncertainty fallback rather than
+silently overwriting an existing regime. Unsafe irreversible outcomes still
+quarantine the responsible policy globally. If safe uncertainty fallbacks are
+exhausted, the controller fails closed.
 
-The controlled benchmark now compares:
+The controlled v1.5 benchmark compares:
 
 1. a fixed balanced policy;
-2. the v1.3 meta-adaptive controller with the true family label supplied;
-3. the observation-only v1.4 controller;
+2. the label-supplied v1.3 meta-adaptive controller;
+3. the unnamed latent-regime controller;
 4. the bounded-policy hindsight oracle used only for evaluation.
 
-Calibration episodes use canonical observable profiles. Held-out episodes use
-shifted profiles rather than exact prototype copies. One held-out
-gradual-versus-abrupt case is deliberately ambiguous and is expected to abstain.
+The evaluator retains family labels solely for measurement of cluster purity and
+comparison against prior controls. Those labels are not passed into latent
+regime selection or latent policy learning.
 
-The benchmark measures held-out utility, regret, false alarms, missed changes,
-false promotions, detection delay, inference confidence, entropy, coverage,
-abstention count, and resolved-family accuracy.
+The target benchmark behavior is:
 
-This is a meaningful reduction in hand-supplied scaffolding, but it is not yet
-fully autonomous latent regime discovery. The family names, feature set,
-prototype locations, confidence threshold, and uncertainty fallback hierarchy
-remain bounded research scaffolds. Those limits are explicit so the next
-milestone can test whether Mabojolu can remove them rather than hiding them.
+- four distinct unnamed regimes discovered during calibration;
+- no new regime creation on the shifted held-out sequence;
+- recurrence recognition when learned regimes return;
+- held-out policy choices matching the label-supplied control;
+- a deliberate ambiguous case triggering abstention rather than forced
+  membership;
+- no increase in false promotions, missed changes, or unsafe irreversible
+  actions.
+
+This is stronger scaffold removal, but it is still bounded research rather than
+open-ended category invention. The observable feature set, feature weights,
+distance function, novelty threshold, ambiguity margin, maximum regime count,
+and policy catalog remain human-specified. Those remaining assumptions define
+the next experiments.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. family-inference accuracy and abstention calibration under progressively
-   noisier signal distributions;
-2. robustness when the observable feature distributions shift away from the
-   predefined prototypes;
-3. whether confidence remains calibrated when two or more regime families
-   overlap substantially;
-4. whether prototype locations can be learned from experience instead of fixed
-   in advance;
-5. whether the system can discover useful latent regime clusters without
-   receiving family names at any stage;
-6. whether latent clusters can acquire distinct adaptation-policy preferences
-   through outcome evidence alone;
-7. split and merge behavior when one discovered cluster contains multiple
-   incompatible adaptation dynamics;
-8. recurrence recognition when a previously discovered latent regime returns
-   after several unrelated episodes;
-9. comparison of latent-regime meta-adaptation against both fixed balanced and
-   label-supplied controls on held-out sequences;
-10. whether scaffold removal preserves zero unsafe irreversible outcomes and
-    controlled false-promotion rates.
+1. latent-regime stability under noisy and continuously drifting observations;
+2. learned rather than fixed regime-creation thresholds;
+3. autonomous split decisions when one latent regime develops incompatible
+   policy-outcome modes;
+4. autonomous merge decisions when two separately discovered regimes become
+   behaviorally equivalent;
+5. learned feature relevance so nuisance signal dimensions can be ignored;
+6. representation learning that can propose new regime features instead of using
+   only the supplied drift statistics;
+7. nonparametric regime growth with explicit complexity penalties and bounded
+   memory;
+8. long-horizon recurrence after many intervening regimes and centroid shifts;
+9. whether learned split/merge behavior lowers held-out policy regret versus the
+   fixed-cluster v1.5 controller;
+10. whether additional scaffold removal preserves auditability, rollback,
+    bounded irreversible action, and zero unsafe-policy reuse.
 
-The next central milestone is latent regime discovery: Mabojolu should learn its
-own useful environment categories from experience instead of selecting among
-human-named families.
+The next central milestone is adaptive latent-regime structure: Mabojolu should
+learn when its own discovered categories are too broad, redundant, or based on
+irrelevant features, then revise that internal taxonomy from outcome evidence.
 
 ## Safety and audit principle
 
