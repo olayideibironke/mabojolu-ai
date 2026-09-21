@@ -240,6 +240,67 @@ describe(
     );
 
     it(
+      "replaces an unsafe current champion even when its regret score is lower",
+      () => {
+        const selector =
+          new SelfCalibratingRepresentationSelector();
+
+        selector.recordEvaluation({
+          profileId:
+            "raw-default",
+
+          episodes:
+            8,
+
+          cumulativeRegret:
+            0,
+
+          unsafeIrreversibleActions:
+            1,
+
+          falsePromotions:
+            0,
+        });
+
+        selector.recordEvaluation({
+          profileId:
+            "drift-compressed",
+
+          episodes:
+            8,
+
+          cumulativeRegret:
+            1,
+
+          unsafeIrreversibleActions:
+            0,
+
+          falsePromotions:
+            0,
+        });
+
+        const decision =
+          selector.chooseChampion();
+
+        expect(
+          decision,
+        ).toMatchObject({
+          championProfileId:
+            "drift-compressed",
+
+          previousChampionProfileId:
+            "raw-default",
+
+          promoted:
+            true,
+
+          reason:
+            "unsafe-champion-replaced",
+        });
+      },
+    );
+
+    it(
       "rolls back a promoted representation when protected follow-up evaluation regresses",
       () => {
         const selector =
