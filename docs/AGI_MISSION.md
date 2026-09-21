@@ -157,7 +157,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - outcome-grounded synthesis of new bounded representation primitives from
   abstract structural roles, with explicit complexity penalties, protected
   validation, cross-domain transfer under renamed variables, reusable-primitive
-  promotion, negative-transfer retirement, and unsafe-primitive quarantine.
+  promotion, negative-transfer retirement, and unsafe-primitive quarantine;
+- autonomous structural role induction that searches target variable sets from
+  protected outcome evidence, groups mathematically equivalent role
+  permutations, abstains on ambiguous correspondences, and composes
+  independently synthesized primitives when no single primitive is sufficient.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -166,94 +170,96 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: bounded representation synthesis and transfer
+### Current milestone: autonomous structural role induction and representation composition
 
-Mabojolu G can now synthesize a new bounded representation primitive from
-outcome evidence instead of selecting only from a predefined encoder catalog.
+Mabojolu G can now infer how an unfamiliar domain's observed variables map onto
+the abstract roles required by a transferred representation primitive.
 
-The v1.8 synthesizer receives examples containing normalized observations and
-the measured utilities of bounded adaptation policies. It is not given a class
-label describing the environment. It searches a deliberately small auditable
-program language over abstract structural roles.
+The v1.8 transfer benchmark still supplied a target role binding explicitly. In
+v1.9 the transferred primitive is frozen, the target variable names are exposed,
+and Mabojolu searches bounded variable-set hypotheses using protected target
+outcome evidence.
 
-The current primitive grammar contains:
+For the current representation grammar, mean and absolute-gap primitives are
+symmetric under permutation of their argument roles. The role-induction search
+therefore groups mathematically equivalent permutations into one variable-set
+hypothesis instead of falsely treating role-order symmetry as uncertainty.
 
-- one-role atomic projections;
-- bounded means over two or three roles;
-- two-role absolute gaps.
+Each candidate target mapping is evaluated by the regret of the frozen
+transferred rule. The winning mapping is accepted only when:
 
-Each candidate is paired with a learned threshold and the best low-side and
-high-side policies found from outcome utility. Candidate selection minimizes
-training regret plus an explicit complexity penalty, so a higher-arity primitive
-must earn its additional structure.
+- its protected regret is below the configured acceptance bound; and
+- it has a sufficient regret margin over the next genuinely different variable
+  set.
 
-The controlled synthesis task is designed so no single raw signal and no
-two-signal mean is sufficient. A three-role mean is the simplest candidate that
-separates the two policy-demand regions without regret. This prevents the
-benchmark from rewarding a renamed copy of an already sufficient feature.
+If multiple target variable sets explain the protected outcomes equally well,
+Mabojolu abstains and returns no binding. Missing variables, inconsistent target
+schemas, and malformed values fail closed.
 
-The synthesized primitive is frozen before protected source validation. A
-separate atomic-only search provides the simpler baseline. The synthesized
-primitive must improve protected regret despite paying a larger complexity
-penalty.
+The v1.9 transfer benchmark removes the supplied target mapping used in v1.8.
+Mabojolu receives the previously synthesized three-role mean, target examples
+with unfamiliar variable names, and target policy-outcome evidence. It correctly
+selects the three-variable structural set while excluding a nuisance variable,
+then reaches the same protected transfer result as the earlier supplied-binding
+control.
 
-Transfer is structural rather than name-based. The learned primitive stores
-abstract roles such as signal-a, signal-b, and signal-c instead of source
-variable names. A second task family binds those roles to differently named
-variables and uses different utility magnitudes. The source-trained primitive,
-threshold, and policy association are then evaluated without refitting on the
-target examples.
+This is calibrated target adaptation rather than zero-shot correspondence:
+protected target outcome evidence is used to infer the mapping. The target
+binding itself is not supplied.
 
-The reusable-primitive library requires positive transfer evidence from multiple
-domains before a candidate becomes reusable. Repeated negative transfer retires
-a primitive. Unsafe irreversible behavior or false promotion quarantines it.
-Transfer-improvement claims are recomputed from baseline and primitive regret,
-and terminally retired or quarantined primitives cannot be revived by later
-evidence.
+v1.9 also adds bounded representation composition. Two independently
+synthesized primitives can be combined through a small auditable gate grammar:
 
-The current v1.8 benchmark therefore compares:
+- AND;
+- OR;
+- XOR.
 
-1. the synthesized bounded representation rule;
-2. the best atomic-only rule learned from the same source training evidence;
-3. protected source validation;
-4. a renamed unfamiliar target family with shifted utility magnitudes.
+The controlled composition task is constructed so neither primitive alone can
+select the correct adaptation policy across all contexts. The composition search
+must discover that responsive behavior is appropriate only when both primitive
+conditions are high. The resulting AND composition reaches the bounded-policy
+oracle across all protected composition cases, while either primitive used
+alone incurs regret.
 
-The target result measures whether a primitive learned from one task family can
-retain its usefulness under symbol renaming and changed reward scale.
+The composition layer does not invent arbitrary code. Primitive programs,
+thresholds, bindings, gate operators, policy choices, complexity penalties, and
+evaluation evidence remain inspectable.
 
-This remains bounded representation synthesis rather than open-ended concept
-invention. The operator grammar, maximum arity, abstract role vocabulary,
-source-to-role and target-to-role bindings, policy catalog, normalization range,
-complexity penalty, and protected evaluation protocol remain human-specified.
+This milestone therefore removes the explicit target role-binding scaffold and
+adds bounded compositional reuse, but it still relies on target outcome evidence,
+a human-specified role vocabulary, a small mapping search space, and a fixed
+composition grammar.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. autonomous induction of structural role correspondences instead of supplying
-   source and target role bindings;
-2. confidence over competing role mappings with abstention when correspondence
-   evidence is weak;
-3. composition of previously useful primitives into deeper bounded
-   representation programs;
-4. search over temporal operators that summarize change, persistence, lag, and
+1. role induction from interaction and causal intervention rather than direct
+   counterfactual policy-utility tables;
+2. zero-shot structural correspondence from relational and causal signatures
+   before any target reward feedback;
+3. active experiment selection that chooses the safest observation or
+   intervention for resolving mapping ambiguity;
+4. posterior uncertainty over structural correspondences instead of a single
+   regret-margin confidence rule;
+5. deeper composition of more than two reusable primitives under explicit
+   complexity and validation budgets;
+6. temporal representation programs that learn lag, trend, persistence, and
    recurrence from raw episode sequences;
-5. complexity regularization for multi-stage representation programs;
-6. protected validation across three or more task families before broad
-   promotion of a reusable abstraction;
-7. automatic specialization when one reusable primitive transfers well to only
-   a subset of domains;
-8. causal tests distinguishing genuinely structural transfer from accidental
-   statistical correlation;
-9. integration of reusable representation primitives into planning, world-model
-   learning, and autonomous experiment selection rather than adaptation alone;
-10. whether additional representation autonomy preserves rollback, auditability,
-    bounded external action, and zero unsafe irreversible behavior.
+7. transfer of composed representations into planning and world-model inference
+   rather than adaptation-policy selection alone;
+8. autonomous creation of new abstract roles when existing role vocabularies
+   cannot explain protected outcomes;
+9. multi-domain consolidation so repeated structural mappings become reusable
+   correspondence priors without leaking task-specific variable names;
+10. whether further scaffold removal preserves abstention, rollback,
+    auditability, bounded external action, and zero unsafe irreversible behavior.
 
-The next central milestone is autonomous structural role induction and
-representation composition: Mabojolu should infer how unfamiliar variables map
-onto learned structural roles, compose reusable primitives when one primitive is
-insufficient, and abstain when the mapping is not justified by evidence.
+The next central milestone is active causal correspondence learning: Mabojolu
+should resolve unfamiliar structural mappings by choosing informative safe
+experiments, update uncertainty over competing causal correspondences, and
+transfer learned representations into planning and world-model reasoning rather
+than relying primarily on supplied counterfactual utility tables.
 
 ## Safety and audit principle
 
