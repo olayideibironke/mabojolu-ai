@@ -203,6 +203,12 @@ describe(
 
             policyId:
               "responsive",
+
+            detectionDelay:
+              0,
+
+            validationEvidenceCost:
+              0,
           }),
         );
 
