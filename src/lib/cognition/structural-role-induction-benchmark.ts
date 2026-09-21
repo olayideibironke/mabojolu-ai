@@ -106,7 +106,7 @@ const SECOND_SOURCE_TRAINING:
         phaseRight:
           0.3,
         clockNoise:
-          0.1,
+          0.9,
       },
       LOW_UTILITIES,
     ),
@@ -117,7 +117,7 @@ const SECOND_SOURCE_TRAINING:
         phaseRight:
           0.7,
         clockNoise:
-          0.9,
+          0.1,
       },
       LOW_UTILITIES,
     ),
@@ -128,7 +128,7 @@ const SECOND_SOURCE_TRAINING:
         phaseRight:
           0.55,
         clockNoise:
-          0.2,
+          0.8,
       },
       LOW_UTILITIES,
     ),
@@ -139,7 +139,7 @@ const SECOND_SOURCE_TRAINING:
         phaseRight:
           0.8,
         clockNoise:
-          0.9,
+          0.8,
       },
       HIGH_UTILITIES,
     ),
@@ -150,7 +150,7 @@ const SECOND_SOURCE_TRAINING:
         phaseRight:
           0.2,
         clockNoise:
-          0.1,
+          0.2,
       },
       HIGH_UTILITIES,
     ),
@@ -161,7 +161,7 @@ const SECOND_SOURCE_TRAINING:
         phaseRight:
           0.85,
         clockNoise:
-          0.8,
+          0.1,
       },
       HIGH_UTILITIES,
     ),
