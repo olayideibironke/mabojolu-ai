@@ -802,6 +802,25 @@ export function PluginCatalog({
 
   return (
     <section className="pb-16">
+      <div className="mb-4">
+        <Link
+          href={
+            returnTo
+          }
+          className="inline-flex items-center gap-1 text-sm font-medium text-text-secondary hover:text-text-primary"
+        >
+          <span
+            aria-hidden="true"
+          >
+            &larr;
+          </span>
+
+          <span>
+            Back to chat
+          </span>
+        </Link>
+      </div>
+
       <div className="flex flex-col gap-6 border-b border-border-subtle pb-6">
         <div className="mx-auto flex rounded-full bg-surface-sunken p-1">
           <span className="rounded-full bg-surface-raised px-6 py-2 text-sm font-semibold text-text-primary shadow-sm">
