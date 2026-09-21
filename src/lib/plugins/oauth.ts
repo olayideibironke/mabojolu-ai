@@ -102,6 +102,9 @@ export function buildPluginAuthorizationUrl(input: {
 
   state:
     string;
+
+  codeChallenge?:
+    string;
 }):
   string {
   const provider =
@@ -228,6 +231,47 @@ export function buildPluginAuthorizationUrl(input: {
       "allow_signup",
       "true",
     );
+
+    return url.toString();
+  }
+
+  if (
+    input.providerId ===
+      "supabase"
+  ) {
+    url.searchParams.set(
+      "client_id",
+      input.config.clientId,
+    );
+
+    url.searchParams.set(
+      "redirect_uri",
+      input.config.redirectUri,
+    );
+
+    url.searchParams.set(
+      "response_type",
+      "code",
+    );
+
+    url.searchParams.set(
+      "state",
+      input.state,
+    );
+
+    if (
+      input.codeChallenge
+    ) {
+      url.searchParams.set(
+        "code_challenge",
+        input.codeChallenge,
+      );
+
+      url.searchParams.set(
+        "code_challenge_method",
+        "S256",
+      );
+    }
 
     return url.toString();
   }
@@ -590,6 +634,155 @@ async function exchangeGitHub(
   };
 }
 
+async function exchangeSupabase(
+  code:
+    string,
+
+  config:
+    PluginOAuthConfig,
+
+  codeVerifier?:
+    string,
+):
+  Promise<PluginTokenResult> {
+  const basic =
+    Buffer.from(
+      `${config.clientId}:${config.clientSecret}`,
+      "utf8",
+    ).toString(
+      "base64",
+    );
+
+  const body =
+    new URLSearchParams({
+      grant_type:
+        "authorization_code",
+      code,
+      redirect_uri:
+        config.redirectUri,
+    });
+
+  if (
+    codeVerifier
+  ) {
+    body.set(
+      "code_verifier",
+      codeVerifier,
+    );
+  }
+
+  const tokenResponse =
+    await fetch(
+      "https://api.supabase.com/v1/oauth/token",
+      {
+        method:
+          "POST",
+
+        headers: {
+          Accept:
+            "application/json",
+          Authorization:
+            `Basic ${basic}`,
+          "Content-Type":
+            "application/x-www-form-urlencoded",
+        },
+
+        body,
+
+        cache:
+          "no-store",
+      },
+    );
+
+  const token =
+    await requireJson<{
+      access_token:
+        string;
+      refresh_token?:
+        string;
+      expires_in?:
+        number;
+      scope?:
+        string;
+    }>(
+      tokenResponse,
+      "Supabase token exchange",
+    );
+
+  let accountLabel =
+    "Supabase account";
+
+  try {
+    const projectsResponse =
+      await fetch(
+        "https://api.supabase.com/v1/projects",
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token.access_token}`,
+          },
+
+          cache:
+            "no-store",
+        },
+      );
+
+    if (
+      projectsResponse.ok
+    ) {
+      const projects =
+        await projectsResponse.json() as
+          Array<{
+            name?:
+              string;
+            organization_slug?:
+              string;
+          }>;
+
+      const first =
+        projects[0];
+
+      accountLabel =
+        first?.organization_slug ??
+        first?.name ??
+        accountLabel;
+    }
+  } catch {
+    // A successful token exchange is enough to establish the connection.
+  }
+
+  return {
+    accessToken:
+      token.access_token,
+
+    ...(token.refresh_token
+      ? {
+          refreshToken:
+            token.refresh_token,
+        }
+      : {}),
+
+    ...(expiresAtFromSeconds(
+      token.expires_in,
+    )
+      ? {
+          expiresAt:
+            expiresAtFromSeconds(
+              token.expires_in,
+            ),
+        }
+      : {}),
+
+    accountLabel,
+
+    scopes:
+      parseScope(
+        token.scope,
+        config.scopes,
+      ),
+  };
+}
+
 export async function exchangePluginAuthorizationCode(input: {
   providerId:
     PluginProviderId;
@@ -599,6 +792,9 @@ export async function exchangePluginAuthorizationCode(input: {
 
   config:
     PluginOAuthConfig;
+
+  codeVerifier?:
+    string;
 }):
   Promise<PluginTokenResult> {
   if (
@@ -629,6 +825,17 @@ export async function exchangePluginAuthorizationCode(input: {
     return exchangeGitHub(
       input.code,
       input.config,
+    );
+  }
+
+  if (
+    input.providerId ===
+      "supabase"
+  ) {
+    return exchangeSupabase(
+      input.code,
+      input.config,
+      input.codeVerifier,
     );
   }
 
