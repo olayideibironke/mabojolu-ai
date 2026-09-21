@@ -718,6 +718,162 @@ describe(
     );
 
     it(
+      "requires posterior confidence before treating low recent accuracy as drift",
+      () => {
+        const model =
+          new AdaptiveValidatedPredicateApplicabilityModel();
+
+        bootstrapChampion(
+          model,
+        );
+
+        for (
+          const input of [
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                true,
+            },
+
+            {
+              history:
+                "3+" as const,
+
+              distinct:
+                "2" as const,
+
+              useful:
+                false,
+            },
+
+            {
+              history:
+                "1" as const,
+
+              distinct:
+                "1" as const,
+
+              useful:
+                true,
+            },
+          ]
+        ) {
+          record(
+            model,
+            input.history,
+            input.distinct,
+            input.useful,
+          );
+        }
+
+        const ambiguous =
+          model.getSummary(
+            "principle-a",
+          );
+
+        expect(
+          ambiguous,
+        ).toMatchObject({
+          phase:
+            "champion",
+
+          driftWindowEvidenceCount:
+            3,
+
+          driftWindowAccuracy:
+            1 / 3,
+
+          driftConfidenceThreshold:
+            0.9,
+        });
+
+        expect(
+          ambiguous
+            .driftPosteriorProbability,
+        ).toBeCloseTo(
+          11 / 16,
+        );
+
+        for (
+          let index =
+            0;
+          index <
+            2;
+          index +=
+            1
+        ) {
+          record(
+            model,
+            "2",
+            "2",
+            false,
+          );
+        }
+
+        const stillChampion =
+          model.getSummary(
+            "principle-a",
+          );
+
+        expect(
+          stillChampion.phase,
+        ).toBe(
+          "champion",
+        );
+
+        expect(
+          stillChampion
+            .driftPosteriorProbability,
+        ).toBeCloseTo(
+          57 / 64,
+        );
+
+        record(
+          model,
+          "2",
+          "2",
+          false,
+        );
+
+        const triggered =
+          model.getSummary(
+            "principle-a",
+          );
+
+        expect(
+          triggered,
+        ).toMatchObject({
+          phase:
+            "challenger-fit",
+
+          lastDriftTriggerEvidenceCount:
+            6,
+
+          lastDriftTriggerAccuracy:
+            1 / 6,
+
+          driftConfidenceThreshold:
+            0.9,
+
+          challengerFitEvidenceCount:
+            0,
+        });
+
+        expect(
+          triggered
+            .lastDriftTriggerPosteriorProbability,
+        ).toBeCloseTo(
+          15 / 16,
+        );
+      },
+    );
+
+    it(
       "replaces the champion only after a fresh challenger beats champion and baseline on fresh holdout",
       () => {
         const model =
