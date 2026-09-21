@@ -176,7 +176,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - bounded mechanism-structure synthesis that can add linear, pairwise
   interaction, or latent-bias terms when coefficient adjustment is
   insufficient, with protected structural validation and dual-control selection
-  between information gathering and goal-directed action.
+  between information gathering and goal-directed action;
+- hierarchical causal-program synthesis that composes separately validated
+  mechanism fragments under protected holdout evaluation, plus depth-limited
+  mixed experiment/action policy trees whose branches select different
+  multi-action programs after informative causal probes.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -185,102 +189,118 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: autonomous mechanism-structure synthesis and dual-control planning
+### Current milestone: hierarchical causal program synthesis and long-horizon dual control
 
-Mabojolu G can now propose a bounded change to causal model structure when an
-additive mechanism family cannot explain protected evidence.
+Mabojolu G can now compose multiple separately validated causal fragments into a
+deeper causal program when no single reusable fragment explains the target
+environment adequately.
 
-The v1.12 challenger path adjusted one existing coefficient at a time. v1.13
-adds a small auditable structural grammar:
+A causal fragment contains one or more previously validated structural terms,
+its source validation error, and its source evidence count. Hierarchical
+composition refuses fragments above a validation-error ceiling before target
+program search begins.
 
-- an additional bounded linear term;
-- a pairwise interaction term;
-- a latent-bias term representing residual effect not attached to an observed
-  intervention variable.
+The v1.14 program synthesizer searches bounded combinations of eligible
+fragments. Every candidate retains the incumbent base causal effects and adds a
+small hierarchy of validated fragments. Candidate ranking uses target discovery
+prediction error plus an explicit per-term complexity penalty.
 
-Structural synthesis starts from an incumbent mechanism and discovery residuals.
-For each candidate structural term, Mabojolu fits a bounded coefficient from the
-residual evidence and creates a separate challenger mechanism. The incumbent is
-never mutated in place.
+The controlled hierarchy benchmark begins with two independently validated
+interaction fragments:
 
-The discovery evidence that creates a structural challenger is not sufficient
-for promotion. All challengers are evaluated on a separate protected
-observation reserve. Protected prediction error plus an explicit structural
-complexity penalty determines whether any challenger has earned promotion.
+- interaction(x,y), coefficient 0.40;
+- interaction(y,z), coefficient 0.30.
 
-The controlled v1.13 structure benchmark uses an environment whose true response
-contains a pairwise x*y interaction. The additive incumbent contains only
-independent x and y effects. Extra linear terms and a latent-bias term can
-partially explain the discovery residual, but only the learned interaction term
-generalizes across protected x-only, y-only, partial-joint, and full-joint
-interventions.
+The target environment requires both interactions. Either fragment alone leaves
+systematic residual error. Their two-fragment composition exactly explains the
+discovery evidence.
 
-The promoted structural term is:
+Discovery fit is not enough for promotion. The candidate programs are evaluated
+again on a disjoint protected reserve containing x-only, y-only, z-only,
+partial-joint, and full-joint interventions. The composed program reaches zero
+protected prediction error and beats the best single-fragment baseline after the
+protected complexity penalty.
 
-interaction(x,y), coefficient 0.60
+The resulting program has depth three:
 
-and the discovery and protected evidence sets are explicitly disjoint.
+base causal program
+-> validated xy interaction fragment
+-> validated yz interaction fragment
 
-v1.13 also introduces bounded dual-control choice. Mabojolu compares the value of
-learning more about the current causal mechanism against the value of acting
-toward the current goal.
+This is hierarchical reuse of already validated causal structure rather than a
+fresh unbounded search over arbitrary code.
 
-For candidate experiments, the score contains expected posterior entropy
-reduction minus experiment cost. For candidate actions, the score contains
-posterior-weighted expected goal progress, probability of reaching the goal, and
-action cost. Experiments and actions must both satisfy the same reversibility and
-hard risk-ceiling constraints.
+v1.14 also extends dual control from one-step experiment-versus-action choice to
+a bounded long-horizon mixed policy tree.
 
-The controlled dual-control benchmark begins with two competing mechanisms. The
-same goal action succeeds under one mechanism but not the other. Under the
-initial 50/50 belief, the best safe action has only 0.50 goal-success probability,
-so a low-cost causal probe has higher value than acting immediately.
+The controlled planning benchmark starts with equal belief over two mechanisms,
+slow and fast. Each mechanism requires a different two-action program to reach
+the same goal within the available horizon:
 
-After the probe returns evidence concentrated on the fast mechanism, the value
-of further information collapses and Mabojolu switches to the goal action. The
-benchmark therefore demonstrates an explicit sequence:
+slow:
+slow-a -> slow-b
 
-uncertain model -> experiment -> belief update -> act
+fast:
+fast-a -> fast-b
 
-rather than an experiment-only or action-only controller.
+Without information gathering, the unresolved belief makes every action produce
+only moderate expected progress. Even three action slots cannot reach the goal.
 
-Unsafe zero-cost probes and unsafe zero-cost actions are present in the
-benchmark but remain excluded by hard risk and reversibility boundaries.
+A cheap reversible probe separates the two mechanisms. With horizon three,
+Mabojolu therefore chooses:
 
-This is bounded structural self-revision, not unrestricted model invention. The
-structural grammar, maximum one-term revision per challenger, variable list,
-coefficient bounds, protected validation reserve, Gaussian mechanism family,
-dual-control scoring weights, action/experiment catalogs, and safety ceilings
-remain human-specified.
+probe-z
+-> if slow: slow-a -> slow-b
+-> if fast: fast-a -> fast-b
+
+The mixed policy reaches the goal with expected success probability 1.0, expected
+cost 0.13, and maximum risk 0.10.
+
+The action-only control receives the same depth budget but no experiments. Its
+goal-success probability remains zero. This isolates the value of information
+inside a longer-horizon plan rather than rewarding extra action steps alone.
+
+Unsafe zero-cost experiments and unsafe zero-cost actions are present in the
+candidate catalogs but are excluded by the same hard risk and reversibility
+constraints used by earlier milestones.
+
+This remains bounded hierarchical program synthesis and bounded lookahead. The
+fragment library, fragment validation threshold, maximum fragment count,
+composition grammar, planning horizon, representative observation branches,
+action and experiment catalogs, scalar goal state, additive mechanism effects,
+cost weights, and risk ceilings remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. multi-term structural challengers where one interaction is not enough;
-2. nonlinear bounded terms such as thresholds, saturation, and piecewise
-   responses;
-3. hidden-state mechanisms that explain delayed or hysteretic effects rather
-   than only a static latent bias;
-4. Bayesian posterior uncertainty over synthesized structure and coefficients;
-5. protected validation across multiple intervention distributions before
-   structural promotion;
-6. automatic rollback when a promoted structural mechanism later regresses;
-7. dual-control planning over multi-step experiment/action sequences instead of
-   one-step experiment-versus-action choice;
-8. joint information and reward planning where actions can themselves be
-   informative about uncertain mechanisms;
-9. transfer of learned structural mechanism fragments into differently named
-   domains;
-10. whether deeper model synthesis preserves hard risk ceilings, abstention,
-    rollback, protected validation, auditability, and zero unsafe irreversible
-    execution.
+1. hierarchical programs with three or more reusable fragments and explicit
+   depth/description-length regularization;
+2. nonlinear reusable fragments such as thresholds, saturation, and piecewise
+   causal responses;
+3. hidden-state fragments that persist across time rather than static
+   observation-only terms;
+4. Bayesian uncertainty over alternative hierarchical causal programs instead
+   of selecting one deterministic champion;
+5. automatic rollback and fragment blame assignment when a composed program
+   regresses on later protected evidence;
+6. long-horizon policy trees with noisy observation integration instead of one
+   representative branch per mechanism;
+7. mixed plans where actions themselves generate information and update the
+   causal posterior;
+8. explicit subgoal generation so long plans can create and revise intermediate
+   goals rather than optimizing one scalar terminal threshold;
+9. transfer of hierarchical causal programs and long-horizon policies across
+   differently named domains;
+10. whether deeper composition and planning preserve hard risk ceilings,
+    abstention, protected validation, rollback, auditability, and zero unsafe
+    irreversible execution.
 
-The next central milestone is hierarchical causal program synthesis and
-long-horizon dual control: Mabojolu should compose multiple validated mechanism
-fragments into deeper causal programs, maintain uncertainty over those programs,
-and plan mixed experiment/action sequences over longer horizons while continuing
-to prefer reversible, auditable, low-risk information gathering.
+The next central milestone is uncertainty-aware hierarchical programs and
+autonomous subgoal formation: Mabojolu should maintain competing causal-program
+hypotheses, identify which fragment caused a prediction failure, generate
+intermediate goals during long-horizon planning, and revise both its program and
+plan as evidence accumulates.
 
 ## Safety and audit principle
 
