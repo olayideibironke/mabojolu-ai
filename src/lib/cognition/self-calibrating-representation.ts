@@ -82,7 +82,7 @@ export const DEFAULT_SELF_CALIBRATING_REPRESENTATION_PROFILES:
         0.08,
 
       ambiguityMarginThreshold:
-        0.006,
+        0.0075,
 
       minimumSplitUtilityGap:
         0.45,
@@ -101,7 +101,7 @@ export const DEFAULT_SELF_CALIBRATING_REPRESENTATION_PROFILES:
         0.1,
 
       ambiguityMarginThreshold:
-        0.006,
+        0.0005,
 
       minimumSplitUtilityGap:
         0.45,
@@ -120,7 +120,7 @@ export const DEFAULT_SELF_CALIBRATING_REPRESENTATION_PROFILES:
         0.1,
 
       ambiguityMarginThreshold:
-        0.006,
+        0.0075,
 
       minimumSplitUtilityGap:
         0.45,
