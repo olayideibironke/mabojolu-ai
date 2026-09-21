@@ -91,6 +91,84 @@ function clamp(
   );
 }
 
+export function scoreMetaAdaptationEpisode(
+  episode:
+    MetaAdaptationEpisode,
+): number {
+  if (
+    episode
+      .unsafeIrreversibleAction
+  ) {
+    return -1;
+  }
+
+  let utility =
+    0;
+
+  if (
+    episode.trueRegimeChange
+  ) {
+    utility +=
+      episode.changeDetected
+        ? 0.35
+        : -0.6;
+  } else {
+    utility +=
+      episode.changeDetected
+        ? -0.5
+        : 0.3;
+  }
+
+  if (
+    episode.recoverySucceeded
+  ) {
+    utility +=
+      0.25;
+  } else if (
+    episode.trueRegimeChange
+  ) {
+    utility -=
+      0.2;
+  }
+
+  if (
+    episode.falsePromotion
+  ) {
+    utility -=
+      0.5;
+  }
+
+  if (
+    episode.changeDetected &&
+    episode.trueRegimeChange
+  ) {
+    utility -=
+      Math.min(
+        0.25,
+        (
+          episode
+            .detectionDelay ??
+          0
+        ) /
+          40,
+      );
+  }
+
+  utility -=
+    Math.min(
+      0.2,
+      episode
+        .validationEvidenceCost /
+        100,
+    );
+
+  return clamp(
+    utility,
+    -1,
+    1,
+  );
+}
+
 function emptyEvidence(): MutablePolicyEvidence {
   return {
     episodes: 0,
@@ -579,7 +657,7 @@ export class MetaAdaptationController {
     }
 
     const utility =
-      this.episodeUtility(
+      scoreMetaAdaptationEpisode(
         episode,
       );
 
@@ -726,84 +804,6 @@ export class MetaAdaptationController {
     }
 
     return evidence;
-  }
-
-  private episodeUtility(
-    episode:
-      MetaAdaptationEpisode,
-  ): number {
-    if (
-      episode
-        .unsafeIrreversibleAction
-    ) {
-      return -1;
-    }
-
-    let utility =
-      0;
-
-    if (
-      episode.trueRegimeChange
-    ) {
-      utility +=
-        episode.changeDetected
-          ? 0.35
-          : -0.6;
-    } else {
-      utility +=
-        episode.changeDetected
-          ? -0.5
-          : 0.3;
-    }
-
-    if (
-      episode.recoverySucceeded
-    ) {
-      utility +=
-        0.25;
-    } else if (
-      episode.trueRegimeChange
-    ) {
-      utility -=
-        0.2;
-    }
-
-    if (
-      episode.falsePromotion
-    ) {
-      utility -=
-        0.5;
-    }
-
-    if (
-      episode.changeDetected &&
-      episode.trueRegimeChange
-    ) {
-      utility -=
-        Math.min(
-          0.25,
-          (
-            episode
-              .detectionDelay ??
-            0
-          ) /
-            40,
-        );
-    }
-
-    utility -=
-      Math.min(
-        0.2,
-        episode
-          .validationEvidenceCost /
-          100,
-      );
-
-    return clamp(
-      utility,
-      -1,
-      1,
-    );
   }
 
   private updateEvidence(
