@@ -81,6 +81,16 @@ function wantsGitHub(
   );
 }
 
+function wantsSupabase(
+  content:
+    string,
+):
+  boolean {
+  return /\b(supabase|supabase projects?|database projects?|project refs?)\b/i.test(
+    content,
+  );
+}
+
 async function parseJson<T>(
   response:
     Response,
@@ -159,6 +169,111 @@ async function accessTokenFor(
     decryptPluginSecret(
       connection.refreshTokenEncrypted,
     );
+
+  if (
+    connection.provider ===
+      "supabase"
+  ) {
+    const basic =
+      Buffer.from(
+        `${config.clientId}:${config.clientSecret}`,
+        "utf8",
+      ).toString(
+        "base64",
+      );
+
+    const refreshed =
+      await parseJson<{
+        access_token:
+          string;
+        refresh_token?:
+          string;
+        expires_in?:
+          number;
+        scope?:
+          string;
+      }>(
+        await fetch(
+          "https://api.supabase.com/v1/oauth/token",
+          {
+            method:
+              "POST",
+
+            headers: {
+              Accept:
+                "application/json",
+              Authorization:
+                `Basic ${basic}`,
+              "Content-Type":
+                "application/x-www-form-urlencoded",
+            },
+
+            body:
+              new URLSearchParams({
+                grant_type:
+                  "refresh_token",
+                refresh_token:
+                  refreshToken,
+              }),
+
+            cache:
+              "no-store",
+          },
+        ),
+      );
+
+    const expiresAt =
+      typeof refreshed
+        .expires_in ===
+        "number"
+        ? new Date(
+            Date.now() +
+              refreshed
+                .expires_in *
+                1_000,
+          ).toISOString()
+        : null;
+
+    await getDatabase()
+      .upsertPluginConnection({
+        userId:
+          connection.userId,
+        provider:
+          connection.provider,
+        accountLabel:
+          connection
+            .accountLabel,
+        accessTokenEncrypted:
+          encryptPluginSecret(
+            refreshed.access_token,
+          ),
+        refreshTokenEncrypted:
+          refreshed.refresh_token
+            ? encryptPluginSecret(
+                refreshed
+                  .refresh_token,
+              )
+            : connection
+                .refreshTokenEncrypted,
+        expiresAt,
+        scopes:
+          typeof refreshed.scope ===
+            "string"
+            ? refreshed.scope
+                .split(
+                  /[ ,]+/,
+                )
+                .filter(
+                  Boolean,
+                )
+            : [
+                ...connection
+                  .scopes,
+              ],
+      });
+
+    return refreshed.access_token;
+  }
 
   const endpoint =
     isGooglePluginProvider(
@@ -622,6 +737,61 @@ async function githubContext(
   );
 }
 
+async function supabaseContext(
+  token:
+    string,
+):
+  Promise<string[]> {
+  const projects =
+    await parseJson<
+      Array<{
+        ref?:
+          string;
+        name?:
+          string;
+        region?:
+          string;
+        status?:
+          string;
+        organization_slug?:
+          string;
+      }>
+    >(
+      await fetch(
+        "https://api.supabase.com/v1/projects",
+        {
+          headers: {
+            Authorization:
+              `Bearer ${token}`,
+          },
+
+          cache:
+            "no-store",
+        },
+      ),
+    );
+
+  return projects
+    .slice(
+      0,
+      MAX_ITEMS,
+    )
+    .map(
+      (
+        project,
+      ) =>
+        [
+          `Project: ${project.name ?? "(unnamed)"}`,
+          `Ref: ${project.ref ?? "unknown"}`,
+          `Status: ${project.status ?? "unknown"}`,
+          `Region: ${project.region ?? "unknown"}`,
+          `Organization: ${project.organization_slug ?? "unknown"}`,
+        ].join(
+          " | ",
+        ),
+    );
+}
+
 function section(
   title:
     string,
@@ -679,6 +849,9 @@ export async function buildWorkspacePluginContext(input: {
       input.latestUserContent,
     ) ||
     wantsGitHub(
+      input.latestUserContent,
+    ) ||
+    wantsSupabase(
       input.latestUserContent,
     );
 
@@ -867,6 +1040,28 @@ export async function buildWorkspacePluginContext(input: {
           section(
             "GitHub",
             await githubContext(
+              token,
+            ),
+          );
+
+        if (value) {
+          sections.push(
+            value,
+          );
+        }
+      }
+
+      if (
+        connection.provider ===
+          "supabase" &&
+        wantsSupabase(
+          input.latestUserContent,
+        )
+      ) {
+        const value =
+          section(
+            "Supabase projects",
+            await supabaseContext(
               token,
             ),
           );
