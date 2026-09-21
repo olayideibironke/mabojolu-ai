@@ -4,7 +4,8 @@ import { redirect } from "next/navigation";
 
 import { ResetPasswordForm } from "@/components/auth/reset-password-form";
 import { BrandMark } from "@/components/ui/brand-mark";
-import { getSession } from "@/lib/auth/session";
+import { hasRecentRecoveryRequest } from "@/lib/auth/recovery";
+import { createServerSupabaseClient } from "@/lib/auth/supabase-server";
 
 export const metadata: Metadata = {
   title: "Reset password",
@@ -13,14 +14,35 @@ export const metadata: Metadata = {
 /**
  * Password-reset page.
  *
- * Supabase establishes a temporary authenticated recovery session before sending
- * the user here. Without that session, changing a password must not be allowed.
+ * A normal signed-in session is not sufficient here. The user must have a
+ * recent Supabase password-recovery session created by the emailed reset link.
  */
 export default async function ResetPasswordPage() {
-  const session = await getSession();
+  const client =
+    await createServerSupabaseClient();
 
-  if (!session) {
-    redirect("/sign-in?error=invalid_reset_session");
+  if (!client) {
+    redirect(
+      "/sign-in?error=invalid_reset_session",
+    );
+  }
+
+  const {
+    data,
+    error,
+  } =
+    await client.auth.getUser();
+
+  if (
+    error ||
+    !data.user ||
+    !hasRecentRecoveryRequest(
+      data.user.recovery_sent_at,
+    )
+  ) {
+    redirect(
+      "/sign-in?error=invalid_reset_session",
+    );
   }
 
   return (
