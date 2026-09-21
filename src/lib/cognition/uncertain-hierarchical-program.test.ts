@@ -566,12 +566,19 @@ describe(
           actionId:
             "01-prepare-xy",
 
-          targetState:
-            0.7,
-
           dependsOnGoalIds:
             [],
         });
+
+        expect(
+          plan
+            .subgoals[
+              0
+            ]!
+            .targetState,
+        ).toBeCloseTo(
+          0.7,
+        );
 
         expect(
           plan
@@ -585,13 +592,20 @@ describe(
           actionId:
             "02-bridge-yz",
 
-          targetState:
-            1,
-
           dependsOnGoalIds: [
             "autonomous-subgoal-1",
           ],
         });
+
+        expect(
+          plan
+            .subgoals[
+              1
+            ]!
+            .targetState,
+        ).toBeCloseTo(
+          1,
+        );
       },
     );
 
