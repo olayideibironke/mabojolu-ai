@@ -184,7 +184,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - uncertainty-aware hierarchical-program belief with Bayesian evidence updates,
   leave-one-fragment-out failure attribution, posterior-gated autonomous
   subgoal formation, and materialization of generated subgoals into the existing
-  dependency-aware goal hierarchy.
+  dependency-aware goal hierarchy;
+- self-revising hierarchical programs and goal chains with cross-episode
+  fragment reliability, repeated-blame quarantine, protected repair or rollback,
+  progress-divergence detection, and replacement of stale subgoals while
+  preserving the terminal goal contract and inherited safety constraints.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -193,112 +197,128 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: uncertainty-aware hierarchical programs and autonomous subgoal formation
+### Current milestone: self-revising hierarchical goals and causal programs
 
-Mabojolu G can now maintain uncertainty over multiple competing hierarchical
-causal programs instead of immediately collapsing to one deterministic program.
+Mabojolu G can now accumulate reliability evidence for individual causal
+fragments across multiple episodes instead of treating every fragment diagnosis
+as an isolated event.
 
-Each candidate hierarchical program retains its validated causal fragments,
-base effects, complexity, depth, and observation-noise scale. New intervention
-evidence updates a posterior over complete programs using Gaussian predictive
-likelihoods.
+The v1.16 reliability tracker uses a Beta-style evidence record per fragment.
+Each leave-one-fragment-out diagnosis contributes one of three evidence classes:
 
-The controlled v1.15 benchmark begins with equal probability over:
+- blame, when removing the fragment materially reduces prediction error;
+- support, when removing the fragment materially increases prediction error;
+- neutral, when the observation does not distinguish the fragment.
 
-- a full hierarchical program containing validated xy and yz interaction
-  fragments;
-- a partial program containing only the xy fragment.
+A fragment cannot be quarantined after one surprising episode. Quarantine
+requires both a minimum number of blame episodes and a sufficiently low
+posterior reliability.
 
-Before any discriminating evidence arrives, the posterior is 50/50 and normalized
-entropy is maximal. Under that unresolved uncertainty, Mabojolu refuses to form a
-high-confidence subgoal chain whose terminal success probability would depend on
-assuming the full program is correct.
+The controlled benchmark presents the same damaged yz fragment with three
+separate yz failures and two independent xy-support episodes. The healthy xy
+fragment reaches posterior reliability 0.75 and remains active. The damaged yz
+fragment falls to posterior reliability 0.20 and is quarantined.
 
-A noisy yz intervention then provides evidence favoring the full program.
-Mabojolu concentrates strongly on the better program while retaining nonzero
-posterior mass on the alternative rather than deleting it.
+Quarantine alone does not authorize model revision. Mabojolu constructs bounded
+alternatives and evaluates them on a separate protected observation reserve:
 
-v1.15 also adds fragment-level failure attribution. When a hierarchical program
-later makes a bad prediction, Mabojolu evaluates the same observation with each
-fragment removed in turn. A fragment is blamed only when removing it materially
-reduces squared prediction error.
+- keep the incumbent;
+- roll back the quarantined fragment;
+- replace it with a previously validated fragment having the same structural
+  signature.
 
-The controlled failure benchmark deliberately corrupts the yz fragment while
-leaving the xy fragment unchanged. Leave-one-fragment-out evaluation identifies
-only the faulty yz fragment as explanatory for the failure.
+The benchmark contains a validated repaired yz fragment. On protected x-only,
+y-only, z-only, yz, and full-joint interventions, the repair reaches zero
+prediction error and beats both the damaged incumbent and simple rollback. The
+repair is therefore promoted and the damaged fragment is explicitly retired.
 
-The subgoal layer uses the complete current program posterior, not only the
-highest-probability program. Mabojolu searches bounded safe action sequences and
-accepts a sequence only when the posterior-weighted probability of reaching the
-terminal goal exceeds the configured confidence threshold.
+If no validated repair is available, v1.16 can still roll back a quarantined
+fragment, but only when rollback improves protected evidence by the configured
+minimum margin.
 
-Once the program posterior is sufficiently concentrated, Mabojolu autonomously
-creates intermediate numeric goals from the expected state reached after each
-selected action.
+The goal system is now self-revising as well. Mabojolu compares observed progress
+after an executed action with the state predicted by the corresponding generated
+subgoal. Progress inside a bounded tolerance leaves the hierarchy untouched.
 
-In the controlled benchmark the resulting sequence is:
+When the miss exceeds tolerance, Mabojolu replans from the observed state using
+the current causal program posterior and the remaining safe action catalog. It
+does not overwrite the old goals silently. The stale goals are blocked, then
+retired as abandoned branches with auditable replacement links.
+
+In the controlled benchmark the repaired causal model initially predicts:
 
 01-prepare-xy
--> intermediate state target about 0.70
+-> state about 0.70
 -> 02-bridge-yz
--> terminal state target 1.00
+-> terminal state 1.00
 
-These subgoals are not stored as a separate planning annotation. They are
-materialized into the existing HierarchicalGoalReasoner as dependency-linked
-child goals beneath the terminal objective.
+Reality instead reports state 0.45 after the first action. The 0.25 prediction
+miss exceeds the 0.10 revision tolerance, so Mabojolu replaces the stale branch
+with:
 
-The first generated subgoal becomes actionable first. After an observed state of
-0.75, Mabojolu marks the first subgoal complete and the second generated subgoal
-becomes the next actionable goal.
+02-bridge-yz
+-> revised intermediate state about 0.95
+-> 03-finish-x
+-> terminal state 1.00
 
-This milestone therefore connects causal-program uncertainty, diagnosis, action
-planning, and the existing hierarchical goal system:
+The replacement goals are inserted into the existing HierarchicalGoalReasoner.
+The first revised goal becomes actionable immediately and the second depends on
+its completion.
 
-competing causal programs
--> posterior update
--> confidence-gated plan
--> autonomous intermediate goals
--> dependency-aware execution
--> observed progress
--> goal-hierarchy update
+The terminal goal is treated as a protected contract during revision. Its id,
+description, priority, success criteria, and constraints must remain unchanged.
+The replacement subgoals also inherit the existing parent constraints and add an
+explicit requirement to preserve the terminal objective and safety boundaries.
 
-The benchmark also contains a cheaper nuisance action and an unsafe zero-cost
-shortcut. Neither enters the autonomous subgoal sequence because one provides no
-causal progress and the other violates the hard reversibility/risk boundary.
+This milestone therefore closes a longer feedback loop:
 
-This remains bounded autonomous subgoal formation rather than unrestricted goal
-creation. The terminal objective, candidate action catalog, maximum action
-count, success-probability threshold, scalar state representation, program
-catalog, likelihood model, fragment-removal diagnostic, and safety ceilings
-remain human-specified.
+experience across episodes
+-> fragment reliability
+-> quarantine only after repeated blame
+-> protected repair or rollback
+-> causal plan
+-> autonomous subgoals
+-> real progress
+-> divergence detection
+-> stale-goal retirement
+-> revised subgoals
+-> continue toward the same terminal objective
+
+This remains bounded self-revision. Fragment repair candidates, structural
+signature matching, protected validation reserve, quarantine thresholds,
+divergence tolerance, remaining action catalog, scalar state representation,
+terminal objective, and safety ceilings remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. posterior uncertainty over newly synthesized hierarchical programs rather than
-   only a supplied competing-program catalog;
-2. Bayesian fragment reliability that accumulates failure attribution across
-   episodes instead of diagnosing one observation at a time;
-3. automatic fragment repair or rollback after repeated blame evidence;
-4. dynamic subgoal revision when observed progress differs substantially from
-   predicted progress;
-5. subgoal generation over multidimensional states rather than one scalar target;
-6. prerequisite discovery where Mabojolu infers which intermediate conditions
-   must hold before an action becomes effective;
-7. mixed information-seeking and goal subgoals inside one dependency hierarchy;
-8. transfer of learned subgoal schemas to differently named domains;
-9. longer episodic evaluation where stale subgoals are retired and replaced as
-   the causal posterior changes;
-10. whether autonomous goal formation preserves parent-goal intent, inherited
-    constraints, hard risk ceilings, abstention, auditability, and zero unsafe
-    irreversible execution.
+1. Bayesian fragment reliability with graded likelihood evidence rather than
+   discrete support/blame/neutral updates;
+2. automatic synthesis of fragment repairs instead of choosing only from a
+   supplied validated repair catalog;
+3. multi-fragment failure attribution when errors arise from interactions
+   between otherwise reliable components;
+4. rollback memory so previously retired fragments can be reconsidered when a
+   recurring environment returns;
+5. repeated subgoal revisions across a long episode rather than one controlled
+   correction;
+6. multidimensional state goals and constraint-aware intermediate target
+   generation;
+7. prerequisite discovery where Mabojolu learns which state predicates must hold
+   before a subgoal or action becomes effective;
+8. mixed epistemic subgoals whose purpose is to reduce uncertainty before
+   returning to task progress;
+9. cross-domain transfer of repaired fragment structures and subgoal schemas;
+10. whether repeated self-revision preserves terminal intent, inherited
+    constraints, hard risk ceilings, protected validation, auditability, and
+    zero unsafe irreversible execution.
 
-The next central milestone is self-revising hierarchical goals and causal
-programs: Mabojolu should accumulate reliability evidence for individual causal
-fragments, repair or roll back failing program components, revise intermediate
-goals when reality diverges from prediction, and preserve the terminal objective
-and safety constraints throughout the revision cycle.
+The next central milestone is multidimensional self-revising planning with
+autonomous repair synthesis: Mabojolu should generate candidate repairs for
+failing causal fragments, reason over several state dimensions and constraints,
+create information-seeking and task-progress subgoals in the same hierarchy,
+and revise those goals repeatedly as its causal model changes.
 
 ## Safety and audit principle
 
