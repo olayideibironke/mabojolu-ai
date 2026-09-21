@@ -158,8 +158,15 @@ export function SettingsDialog({
       }
 
       onClose();
-      router.replace("/sign-in");
-      router.refresh();
+
+      /*
+       * Sign-out changes the authentication cookie. Force a full document
+       * navigation so neither Next.js nor an alternate deployment adapter can
+       * reuse an authenticated App Router cache entry after the cookie is gone.
+       */
+      window.location.replace(
+        "/sign-in",
+      );
     } catch {
       setIsSigningOut(false);
     }
