@@ -16,6 +16,9 @@ import {
 import {
   PLUGIN_PROVIDERS,
 } from "@/lib/plugins/registry";
+import {
+  normalizePluginReturnPath,
+} from "@/lib/plugins/return-path";
 
 function providerMessage(
   value:
@@ -152,6 +155,13 @@ export default async function PluginsPage(input: {
   const searchParams =
     await input.searchParams;
 
+  const returnTo =
+    normalizePluginReturnPath(
+      providerMessage(
+        searchParams.returnTo,
+      ),
+    );
+
   const connectedProvider =
     providerMessage(
       searchParams.connected,
@@ -199,6 +209,9 @@ export default async function PluginsPage(input: {
         <PluginCatalog
           items={
             items
+          }
+          returnTo={
+            returnTo
           }
         />
       </div>
