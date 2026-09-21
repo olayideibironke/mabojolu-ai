@@ -169,7 +169,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   planning;
 - uncertainty-aware causal world-model transfer with Gaussian likelihood
   updates, persistent posterior mass over competing mechanisms, bounded
-  multi-step experiment lookahead, and posterior-aware multi-step goal planning.
+  multi-step experiment lookahead, and posterior-aware multi-step goal planning;
+- adaptive mechanism discovery with online effect estimation, predictive-misfit
+  detection, bounded challenger proposal, protected challenger promotion,
+  contingent experiment branching, and receding-horizon action replanning.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -178,90 +181,91 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: uncertainty-aware causal world-model transfer
+### Current milestone: adaptive mechanism discovery and contingent scientific planning
 
-Mabojolu G can now maintain probabilistic competing causal mechanisms under
-noisy observations instead of eliminating hypotheses deterministically after
-each experiment.
+Mabojolu G can now revise parts of its causal mechanism family when observed
+intervention effects are inconsistent with every incumbent model.
 
-Each bounded mechanism specifies a causal effect map over unfamiliar variables
-and an observation-noise scale. Experiments produce noisy measurements of the
-effect predicted by a mechanism. Mabojolu updates its belief with Gaussian
-likelihoods, so mechanisms that become unlikely retain nonzero posterior mass
-rather than disappearing after one imperfect observation.
+The v1.12 mechanism learner adds bounded online parameter estimation for
+single-variable interventions. Repeated noisy measurements update an effect mean
+and sample variance incrementally. This provides a direct learned parameter
+estimate rather than requiring every causal coefficient to be supplied in
+advance.
 
-The world-model experiment planner supports bounded lookahead. Candidate
-experiment sequences are evaluated by expected terminal belief entropy under the
-current posterior, with explicit experiment cost penalties, reversibility
-requirements, and hard risk ceilings.
+A separate predictive-adequacy test evaluates the incumbent mechanism family
+against new observations. If the best incumbent predictive likelihood falls
+below a configured threshold, Mabojolu marks the current model family
+inadequate.
 
-The controlled v1.11 experiment benchmark is deliberately arranged so a
-one-step information planner prefers an expensive direct probe, while a
-two-step planner discovers that two cheaper complementary interventions provide
-essentially complete identification at lower total cost.
+Model inadequacy does not trigger unrestricted model creation. The challenger
+generator is bounded to the discrepant intervention and proposes a small number
+of mechanism variants whose affected causal coefficient is grounded in the
+observed intervention effect. Incumbent models are not mutated.
 
-The deterministic benchmark values are:
+The discovery observation that creates a challenger cannot also promote it.
+Promotion requires a separate protected observation reserve. The incumbent and
+challengers are compared on protected mean squared prediction error, and a
+challenger is promoted only if it exceeds a minimum validated improvement.
 
-- one-step direct probe cost: 0.50;
-- two-step complementary probe cost: 0.10;
-- two-step experiment maximum risk: 0.10;
-- hard experiment risk ceiling: 0.30.
+v1.12 also replaces open-loop two-step experiment execution with a bounded
+contingent experiment policy. Mabojolu chooses a first safe experiment and
+precomputes a second-step decision for each representative first-step outcome.
+At runtime, the actual noisy observation is assigned to the nearest
+representative branch.
 
-The observations delivered during execution are perturbed away from the exact
-mechanism means. Posterior updating therefore exercises the noisy likelihood
-path. The correct mechanism becomes dominant without assigning exact zero
-probability to alternatives.
+The controlled benchmark compares:
 
-The mechanism belief is then used for multi-step planning. Candidate actions are
-evaluated under every mechanism still represented in the posterior. A plan is
-accepted only when the posterior-weighted probability of reaching the goal
-meets a configured success threshold.
+- the v1.11 open-loop sequence cheap-x -> cheap-y, cost 0.10;
+- the v1.12 contingent policy, which begins with cheap-x and conditionally
+  executes cheap-y only when the first result leaves ambiguity.
 
-The current planning benchmark begins from a state where no safe single action
-can reach the goal with sufficient probability. Horizon-one planning therefore
-abstains. Horizon-two planning finds a two-action sequence that reaches the goal
-across the posterior mechanism belief while remaining below the action-risk
-ceiling.
+For the benchmark's decisive high-x observation, the contingent policy stops
+after cheap-x, reducing executed experiment cost from 0.10 to 0.05 while
+preserving the same safety ceiling.
 
-This milestone moves Mabojolu from deterministic correspondence resolution
-toward uncertainty-aware causal world modeling and planning, but it remains a
-bounded experimental scaffold. The mechanism catalog, causal effect maps,
-Gaussian noise family, observation variance, intervention catalog, action
-catalog, planning horizon, cost penalty, risk estimates, and state abstraction
-remain human-specified.
+Action planning is also receding-horizon. Mabojolu executes only the first action
+of a multi-step plan, observes the resulting state, and replans. In the
+controlled benchmark the initial model predicts that boost-x and boost-y are
+both required. The observed transition after boost-x already crosses the goal,
+so replanning terminates instead of executing the unnecessary second action.
 
-The current experiment planner uses open-loop sequence evaluation rather than a
-fully contingent policy tree, and the mechanism transition model is linear and
-additive. Learning new mechanisms, nonlinear dynamics, hidden state, and
-closed-loop replanning remain open.
+This milestone therefore adds three kinds of adaptation: causal parameter
+learning, bounded mechanism-family revision, and closed-loop experiment/action
+execution.
+
+It is still a controlled scaffold. Parameter learning currently supports
+single-variable interventions, challengers modify one bounded coefficient at a
+time, mechanism topology is fixed, protected validation is supplied explicitly,
+contingent experiment planning uses representative mechanism means rather than
+full observation integration, and receding-horizon planning still uses a
+human-specified action catalog and goal state.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. contingent multi-step experiment policies that choose the second experiment
-   based on the first noisy observation rather than committing to an open-loop
-   sequence;
-2. online learning of mechanism parameters and observation variance instead of
-   selecting only among fixed mechanism models;
-3. bounded proposal of new mechanism structures when every current model has low
-   posterior predictive likelihood;
-4. nonlinear and interaction effects between causal variables;
-5. hidden-state inference and delayed causal effects;
-6. posterior predictive calibration under repeated noisy observations;
-7. receding-horizon action planning that replans after each observed state
-   transition;
-8. joint value-of-information and goal-progress planning, where Mabojolu chooses
-   when to experiment versus when to act;
-9. transfer of learned mechanism fragments across differently named domains;
-10. whether increased world-model autonomy preserves hard risk ceilings,
-    abstention, rollback, auditability, and zero unsafe irreversible execution.
+1. bounded synthesis of new mechanism topology, not only adjustment of an
+   existing coefficient;
+2. discovery of interaction and nonlinear terms when additive models fail;
+3. hidden-state hypotheses for delayed or partially observed causal effects;
+4. Bayesian parameter posteriors rather than point estimates for learned causal
+   coefficients;
+5. protected challenger validation across multiple intervention contexts;
+6. contingent experiment policy trees integrated over noisy observation
+   distributions rather than representative means;
+7. joint experiment-versus-action planning so information gathering and goal
+   progress compete in one objective;
+8. receding-horizon replanning after every action and experiment outcome;
+9. mechanism-fragment transfer across differently named domains;
+10. whether increased mechanism autonomy preserves hard risk ceilings,
+    abstention, rollback, protected validation, auditability, and zero unsafe
+    irreversible execution.
 
-The next central milestone is adaptive mechanism discovery and contingent
-scientific planning: Mabojolu should learn causal parameters online, detect when
-its current mechanism family is inadequate, propose bounded challengers, choose
-experiments conditionally on observed outcomes, and replan actions as its world
-model changes.
+The next central milestone is autonomous mechanism-structure synthesis and
+dual-control planning: Mabojolu should propose bounded new causal structures
+when coefficient adjustment is insufficient, infer hidden or interaction
+mechanisms from evidence, and decide whether to experiment or act based on both
+information value and goal progress.
 
 ## Safety and audit principle
 
