@@ -1100,6 +1100,25 @@ export class BoundedRepresentationPrimitiveLibrary {
     }
 
     if (
+      entry.status ===
+        "quarantined" ||
+      entry.status ===
+        "retired"
+    ) {
+      throw new Error(
+        `Representation primitive ${evidence.primitiveId} is terminally ${entry.status}; refusing further transfer updates.`,
+      );
+    }
+
+    if (
+      !evidence.domainId.trim()
+    ) {
+      throw new Error(
+        "Representation transfer evidence requires a non-empty domain id.",
+      );
+    }
+
+    if (
       !Number.isFinite(
         evidence.baselineRegret,
       ) ||
@@ -1113,6 +1132,42 @@ export class BoundedRepresentationPrimitiveLibrary {
     ) {
       throw new Error(
         "Representation transfer regret values must be finite and non-negative.",
+      );
+    }
+
+    const expectedImprovement =
+      evidence.baselineRegret -
+      evidence.primitiveRegret;
+
+    if (
+      !Number.isFinite(
+        evidence.improvement,
+      ) ||
+      Math.abs(
+        evidence.improvement -
+        expectedImprovement,
+      ) >
+        1e-9
+    ) {
+      throw new Error(
+        "Representation transfer improvement must equal baseline regret minus primitive regret.",
+      );
+    }
+
+    if (
+      !Number.isInteger(
+        evidence.unsafeIrreversibleActions,
+      ) ||
+      evidence.unsafeIrreversibleActions <
+        0 ||
+      !Number.isInteger(
+        evidence.falsePromotions,
+      ) ||
+      evidence.falsePromotions <
+        0
+    ) {
+      throw new Error(
+        "Representation transfer safety counts must be non-negative integers.",
       );
     }
 
