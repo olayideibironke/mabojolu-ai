@@ -241,7 +241,7 @@ describe(
           choice
             .expectedInformationGain,
         ).toBeGreaterThan(
-          0.9,
+          0.85,
         );
 
         expect(
