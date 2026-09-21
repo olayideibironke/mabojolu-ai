@@ -13,9 +13,9 @@ describe(
   "Mabojolu browser identity",
   () => {
     it(
-      "identifies Westforge as Mabojolu's builder",
+      "identifies Westforge Holdings Inc. as Mabojolu's builder",
       () => {
-        expect(
+        const response =
           mabojoluIdentityResponse([
             {
               role:
@@ -23,9 +23,18 @@ describe(
               content:
                 "Who created you?",
             },
-          ]),
+          ]);
+
+        expect(
+          response,
         ).toContain(
           "Westforge Holdings Inc.",
+        );
+
+        expect(
+          response,
+        ).toContain(
+          "Mabojolu",
         );
       },
     );
@@ -76,6 +85,12 @@ describe(
         expect(
           BROWSER_SYSTEM_PROMPT,
         ).toContain(
+          "A Westforge Holdings Inc. Product",
+        );
+
+        expect(
+          BROWSER_SYSTEM_PROMPT,
+        ).not.toContain(
           "Mabojolu by Westforge",
         );
       },
