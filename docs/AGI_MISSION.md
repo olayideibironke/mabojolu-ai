@@ -150,7 +150,10 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - adaptive latent-regime structure revision that splits behaviorally overloaded
   regimes, merges redundant regimes only when policy profiles agree, and learns
   outcome-linked feature relevance while preserving fresh-evidence and
-  fail-closed safety rules.
+  fail-closed safety rules;
+- bounded self-calibration across alternative observation representations and
+  structural thresholds, using protected validation, champion/challenger
+  promotion, unsafe-profile quarantine, and explicit rollback on regression.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -159,96 +162,92 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: adaptive latent-regime structure
+### Current milestone: self-calibrating representation and structure
 
-Mabojolu G can now revise the structure of its own discovered environment
-categories instead of treating the v1.5 latent taxonomy as permanent.
+Mabojolu G can now evaluate bounded alternatives for how it represents regime
+evidence and how sensitively it draws structural boundaries.
 
-The v1.6 controller maintains unnamed latent regimes, bounded adaptation-policy
-evidence, and an auditable history of structural revisions. It adds three
-controlled mechanisms.
+The v1.6 controller learned feature relevance inside one fixed observation
+representation, but its raw signal encoding and several key structural
+thresholds were still selected by hand. The v1.7 self-calibration layer turns
+those choices into auditable champion/challenger candidates.
 
-First, a latent regime can split when outcome evidence shows that the same
-adaptation policy behaves materially differently across two separable regions
-of the regime's observation history. A split therefore requires behavioral
-evidence, not geometric variation alone. The split feature, threshold, affected
-policy, utility gap, and feature separation are recorded in the audit trail.
+Each bounded representation profile specifies:
 
-Second, separately discovered regimes can merge only when they are close in the
-current learned metric, agree on their preferred policy, and have sufficiently
-similar policy-outcome profiles. Geometric similarity alone is not enough to
-erase a distinction that matters for behavior.
+- an observation encoder;
+- regime-assignment distance threshold;
+- ambiguity margin for abstention;
+- minimum utility gap required to justify a split;
+- minimum feature separation required to justify a split.
 
-Third, feature relevance is relearned from policy-outcome differences between
-regimes. Signal dimensions whose variation does not correspond to a behavioral
-difference are down-weighted toward a bounded floor, while dimensions associated
-with meaningful policy differences receive more weight. All learned weights
-remain bounded.
+The current candidate library includes raw representations with different
+structural sensitivity and compressed derived representations that combine
+multiple observable drift signals into higher-level quantities such as drift
+pressure and temporal instability.
 
-After a split, child regimes retain the historical observations needed for
-audit and structure analysis but their adaptation-policy evidence is reset.
-Each child must earn fresh policy evidence rather than inheriting conclusions
-from the mixed parent regime.
+Candidate evaluation uses protected episodes. Each protected episode is tested
+from a freshly trained controller instance so a candidate cannot learn from one
+validation episode and use that information on the next. Evaluation therefore
+measures the state produced by calibration rather than adaptation to the
+validation set itself.
 
-The controlled v1.6 benchmark intentionally creates one broad latent regime
-containing two observational modes with incompatible adaptation needs. A frozen
-v1.5 controller continues treating them as one category. The adaptive v1.6
-controller detects that one policy's utility changes sharply across
-change-point-strength regions, splits the regime, relearns policy evidence in
-each child, and is then evaluated on a mixed held-out sequence.
+The current representation champion is promoted only when a safe challenger
+produces a material reduction in protected cumulative regret. Any candidate
+associated with unsafe irreversible behavior or false promotion is quarantined.
+If the current champion itself becomes unsafe, it must be replaced by a safe
+evaluated profile even when its numerical regret appears lower.
 
-The benchmark compares:
+The previous champion is archived. After promotion, a shifted final holdout is
+used as a second protection layer. If the promoted representation regresses
+beyond a bounded tolerance relative to the archived champion, Mabojolu rolls
+back and quarantines the failed representation.
 
-1. adaptive latent-regime structure;
-2. the frozen v1.5 latent-regime controller using the same broad initial
-   assignment threshold;
-3. a fixed balanced adaptation policy;
-4. the bounded-policy hindsight oracle used only for evaluation.
+The controlled v1.7 benchmark intentionally places final observations near a
+regime boundary. The raw representation remains uncertain and abstains, while a
+derived drift-compressed representation combines the relevant signals and uses a
+calibrated ambiguity threshold to preserve the useful distinction. The final
+holdout shifts those boundary observations again to test whether the promoted
+representation generalizes beyond the protected validation points.
 
-The target held-out behavior is that the revised structure selects conservative
-adaptation in the low-change mode and responsive adaptation in the high-change
-mode, reaches the bounded-policy oracle on those held-out episodes, and
-outperforms both the frozen taxonomy and the fixed balanced baseline.
+The benchmark keeps environment truth invariant across policy counterfactuals.
+A different adaptation policy may change detection, recovery, false promotion,
+delay, or evidence cost, but it does not change whether the underlying
+environment actually changed.
 
-Separate controlled tests verify autonomous merge behavior for redundant nearby
-regimes, refusal to merge behaviorally incompatible regimes, bounded learned
-feature weights, fresh evidence after splits, and continued global quarantine
-of policies associated with unsafe irreversible outcomes.
-
-This is still bounded structure learning rather than unrestricted self-
-redesign. The observable feature vocabulary, initial distance function,
-split/merge thresholds, maximum regime budget, policy catalog, and structural
-revision algorithm remain human-specified.
+This remains bounded self-calibration rather than unrestricted representation
+invention. The candidate encoder library, allowed derived operations, policy
+catalog, safety criteria, promotion rule, rollback tolerance, and evaluation
+protocol remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. learning split and merge thresholds from held-out regret rather than fixing
-   them manually;
-2. learning novelty and ambiguity thresholds from calibration error and
-   abstention utility;
-3. replacing hand-weighted observation dimensions with a learned compact
-   representation;
-4. autonomous discovery of derived regime features from temporal patterns
-   rather than using only supplied summary statistics;
-5. whether representation changes improve held-out regret without destabilizing
-   previously useful regimes;
-6. explicit rollback when a structural or representation revision performs worse
-   on protected validation episodes;
-7. bounded proposal, validation, promotion, and retirement of representation
-   revisions using the existing champion/challenger pattern;
-8. long-horizon consolidation so repeatedly useful latent structures become
-   reusable abstractions across task families;
-9. cross-domain tests where the same learned structural principle transfers to
-   differently named state variables and action spaces;
-10. whether further scaffold removal preserves auditability, bounded external
-    action, zero unsafe-policy reuse, and reproducible evaluation.
+1. generating new bounded representation candidates from observed failure modes
+   instead of choosing only from a fixed encoder catalog;
+2. learning calibration thresholds continuously from outcome evidence while
+   preserving protected validation partitions;
+3. complexity penalties so a more elaborate representation must earn its extra
+   structure through held-out improvement;
+4. compositional derived-feature search over bounded arithmetic, relational, and
+   temporal operators;
+5. whether useful derived features transfer across renamed state variables and
+   different task families;
+6. protected multi-stage validation so representation changes cannot overfit one
+   narrow benchmark sequence;
+7. memory consolidation that promotes repeatedly useful representation
+   primitives into reusable abstractions;
+8. automatic retirement of derived features that stop improving prediction,
+   planning, or adaptation utility;
+9. cross-domain evaluation where one learned representation primitive improves
+   performance in an unfamiliar causal task family;
+10. whether increasing representation autonomy preserves rollback, auditability,
+    zero unsafe irreversible actions, and reproducible evaluation.
 
-The next central milestone is self-calibrating representation and structure
-learning: Mabojolu should learn not only which regimes exist, but also which
-observations, derived features, and structural thresholds are useful for
-discovering them.
+The next central milestone is bounded representation synthesis and transfer:
+Mabojolu should begin proposing new reusable representation primitives from
+experience, validate them against protected tasks, and transfer successful
+primitives across domains without changing its safety or approval boundaries.
 
 ## Safety and audit principle
 
