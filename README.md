@@ -1,9 +1,9 @@
 # Mabojolu AI
 
-**Mabojolu by Westforge** — a general-purpose conversational AI product for
+**Mabojolu** — a general-purpose conversational AI product from Westforge Holdings Inc. for
 thinking, writing, analysis, planning, research, and coding assistance.
 
-A Westforge Holdings Product. [mabojolu.com](https://mabojolu.com)
+A Westforge Holdings Inc. Product. [mabojolu.com](https://mabojolu.com)
 
 The name combines Maria, Mobolaji, Mobolajoko, and Mojolaoluwa.
 
