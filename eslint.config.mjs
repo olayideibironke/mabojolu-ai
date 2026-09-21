@@ -12,6 +12,12 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+
+    // Generated deployment-adapter artifacts.
+    // These are build outputs, not Mabojolu source code.
+    ".vinext/**",
+    ".wrangler/**",
+    "dist/**",
   ]),
 ]);
 
