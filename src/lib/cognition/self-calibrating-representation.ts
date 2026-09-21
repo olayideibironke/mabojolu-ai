@@ -336,6 +336,9 @@ function validateProfiles(
     );
 
     if (
+      !Number.isFinite(
+        profile.assignmentDistanceThreshold,
+      ) ||
       profile.assignmentDistanceThreshold <=
         0 ||
       profile.assignmentDistanceThreshold >
@@ -347,6 +350,9 @@ function validateProfiles(
     }
 
     if (
+      !Number.isFinite(
+        profile.ambiguityMarginThreshold,
+      ) ||
       profile.ambiguityMarginThreshold <
         0 ||
       profile.ambiguityMarginThreshold >
@@ -500,8 +506,9 @@ export class SelfCalibratingRepresentationSelector {
       );
     }
 
-    let best =
-      championEvaluation;
+    let best:
+      RepresentationEvaluation |
+      undefined;
 
     for (
       const evaluation of
@@ -516,6 +523,7 @@ export class SelfCalibratingRepresentationSelector {
       }
 
       if (
+        !best ||
         evaluation.cumulativeRegret <
           best.cumulativeRegret -
             Number.EPSILON
@@ -525,6 +533,19 @@ export class SelfCalibratingRepresentationSelector {
       }
     }
 
+    if (
+      !best
+    ) {
+      throw new Error(
+        "All evaluated representation profiles are quarantined; refusing unsafe self-calibration.",
+      );
+    }
+
+    const championUnsafe =
+      this.quarantinedProfileIds.has(
+        this.championProfileId,
+      );
+
     const improvement =
       championEvaluation
         .cumulativeRegret -
@@ -532,7 +553,8 @@ export class SelfCalibratingRepresentationSelector {
 
     if (
       best.profileId ===
-        this.championProfileId
+        this.championProfileId &&
+      !championUnsafe
     ) {
       return {
         championProfileId:
@@ -550,6 +572,7 @@ export class SelfCalibratingRepresentationSelector {
     }
 
     if (
+      !championUnsafe &&
       improvement <
         this.minimumPromotionImprovement
     ) {
