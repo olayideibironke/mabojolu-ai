@@ -884,6 +884,9 @@ export function selectValidatedStructuralChampion(
   let bestObjective =
     incumbentError;
 
+  let bestTermId =
+    incumbent.id;
+
   for (
     const challenger of
       challengers
@@ -923,9 +926,7 @@ export function selectValidatedStructuralChampion(
         challenger
           .addedTerm
           .id <
-          (
-            bestMechanism.id
-          )
+          bestTermId
       )
     ) {
       bestMechanism =
@@ -936,6 +937,11 @@ export function selectValidatedStructuralChampion(
 
       bestObjective =
         objective;
+
+      bestTermId =
+        challenger
+          .addedTerm
+          .id;
     }
   }
 
