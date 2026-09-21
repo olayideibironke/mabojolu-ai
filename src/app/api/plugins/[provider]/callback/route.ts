@@ -26,6 +26,9 @@ import {
 import {
   isPluginProviderId,
 } from "@/lib/plugins/registry";
+import {
+  normalizePluginReturnPath,
+} from "@/lib/plugins/return-path";
 
 export const runtime =
   "nodejs";
@@ -144,8 +147,34 @@ export async function GET(
       cookieName,
     )?.value;
 
+  const returnCookieName =
+    `mabojolu-plugin-return-${provider}`;
+
+  const returnPath =
+    normalizePluginReturnPath(
+      store.get(
+        returnCookieName,
+      )?.value,
+    );
+
+  const pkceCookieName =
+    `mabojolu-plugin-pkce-${provider}`;
+
+  const codeVerifier =
+    store.get(
+      pkceCookieName,
+    )?.value;
+
   store.delete(
     cookieName,
+  );
+
+  store.delete(
+    returnCookieName,
+  );
+
+  store.delete(
+    pkceCookieName,
   );
 
   if (
@@ -180,6 +209,11 @@ export async function GET(
           provider,
         code,
         config,
+        ...(codeVerifier
+          ? {
+              codeVerifier,
+            }
+          : {}),
       });
 
     const existing =
@@ -222,9 +256,11 @@ export async function GET(
         ],
       });
 
-    return pluginRedirect(
-      request,
-      `connected=${provider}`,
+    return Response.redirect(
+      new URL(
+        returnPath,
+        request.url,
+      ),
     );
   } catch (cause) {
     console.error(
