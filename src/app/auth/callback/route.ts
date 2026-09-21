@@ -1,7 +1,14 @@
-import type { NextRequest } from "next/server";
+import {
+  NextResponse,
+  type NextRequest,
+} from "next/server";
 
+import {
+  RECOVERY_SESSION_COOKIE,
+  RECOVERY_SESSION_MAX_AGE_SECONDS,
+  resolveAuthCallbackTarget,
+} from "@/lib/auth/recovery";
 import { createServerSupabaseClient } from "@/lib/auth/supabase-server";
-import { resolveAuthCallbackTarget } from "@/lib/auth/recovery";
 
 /**
  * Authentication callback.
@@ -30,7 +37,7 @@ export async function GET(
     );
 
   if (!code) {
-    return Response.redirect(
+    return NextResponse.redirect(
       new URL(
         "/sign-in?error=missing_code",
         origin,
@@ -43,7 +50,7 @@ export async function GET(
     await createServerSupabaseClient();
 
   if (!client) {
-    return Response.redirect(
+    return NextResponse.redirect(
       new URL(
         "/sign-in?error=not_configured",
         origin,
@@ -78,7 +85,7 @@ export async function GET(
       },
     );
 
-    return Response.redirect(
+    return NextResponse.redirect(
       new URL(
         "/sign-in?error=invalid_link",
         origin,
@@ -96,11 +103,48 @@ export async function GET(
           ?.recovery_sent_at,
     });
 
-  return Response.redirect(
-    new URL(
-      next,
-      origin,
-    ),
-    302,
-  );
+  const response =
+    NextResponse.redirect(
+      new URL(
+        next,
+        origin,
+      ),
+      302,
+    );
+
+  if (
+    next ===
+      "/reset-password"
+  ) {
+    response.cookies.set(
+      RECOVERY_SESSION_COOKIE,
+      "1",
+      {
+        httpOnly: true,
+        secure:
+          process.env.NODE_ENV ===
+          "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge:
+          RECOVERY_SESSION_MAX_AGE_SECONDS,
+      },
+    );
+  } else {
+    response.cookies.set(
+      RECOVERY_SESSION_COOKIE,
+      "",
+      {
+        httpOnly: true,
+        secure:
+          process.env.NODE_ENV ===
+          "production",
+        sameSite: "lax",
+        path: "/",
+        maxAge: 0,
+      },
+    );
+  }
+
+  return response;
 }
