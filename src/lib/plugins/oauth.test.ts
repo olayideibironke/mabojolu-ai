@@ -149,5 +149,65 @@ describe(
         );
       },
     );
+
+    it(
+      "builds Supabase authorization with PKCE",
+      () => {
+        const url =
+          new URL(
+            buildPluginAuthorizationUrl({
+              providerId:
+                "supabase",
+              config: {
+                ...baseConfig,
+                providerId:
+                  "supabase",
+                authorizationUrl:
+                  "https://api.supabase.com/v1/oauth/authorize",
+                redirectUri:
+                  "https://mabojolu.example/api/plugins/supabase/callback",
+                scopes: [],
+              },
+              state:
+                "state-supabase",
+              codeChallenge:
+                "challenge-123",
+            }),
+          );
+
+        expect(
+          url.searchParams.get(
+            "response_type",
+          ),
+        ).toBe(
+          "code",
+        );
+
+        expect(
+          url.searchParams.get(
+            "state",
+          ),
+        ).toBe(
+          "state-supabase",
+        );
+
+        expect(
+          url.searchParams.get(
+            "code_challenge",
+          ),
+        ).toBe(
+          "challenge-123",
+        );
+
+        expect(
+          url.searchParams.get(
+            "code_challenge_method",
+          ),
+        ).toBe(
+          "S256",
+        );
+      },
+    );
+
   },
 );
