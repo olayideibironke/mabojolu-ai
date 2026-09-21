@@ -96,6 +96,43 @@ describe(
     );
 
     it(
+      "builds Supabase OAuth config from dedicated credentials",
+      () => {
+        vi.stubEnv(
+          "MABOJOLU_APP_URL",
+          "https://www.mabojolu.com",
+        );
+        vi.stubEnv(
+          "MABOJOLU_PLUGIN_ENCRYPTION_KEY",
+          "12345678901234567890123456789012",
+        );
+        vi.stubEnv(
+          "SUPABASE_OAUTH_CLIENT_ID",
+          "supabase-client-id",
+        );
+        vi.stubEnv(
+          "SUPABASE_OAUTH_CLIENT_SECRET",
+          "supabase-client-secret",
+        );
+
+        expect(
+          pluginOAuthConfig(
+            "supabase",
+          ),
+        ).toMatchObject({
+          providerId:
+            "supabase",
+          clientId:
+            "supabase-client-id",
+          redirectUri:
+            "https://www.mabojolu.com/api/plugins/supabase/callback",
+          authorizationUrl:
+            "https://api.supabase.com/v1/oauth/authorize",
+        });
+      },
+    );
+
+    it(
       "returns null when provider credentials are missing",
       () => {
         vi.stubEnv(
