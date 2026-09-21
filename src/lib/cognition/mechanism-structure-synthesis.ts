@@ -1,6 +1,5 @@
 import {
   ProbabilisticCausalWorldModel,
-  chooseProbabilisticActionPlan,
   predictMechanismEffect,
   type ProbabilisticCausalMechanism,
   type WorldModelAction,
