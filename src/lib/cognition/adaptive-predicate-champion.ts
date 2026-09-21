@@ -85,6 +85,18 @@ export interface AdaptivePredicateSummary {
   driftConfidenceThreshold:
     number;
 
+  changePointScore:
+    number;
+
+  changePointEvidenceCount:
+    number;
+
+  changePointOperationalEvidenceIndex?:
+    number;
+
+  sequentialEvidenceThreshold:
+    number;
+
   lastDriftTriggerEvidenceCount?:
     number;
 
@@ -99,6 +111,18 @@ export interface AdaptivePredicateSummary {
 
   challengerValidationEvidenceCount:
     number;
+
+  challengerValidationTarget?:
+    number;
+
+  challengerAttemptCount:
+    number;
+
+  challengerAttemptBudget:
+    number;
+
+  challengerSearchExhausted:
+    boolean;
 
   challengerProgramId?:
     string;
@@ -157,6 +181,12 @@ interface ChallengerState {
   validation:
     Observation[];
 
+  attempt:
+    number;
+
+  validationTarget:
+    number;
+
   program?:
     SymbolicPredicateProgram;
 
@@ -189,8 +219,20 @@ interface PrincipleState {
   recentChampionCorrectness:
     boolean[];
 
+  changePointScore:
+    number;
+
+  changePointOperationalEvidenceIndex?:
+    number;
+
   challenger?:
     ChallengerState;
+
+  challengerAttemptCount:
+    number;
+
+  challengerSearchExhausted:
+    boolean;
 
   replacementCount:
     number;
@@ -808,6 +850,17 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
 
     private readonly driftMaximumEvidence =
       12,
+
+    private readonly sequentialEvidenceThreshold =
+      Math.log(
+        4,
+      ),
+
+    private readonly maxChallengerAttemptsPerRegime =
+      2,
+
+    private readonly challengerValidationGrowthPerAttempt =
+      2,
   ) {
     if (
       !Number.isInteger(
@@ -896,6 +949,42 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     ) {
       throw new Error(
         "driftMaximumEvidence must be at least driftMinimumEvidence.",
+      );
+    }
+
+    if (
+      !Number.isFinite(
+        sequentialEvidenceThreshold,
+      ) ||
+      sequentialEvidenceThreshold <=
+        0
+    ) {
+      throw new Error(
+        "sequentialEvidenceThreshold must be positive.",
+      );
+    }
+
+    if (
+      !Number.isInteger(
+        maxChallengerAttemptsPerRegime,
+      ) ||
+      maxChallengerAttemptsPerRegime <
+        1
+    ) {
+      throw new Error(
+        "maxChallengerAttemptsPerRegime must be at least 1.",
+      );
+    }
+
+    if (
+      !Number.isInteger(
+        challengerValidationGrowthPerAttempt,
+      ) ||
+      challengerValidationGrowthPerAttempt <
+        0
+    ) {
+      throw new Error(
+        "challengerValidationGrowthPerAttempt must be non-negative.",
       );
     }
   }
@@ -1097,7 +1186,7 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       if (
         challenger.validation
           .length >=
-          this.validationObservationTarget
+          challenger.validationTarget
       ) {
         this.finalizeChallenger(
           state,
@@ -1124,15 +1213,20 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         observation,
       );
 
-    state.recentChampionCorrectness
-      .push(
-        predictionFor(
-          champion,
-          observation
-            .signature,
-        ) ===
-          observation.useful,
-      );
+    const championCorrect =
+      predictionFor(
+        champion,
+        observation
+          .signature,
+      ) ===
+        observation.useful;
+
+    this.updateSequentialDriftEvidence(
+      state,
+      championCorrect,
+      champion.operationalEvidence
+        .length,
+    );
 
     if (
       state.recentChampionCorrectness
@@ -1141,16 +1235,26 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     ) {
       state.recentChampionCorrectness
         .shift();
+
+      state.changePointOperationalEvidenceIndex =
+        champion.operationalEvidence
+          .length -
+        state.recentChampionCorrectness
+          .length +
+        1;
     }
 
     if (
+      !state.challengerSearchExhausted &&
       state.recentChampionCorrectness
         .length >=
         this.driftMinimumEvidence &&
       this.recentDriftPosteriorProbability(
         state,
       ) >=
-        this.driftConfidenceThreshold
+        this.driftConfidenceThreshold &&
+      state.changePointScore >=
+        this.sequentialEvidenceThreshold
     ) {
       this.startAdaptation(
         state,
@@ -1311,11 +1415,29 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         driftConfidenceThreshold:
           this.driftConfidenceThreshold,
 
+        changePointScore:
+          0,
+
+        changePointEvidenceCount:
+          0,
+
+        sequentialEvidenceThreshold:
+          this.sequentialEvidenceThreshold,
+
         challengerFitEvidenceCount:
           0,
 
         challengerValidationEvidenceCount:
           0,
+
+        challengerAttemptCount:
+          0,
+
+        challengerAttemptBudget:
+          this.maxChallengerAttemptsPerRegime,
+
+        challengerSearchExhausted:
+          false,
       };
     }
 
@@ -1362,6 +1484,15 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       regimeRecallValidation: [],
 
       recentChampionCorrectness: [],
+
+      changePointScore:
+        0,
+
+      challengerAttemptCount:
+        0,
+
+      challengerSearchExhausted:
+        false,
 
       replacementCount:
         0,
@@ -1523,8 +1654,9 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
         state,
       );
 
-    state.recentChampionCorrectness =
-      [];
+    this.resetSequentialDriftEvidence(
+      state,
+    );
 
     if (
       state.archivedChampions
@@ -1552,11 +1684,42 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     state:
       PrincipleState,
   ): void {
-    state.phase =
-      "challenger-fit";
-
     state.regimeRecallValidation =
       [];
+
+    if (
+      state.challengerAttemptCount >=
+        this.maxChallengerAttemptsPerRegime
+    ) {
+      state.challenger =
+        undefined;
+
+      state.challengerSearchExhausted =
+        true;
+
+      state.phase =
+        state.champion
+          ? "champion"
+          : "bootstrap-rejected";
+
+      this.resetSequentialDriftEvidence(
+        state,
+      );
+
+      return;
+    }
+
+    state.challengerAttemptCount +=
+      1;
+
+    const attempt =
+      state.challengerAttemptCount;
+
+    state.challengerSearchExhausted =
+      false;
+
+    state.phase =
+      "challenger-fit";
 
     state.challenger = {
       fitModel:
@@ -1569,6 +1732,16 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       fit: [],
 
       validation: [],
+
+      attempt,
+
+      validationTarget:
+        this.validationObservationTarget +
+        (
+          attempt -
+          1
+        ) *
+          this.challengerValidationGrowthPerAttempt,
     };
   }
 
@@ -1827,8 +2000,15 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     state.challenger =
       undefined;
 
-    state.recentChampionCorrectness =
-      [];
+    state.challengerAttemptCount =
+      0;
+
+    state.challengerSearchExhausted =
+      false;
+
+    this.resetSequentialDriftEvidence(
+      state,
+    );
 
     state.phase =
       "champion";
@@ -1943,8 +2123,15 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       state.challenger =
         undefined;
 
-      state.recentChampionCorrectness =
-        [];
+      state.challengerAttemptCount =
+        0;
+
+      state.challengerSearchExhausted =
+        false;
+
+      this.resetSequentialDriftEvidence(
+        state,
+      );
 
       state.phase =
         "champion";
@@ -1978,13 +2165,100 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
     state.challenger =
       undefined;
 
-    state.recentChampionCorrectness =
-      [];
+    state.challengerSearchExhausted =
+      state.challengerAttemptCount >=
+        this.maxChallengerAttemptsPerRegime;
+
+    this.resetSequentialDriftEvidence(
+      state,
+    );
 
     state.phase =
       state.champion
         ? "champion"
         : "bootstrap-rejected";
+  }
+
+  private resetSequentialDriftEvidence(
+    state:
+      PrincipleState,
+  ): void {
+    state.recentChampionCorrectness =
+      [];
+
+    state.changePointScore =
+      0;
+
+    state.changePointOperationalEvidenceIndex =
+      undefined;
+  }
+
+  private updateSequentialDriftEvidence(
+    state:
+      PrincipleState,
+
+    correct:
+      boolean,
+
+    operationalEvidenceIndex:
+      number,
+  ): void {
+    const stableAccuracy =
+      this.minimumValidationAccuracy;
+
+    const driftAccuracy =
+      this.driftAccuracyThreshold;
+
+    const increment =
+      correct
+        ? Math.log(
+            driftAccuracy /
+              stableAccuracy,
+          )
+        : Math.log(
+            (
+              1 -
+              driftAccuracy
+            ) /
+              (
+                1 -
+                stableAccuracy
+              ),
+          );
+
+    const nextScore =
+      state.changePointScore +
+      increment;
+
+    if (
+      nextScore <=
+        EPSILON
+    ) {
+      this.resetSequentialDriftEvidence(
+        state,
+      );
+
+      return;
+    }
+
+    if (
+      state.changePointScore <=
+        EPSILON
+    ) {
+      state.recentChampionCorrectness =
+        [];
+
+      state.changePointOperationalEvidenceIndex =
+        operationalEvidenceIndex;
+    }
+
+    state.changePointScore =
+      nextScore;
+
+    state.recentChampionCorrectness
+      .push(
+        correct,
+      );
   }
 
   private recentDriftPosteriorProbability(
@@ -2134,6 +2408,26 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
       driftConfidenceThreshold:
         this.driftConfidenceThreshold,
 
+      changePointScore:
+        state.changePointScore,
+
+      changePointEvidenceCount:
+        state.recentChampionCorrectness
+          .length,
+
+      ...(state
+          .changePointOperationalEvidenceIndex !==
+        undefined
+        ? {
+            changePointOperationalEvidenceIndex:
+              state
+                .changePointOperationalEvidenceIndex,
+          }
+        : {}),
+
+      sequentialEvidenceThreshold:
+        this.sequentialEvidenceThreshold,
+
       ...(state
           .lastDriftTriggerEvidenceCount !==
         undefined
@@ -2175,6 +2469,23 @@ export class AdaptiveValidatedPredicateApplicabilityModel {
           ?.validation
           .length ??
         0,
+
+      ...(state.challenger
+        ? {
+            challengerValidationTarget:
+              state.challenger
+                .validationTarget,
+          }
+        : {}),
+
+      challengerAttemptCount:
+        state.challengerAttemptCount,
+
+      challengerAttemptBudget:
+        this.maxChallengerAttemptsPerRegime,
+
+      challengerSearchExhausted:
+        state.challengerSearchExhausted,
 
       ...(state.challenger
           ?.program
