@@ -216,12 +216,21 @@ function searchBlob(
 
 export function PluginCatalog({
   items,
+  returnTo,
 }: {
   items:
     PluginCatalogItem[];
+
+  returnTo:
+    string;
 }) {
   const router =
     useRouter();
+
+  const connectReturnQuery =
+    `?returnTo=${encodeURIComponent(
+      returnTo,
+    )}`;
 
   const [
     query,
@@ -330,10 +339,65 @@ export function PluginCatalog({
                   parsed,
                 )
               ) {
-                setCustomDrafts(
+                const drafts =
                   parsed as
-                    CustomPluginDraft[],
+                    CustomPluginDraft[];
+
+                const customOnly =
+                  drafts.filter(
+                    (
+                      draft,
+                    ) => {
+                      const draftName =
+                        draft.name
+                          .trim()
+                          .toLowerCase();
+
+                      const draftDomain =
+                        normalizeDomain(
+                          draft.website,
+                        )
+                          ?.toLowerCase();
+
+                      return !PLUGIN_MARKETPLACE
+                        .some(
+                          (
+                            entry,
+                          ) =>
+                            Boolean(
+                              entry.providerId &&
+                              (
+                                entry.name
+                                  .toLowerCase() ===
+                                  draftName ||
+                                (
+                                  draftDomain &&
+                                  entry.domain
+                                    ?.toLowerCase() ===
+                                    draftDomain
+                                )
+                              ),
+                            ),
+                        );
+                    },
+                  );
+
+                setCustomDrafts(
+                  customOnly,
                 );
+
+                if (
+                  customOnly.length !==
+                  drafts.length
+                ) {
+                  window.localStorage
+                    .setItem(
+                      CUSTOM_PLUGIN_STORAGE_KEY,
+                      JSON.stringify(
+                        customOnly,
+                      ),
+                    );
+                }
               }
             } catch {
               // Ignore malformed local drafts and keep the marketplace usable.
@@ -555,7 +619,7 @@ export function PluginCatalog({
       closeWizard();
 
       router.push(
-        `/api/plugins/${knownPlugin.providerId}/connect`,
+        `/api/plugins/${knownPlugin.providerId}/connect${connectReturnQuery}`,
       );
 
       return;
@@ -709,7 +773,7 @@ export function PluginCatalog({
     ) {
       return (
         <Link
-          href={`/api/plugins/${providerId}/connect`}
+          href={`/api/plugins/${providerId}/connect${connectReturnQuery}`}
           aria-label={`Connect ${entry.name}`}
           title={`Connect ${entry.name}`}
           className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-default text-xl font-light text-text-secondary transition-colors hover:bg-surface-sunken hover:text-text-primary"
