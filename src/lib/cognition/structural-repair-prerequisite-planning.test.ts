@@ -816,13 +816,15 @@ describe(
 
           goalSuccessProbability:
             1,
-
-          totalCost:
-            0.15,
-
           reason:
             "prerequisite-aware-vector-plan",
         });
+
+        expect(
+          plan.totalCost,
+        ).toBeCloseTo(
+          0.15,
+        );
 
         expect(
           plan.actionIds,
