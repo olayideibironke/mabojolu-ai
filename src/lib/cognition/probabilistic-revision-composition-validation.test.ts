@@ -230,7 +230,7 @@ const HYPOTHESIS_Y =
   );
 
 function lineage() {
-  let result =
+  const result =
     createRevisionLineage(
       "rev-z",
       PROGRAM_Z,
