@@ -234,7 +234,13 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   revisions, missing causal regions are detected explicitly, safe validation
   probes are synthesized to fill both coverage and sample-count gaps, and
   lineage activation still requires the completed fresh reserve to pass the
-  protected historical comparison.
+  protected historical comparison;
+- probabilistic revision composition with bounded active validation planning,
+  where different retained revisions can explain different causal regions, only
+  previously validated fragments are eligible for composition, two-step
+  protected probes can separate single-revision and composite explanations, and
+  a composite enters the lineage only after disjoint protected validation plus
+  the adaptive protected-evidence budget.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -243,179 +249,204 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: active protected-evidence acquisition and probabilistic revision ancestry
+### Current milestone: probabilistic revision composition and active validation planning
 
-Mabojolu G can now respond actively when its protected validation reserve is too
-small or too narrow to support a lineage decision.
+Mabojolu G can now represent the case where no single retained historical
+revision explains all fresh causal regions.
 
-v1.26 begins by calculating the strictest adaptive protected-evidence
-requirement across every retained lineage revision.
+The controlled lineage contains two retained revisions.
 
-The resulting protected budget still includes both:
+rev-y contains a validated linear y fragment.
 
-- minimum observation count;
-- minimum distinct intervention signatures.
+rev-z contains a validated linear z fragment.
 
-Mabojolu then compares that requirement with the fresh protected evidence
-already available.
+Fresh composition-fitting evidence contains:
 
-The controlled benchmark starts with only two fresh observations:
+- y-only observations best explained by rev-y;
+- z-only observations best explained by rev-z;
+- a joint y+z observation that neither single revision explains adequately.
 
-y-only
-z-only
+v1.27 first evaluates every retained revision globally.
 
-Those observations are enough to make the old linear rev-0 highly implausible,
-but they do not separate the two retained interaction revisions.
+If one retained revision already has sufficiently low fitting error, composition
+is blocked and that single revision is retained.
 
-The probabilistic ancestry therefore begins approximately:
+If no single revision is adequate, Mabojolu groups the fitting observations by
+intervention signature and scores every retained revision inside each region.
 
-rev-0 -> near zero
-rev-1 -> about 0.50
-rev-2 -> about 0.50
+Composition becomes eligible only when:
 
-The posterior is uncertain and the protected reserve is incomplete.
+- at least two causal regions have decisive support;
+- those regions favor at least two different retained revisions;
+- the selected source revisions have compatible base effects.
 
-The coverage analyzer reports both kinds of missing evidence:
+Mabojolu does not synthesize arbitrary new structure.
 
-- four additional protected observations are still required;
-- one additional intervention signature is missing.
+It collects only validated causal fragments already present in the supported
+retained revisions and passes those fragments through the existing bounded
+hierarchical-program composition search.
 
-v1.26 synthesizes bounded protected-validation probes directly from the
-variables used by the retained revision programs.
+In the benchmark the bounded search combines:
 
-For the benchmark lineage it generates safe binary interventions over:
-
-y
-z
-y + z
-
-The existing reserve already contains y-only and z-only observations, so the
-joint y+z intervention is marked as filling the missing protected causal region.
-
-Probe choice combines two bounded values:
-
-expected information gain over revision ancestry
+linear(y), coefficient about 0.60
 +
-protected-reserve completion value
--
-probe cost penalty.
+linear(z), coefficient about 0.50
 
-When a causal region is missing, a probe that fills that region receives the
-largest bounded coverage bonus.
+The resulting composed program predicts:
 
-After intervention coverage is complete, missing protected row count still has
-a smaller completion value. This prevents Mabojolu from stopping merely because
-the posterior became sharp before the required reserve size was reached.
+y-only -> about 0.60
+z-only -> about 0.50
+y+z -> about 1.10
 
-The first controlled acquisition probe is therefore:
+The composition-fitting observations are recorded by id.
 
-protected-probe:y+z
+Any attempt to reuse one of those same ids as protected composition validation
+evidence is rejected explicitly.
 
-Its outcome strongly separates rev-1 from rev-2.
+Protected validation also recalculates the strongest retained single ancestor on
+the protected reserve itself. The composition is therefore not compared only
+against whichever single revision happened to look best during fitting.
 
-Mabojolu continues collecting safe protected observations until the adaptive
-reserve contains six observations across at least three intervention
-signatures.
+v1.27 adds a probabilistic belief over three protected explanations:
 
-The revision posterior then concentrates strongly on:
+rev-y
+rev-z
+composite
 
-rev-1
+With only unary validation probes, no single probe fully separates all three
+explanations.
 
-while alternatives retain nonzero probability under the Gaussian likelihood
-model.
+A y-only probe separates rev-z from rev-y/composite.
 
-Posterior confidence alone is not activation authority.
+A z-only probe separates rev-y from rev-z/composite.
 
-The completed fresh protected reserve is passed back through the existing v1.25
-lineage evaluator.
+The depth-two protected validation planner therefore lowers expected terminal
+explanation entropy relative to a one-step plan by choosing the second probe
+conditionally after the first protected observation.
 
-Only after that protected comparison returns:
+Unsafe validation probes remain filtered by the external risk and reversibility
+ceiling.
 
-rollback-parent
--> rev-1
+Posterior concentration is still not installation authority.
 
-can the lineage activation machinery replace the active rev-2 hypothesis.
+After active validation, the candidate must independently beat the best retained
+single revision on a disjoint protected reserve.
 
-The end-to-end benchmark therefore starts with:
+The controlled protected reserve gives:
 
-rev-2 active
-prep-ultra
+composite protected MSE = 0
+
+while the best retained single ancestor has materially larger protected error.
+
+The composition is promoted only because it wins that independent comparison.
+
+v1.27 then derives the adaptive protected-evidence requirement for the new
+composite revision.
+
+If the protected comparison technically favors the composition but the reserve
+is still too small or lacks enough intervention coverage for that complexity and
+uncertainty level, installation is refused.
+
+Only after the protected reserve satisfies that adaptive budget can the new
+revision enter the bounded lineage.
+
+The controlled installation creates:
+
+rev-composite
+
+from source revisions:
+
+rev-y
+rev-z
+
+The lineage itself remains single-parent for audit simplicity in this milestone.
+The composition records its source revision ids separately; true multi-parent
+lineage topology remains future work.
+
+For live planning, the composite inherits the strictest compatible prerequisite
+among its source revisions.
+
+The active rev-y branch originally requires readiness of about 0.35:
+
+prep-light
 -> finish
 
-and, after active protected acquisition plus protected lineage selection,
-changes to:
+The rev-z source requires readiness of about 0.70.
 
-rev-1 active
+The protected composite therefore adopts the conservative compatible threshold:
+
+readiness >= about 0.70
+
+Its task effect is projected from the protected composite causal program.
+
+The live plan becomes:
+
 prep-strong
 -> finish
 
-The materialized rev-2 goal branch is retired and replaced by revision-3
-subgoals while the terminal contract remains unchanged.
+The stale prep-light branch is replaced in the goal hierarchy while the root
+terminal goal contract remains unchanged.
 
-The selected rev-1 hypothesis is then passed directly back into receding-horizon
-control.
+Finally the composite live hypothesis is passed directly into the existing
+receding-horizon controller.
 
 The next real controller decision becomes:
 
 prep-strong
 
-The full v1.26 loop is:
+The v1.27 loop is therefore:
 
-existing fresh protected evidence
--> condition probabilistic revision ancestry
--> calculate adaptive reserve gap
--> identify missing causal coverage
--> synthesize bounded safe validation probes
--> score probes by information gain and reserve-completion value
--> execute one validation probe
--> observe real effect
--> update revision posterior
--> continue until protected count and coverage are complete
--> run the shared fresh reserve through protected lineage evaluation
--> retain, rollback, branch, or reopen search
--> synchronize goal branch and receding control.
+fresh composition-fitting evidence
+-> score retained revisions by causal region
+-> block composition if one ancestor already explains the evidence
+-> select supported historical fragments
+-> bounded hierarchical composition search
+-> probabilistic protected explanation belief
+-> one- or two-step safe protected validation planning
+-> disjoint protected comparison against the best protected single ancestor
+-> enforce adaptive protected count and intervention coverage
+-> append protected composite revision
+-> inherit conservative compatible prerequisite
+-> replace stale goal branch
+-> receding-horizon control.
 
-The hidden true revision is used only by the controlled benchmark simulator to
-generate synthetic observations. The runtime-facing planner does not receive the
-true revision id. It only sees the prior lineage, protected evidence, candidate
-safe probes, and observed effects.
-
-This remains bounded active validation rather than autonomous unrestricted
-experimentation. Variable set, intervention arity, binary intervention values,
-risk ceiling, reversibility requirement, observation noise, cost penalty,
-coverage bonus, posterior stopping thresholds, adaptive evidence formula,
-retained lineage, and final protected activation rules remain human-specified.
+This remains bounded historical recombination rather than unrestricted model
+synthesis. Candidate fragments must already be validated, source base effects
+must be compatible, maximum fragment count is bounded, fitting and protected
+evidence remain disjoint, validation risk and reversibility are externally
+limited, adaptive evidence thresholds remain fixed by governance rules, and the
+terminal goal contract remains protected.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. continuous-valued protected validation interventions rather than binary
-   variable activation;
-2. multi-step protected acquisition where the best first probe is chosen for the
-   information value of later validation probes;
-3. posterior uncertainty over lineage structure itself, including ambiguous
-   parent/ancestor relationships;
-4. region-specific revision mixtures where no single historical revision
-   explains every protected causal region;
-5. safe protected probes that simultaneously validate structural repair and
-   prerequisite thresholds;
-6. adaptive observation-noise estimation from repeated protected measurements;
-7. explicit value-of-validation that balances the benefit of more protected
-   certainty against delaying a real task action;
-8. branching new revisions from a probabilistically selected ancestor rather
-   than only activating an existing retained revision;
-9. active protected acquisition across renamed structurally equivalent domains;
-10. whether active protected validation preserves evidence independence,
-    terminal intent, hard risk ceilings, abstention, auditability, and zero
-    unsafe irreversible execution.
+1. true multi-parent lineage nodes rather than recording composite source ids
+   beside a single-parent audit chain;
+2. compositions containing interaction and latent-bias fragments from different
+   historical revisions;
+3. protected validation plans with horizons longer than two while executing only
+   one next probe;
+4. continuous-valued validation probes chosen to maximize separation between
+   single and composite explanations;
+5. region-specific posterior mixtures where different revisions remain useful
+   without requiring immediate global composition;
+6. composition rollback when one inherited fragment later regresses while other
+   inherited fragments remain valid;
+7. automatic retirement of redundant source fragments after repeated protected
+   evidence;
+8. transfer of composed revisions to structurally equivalent renamed domains;
+9. value-of-validation that trades protected probe cost and task delay against
+   expected benefit of a new composition;
+10. whether revision composition preserves evidence independence, protected
+    installation, terminal intent, hard risk ceilings, abstention, auditability,
+    and zero unsafe irreversible execution.
 
-The next central milestone is probabilistic revision composition and active
-validation planning: Mabojolu should represent the possibility that different
-historical revisions explain different causal subregions, plan short sequences
-of protected probes to distinguish those mixtures, and synthesize a bounded new
-revision only when no single retained ancestor adequately explains the fresh
-protected evidence.
+The next central milestone is compositional revision maintenance and selective
+fragment rollback: Mabojolu should track reliability separately for every
+inherited fragment inside a composite revision, preserve the fragments that
+remain protected, retire or replace only the fragment that regresses, and avoid
+rolling back the entire composite when a local repair is sufficient.
 
 ## Safety and audit principle
 
