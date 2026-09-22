@@ -31,11 +31,13 @@ import {
   chatRequestSchema,
   MAX_CHAT_IMAGE_ATTACHMENTS,
   MAX_CHAT_IMAGE_DATA_URL_CHARS,
+  MAX_CHAT_DOCUMENT_TEXT_CHARS,
   parseJsonBody,
 } from "@/lib/validation/chat";
-import type {
-  ChatImageAttachment,
-  ChatMessage,
+import {
+  isChatImageAttachment,
+  type ChatAttachment,
+  type ChatMessage,
 } from "@/types/chat";
 
 /**
@@ -66,6 +68,8 @@ export const dynamic = "force-dynamic";
 const MAX_BODY_BYTES =
   MAX_CHAT_IMAGE_ATTACHMENTS *
     MAX_CHAT_IMAGE_DATA_URL_CHARS +
+  MAX_CHAT_DOCUMENT_TEXT_CHARS *
+    6 +
   1_000_000;
 
 function normalizedMessageContent(
@@ -85,7 +89,7 @@ function normalizedMessageContent(
     message.attachments &&
     message.attachments.length > 0
   ) {
-    return "Please describe and analyze the attached image.";
+    return "Please analyze the attached file.";
   }
 
   return message.content;
@@ -93,33 +97,30 @@ function normalizedMessageContent(
 
 function copyAttachments(
   attachments:
-    | Array<{
-        id: string;
-        name: string;
-        mimeType:
-          | "image/jpeg"
-          | "image/png"
-          | "image/webp";
-        sizeBytes: number;
-        dataUrl: string;
-      }>
-    | undefined,
-): ChatImageAttachment[] | undefined {
+    ChatAttachment[] |
+    undefined,
+): ChatAttachment[] | undefined {
   if (
     !attachments ||
-    attachments.length === 0
+    attachments.length ===
+      0
   ) {
     return undefined;
   }
 
   return attachments.map(
-    (attachment) => ({
-      id: attachment.id,
-      name: attachment.name,
-      mimeType: attachment.mimeType,
-      sizeBytes: attachment.sizeBytes,
-      dataUrl: attachment.dataUrl,
-    }),
+    (
+      attachment,
+    ) =>
+      isChatImageAttachment(
+        attachment,
+      )
+        ? {
+            ...attachment,
+          }
+        : {
+            ...attachment,
+          },
   );
 }
 
@@ -381,7 +382,7 @@ export async function POST(
         normalizedLastContent.trim()
           .length > 0
           ? normalizedLastContent
-          : "Image conversation";
+          : "File conversation";
 
       const created =
         await database.createConversation(
@@ -505,8 +506,11 @@ export async function POST(
         (message) =>
           (
             message.attachments
-              ?.length ?? 0
-          ) > 0,
+              ?.some(
+                isChatImageAttachment,
+              ) ??
+            false
+          ),
       );
 
     if (
