@@ -1967,26 +1967,6 @@ function buildCompositeHypothesis(
   prerequisite:
     LearnedActionPrerequisite;
 } {
-  const sourceNodes =
-    sourceRevisionIds.map(
-      (sourceRevisionId) => {
-        const node =
-          lineage.nodes.find(
-            (candidate) =>
-              candidate.revisionId ===
-              sourceRevisionId,
-          );
-
-        if (!node) {
-          throw new Error(
-            `Unknown composite hypothesis source ${sourceRevisionId}.`,
-          );
-        }
-
-        return node;
-      },
-    );
-
   const active =
     lineage.nodes.find(
       (node) =>
