@@ -159,14 +159,14 @@ describe(
                 "prerequisite-vector-subgoal-2",
             );
 
-        const revisedFirst =
+        const revisedSecond =
           report
             .hierarchyAfterRevision
             .goals
             .find(
               (goal) =>
                 goal.id ===
-                "prerequisite-revised-1-1",
+                "prerequisite-revised-1-2",
             );
 
         expect(
@@ -184,7 +184,7 @@ describe(
         );
 
         expect(
-          revisedFirst
+          revisedSecond
             ?.successCriteria,
         ).toEqual(
           expect.arrayContaining([
