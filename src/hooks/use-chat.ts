@@ -18,7 +18,7 @@ import {
 } from "@/lib/utilities/ids";
 import type {
   ChatErrorPayload,
-  ChatImageAttachment,
+  ChatAttachment,
   ChatMessage,
   ChatSource,
   FeedbackRating,
@@ -31,12 +31,12 @@ export interface UseChatResult {
 
   send: (
     content: string,
-    attachments?: ChatImageAttachment[],
+    attachments?: ChatAttachment[],
   ) => void;
 
   startFreshConversation: (
     content: string,
-    attachments?: ChatImageAttachment[],
+    attachments?: ChatAttachment[],
   ) => void;
 
   stop: () => void;
@@ -79,7 +79,7 @@ interface RequestMessage {
   role: ChatMessage["role"];
   content: string;
   createdAt: string;
-  attachments?: ChatImageAttachment[];
+  attachments?: ChatAttachment[];
 }
 
 /**
@@ -95,12 +95,10 @@ function prepareRequestMessage(
 ): RequestMessage {
   const attachments =
     message.attachments?.map(
-      (attachment) => ({
-        id: attachment.id,
-        name: attachment.name,
-        mimeType: attachment.mimeType,
-        sizeBytes: attachment.sizeBytes,
-        dataUrl: attachment.dataUrl,
+      (
+        attachment,
+      ) => ({
+        ...attachment,
       }),
     );
 
@@ -493,7 +491,7 @@ export function useChat(
     (
       content: string,
       attachments:
-        ChatImageAttachment[] = [],
+        ChatAttachment[] = [],
     ) => {
       const trimmed =
         content.trim();
@@ -565,7 +563,7 @@ export function useChat(
     (
       content: string,
       attachments:
-        ChatImageAttachment[] = [],
+        ChatAttachment[] = [],
     ) => {
       const trimmed =
         content.trim();
