@@ -2,7 +2,6 @@ import {
   MultiFragmentStructuralPosterior,
   planContingentMultiFragmentStructuralDiagnostics,
   type ContingentStructuralDiagnosticPlan,
-  type MultiFragmentStructuralBelief,
   type MultiFragmentStructuralRevisionCandidate,
 } from "./multi-fragment-structural-revision";
 
