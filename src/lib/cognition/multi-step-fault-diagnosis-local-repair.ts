@@ -545,7 +545,9 @@ function buildFaultExplanations(
     ),
   )
     .map(
-      (fragmentIdsForFault) => ({
+      (
+        fragmentIdsForFault,
+      ): BoundedFaultExplanation => ({
         id:
           fragmentIdsForFault.length ===
             0
