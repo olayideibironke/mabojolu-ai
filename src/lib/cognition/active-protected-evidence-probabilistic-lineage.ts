@@ -453,7 +453,6 @@ function lineageVariables(
             ),
         ]),
       ),
-    ),
   ).sort();
 }
 
