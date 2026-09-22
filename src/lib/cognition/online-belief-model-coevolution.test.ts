@@ -14,7 +14,10 @@ import {
 } from "./online-belief-model-coevolution";
 
 import {
+  learnActionPrerequisite,
   materializePrerequisiteAwareSubgoals,
+  synthesizeStructuralRepairCandidates,
+  validateStructuralRepairCandidates,
   type ActionPrerequisiteObservation,
   type LearnedActionPrerequisite,
 } from "./structural-repair-prerequisite-planning";
@@ -628,15 +631,6 @@ describe(
             "bad-linear-y",
             triggeredMismatchStatus(),
           );
-
-        const {
-          synthesizeStructuralRepairCandidates,
-          validateStructuralRepairCandidates,
-          learnActionPrerequisite,
-        } =
-          require(
-            "./structural-repair-prerequisite-planning",
-          ) as typeof import("./structural-repair-prerequisite-planning");
 
         const candidates =
           synthesizeStructuralRepairCandidates(
