@@ -1,4 +1,8 @@
 import type {
+  HierarchicalCausalProgram,
+} from "./hierarchical-causal-program";
+
+import type {
   StructuralRepairTopologyCandidate,
 } from "./structural-repair-prerequisite-planning";
 
