@@ -869,6 +869,85 @@ describe(
     );
 
     it(
+      "does not let posterior certainty bypass repeated-blame quarantine",
+      () => {
+        const {
+          reasoner,
+          plan,
+        } =
+          reasonerAndPlan();
+
+        const result =
+          runControlledLocalizedCompositeMaintenance(
+            lineage(),
+            ACTUAL_PROGRAM,
+            [
+              observation(
+                "certainty-without-z-blame",
+                1,
+                0,
+                0.6,
+              ),
+            ],
+            probes(),
+            [
+              REPAIR_Z,
+            ],
+            PROTECTED,
+            "progress",
+            {
+              finish: {
+                y:
+                  0.5,
+                z:
+                  1,
+              },
+
+              "boost-finish": {
+                y:
+                  1,
+                z:
+                  1,
+              },
+            },
+            STATE,
+            GOAL,
+            ACTIONS,
+            plan,
+            reasoner,
+            "fault-localization-terminal",
+            "rev-certainty-no-quarantine",
+            1,
+            provenance(),
+            {
+              maximumSteps:
+                1,
+            },
+          );
+
+        expect(
+          result.localization,
+        ).toMatchObject({
+          decision:
+            "resolved",
+
+          selectedFragmentId:
+            "rev-z:program-z-fragment",
+        });
+
+        expect(
+          result,
+        ).toMatchObject({
+          maintenance:
+            undefined,
+
+          reason:
+            "localized-fragment-not-quarantined",
+        });
+      },
+    );
+
+    it(
       "localizes z, satisfies repeated-blame quarantine, and installs only the local z repair",
       () => {
         const {
