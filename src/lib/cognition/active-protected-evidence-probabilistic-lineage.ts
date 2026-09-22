@@ -1177,7 +1177,7 @@ function cloneObservation(
   };
 }
 
-export function activelyAcquireProtectedEvidence(
+export function runControlledProtectedEvidenceAcquisition(
   lineage: RevisionLineage,
   initialEvidence:
     readonly StructuralMechanismObservation[],
