@@ -988,6 +988,40 @@ export function evaluateRevisionLineage(
     selected.meanSquaredError;
 
   if (
+    selected.meanSquaredError >
+      maximumAcceptableMeanSquaredError
+  ) {
+    return {
+      decision:
+        "reopen-search",
+
+      activeRevisionId:
+        active.revisionId,
+
+      activeMeanSquaredError:
+        activeScore
+          .meanSquaredError,
+
+      selectedMeanSquaredError:
+        selected
+          .meanSquaredError,
+
+      improvement,
+
+      requirement,
+
+      scores,
+
+      freshProtectedEvidenceIds:
+        coverage
+          .protectedEvidenceIds,
+
+      reason:
+        "all-lineage-revisions-inadequate",
+    };
+  }
+
+  if (
     selected.revisionId ===
       active.revisionId
   ) {
