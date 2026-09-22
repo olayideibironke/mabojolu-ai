@@ -582,41 +582,86 @@ describe(
           estimates();
 
         expect(
-          inferred,
-        ).toMatchObject([
+          inferred.map(
+            (estimate) => ({
+              fragmentId:
+                estimate.fragmentId,
+
+              effectiveEvidenceCount:
+                estimate
+                  .effectiveEvidenceCount,
+            }),
+          ),
+        ).toEqual([
           {
             fragmentId:
               "rev-y:program-y-fragment",
 
-            estimatedScale:
-              0.4,
-
             effectiveEvidenceCount:
               1,
-
-            lowerBound:
-              0.3,
-
-            upperBound:
-              0.5,
           },
           {
             fragmentId:
               "rev-z:program-z-fragment",
 
-            estimatedScale:
-              0.7,
-
             effectiveEvidenceCount:
               1,
-
-            lowerBound:
-              0.6,
-
-            upperBound:
-              0.8,
           },
         ]);
+
+        expect(
+          inferred[
+            0
+          ]!
+            .estimatedScale,
+        ).toBeCloseTo(
+          0.4,
+        );
+
+        expect(
+          inferred[
+            0
+          ]!
+            .lowerBound,
+        ).toBeCloseTo(
+          0.3,
+        );
+
+        expect(
+          inferred[
+            0
+          ]!
+            .upperBound,
+        ).toBeCloseTo(
+          0.5,
+        );
+
+        expect(
+          inferred[
+            1
+          ]!
+            .estimatedScale,
+        ).toBeCloseTo(
+          0.7,
+        );
+
+        expect(
+          inferred[
+            1
+          ]!
+            .lowerBound,
+        ).toBeCloseTo(
+          0.6,
+        );
+
+        expect(
+          inferred[
+            1
+          ]!
+            .upperBound,
+        ).toBeCloseTo(
+          0.8,
+        );
       },
     );
 
@@ -1078,12 +1123,16 @@ describe(
           decision:
             "installed",
 
-          candidateProtectedMeanSquaredError:
-            0,
-
           reason:
             "protected-local-repair-selected",
         });
+
+        expect(
+          fullDecision
+            .candidateProtectedMeanSquaredError,
+        ).toBeCloseTo(
+          0,
+        );
       },
     );
 
