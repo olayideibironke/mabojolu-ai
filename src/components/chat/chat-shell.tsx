@@ -1154,7 +1154,7 @@ export function ChatShell({
               composerDisabledReason
             }
             imageAttachmentsEnabled={
-              false
+              true
             }
             computeStatus={
               statusLabel
