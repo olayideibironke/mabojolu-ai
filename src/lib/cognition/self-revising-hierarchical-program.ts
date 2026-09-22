@@ -890,7 +890,7 @@ function remapRevisionPlan(
   const ids =
     plan.subgoals.map(
       (
-        ,
+        _subgoal,
         index,
       ) =>
         `revised-subgoal-${revisionNumber}-${index + 1}`,
