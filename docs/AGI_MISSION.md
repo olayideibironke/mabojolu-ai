@@ -274,7 +274,13 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   alternatives, safe experiments are selected by expected information gain,
   topology-changing candidates require independent protected validation, and
   only the protected winner may replace the live fragment while preserving
-  provenance and terminal intent.
+  provenance and terminal intent;
+- bounded multi-fragment structural revision with contingent active validation,
+  where several local structural uncertainties are composed into a bounded
+  joint hypothesis space, depth-two diagnostic plans can stop early or choose a
+  different second probe depending on the first observed outcome, and a joint
+  topology revision can enter the live lineage only after the same multi-fragment
+  structure wins on a disjoint adaptive protected reserve.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -283,91 +289,23 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: bounded local structural mutation and joint parameter-structure uncertainty
+### Current milestone: multi-fragment structural revision with contingent active validation
 
-Mabojolu G can now distinguish bounded parameter drift from a bounded local
-change in causal form.
+Mabojolu G can now maintain bounded uncertainty over simultaneous local
+structural changes in more than one inherited causal fragment.
 
-The structural grammar now includes:
+v1.33 composes already bounded local candidate sets rather than opening an
+unrestricted cross-product over arbitrary programs.
 
-- linear;
-- saturating;
-- interaction;
-- latent-bias.
-
-The saturating term is intentionally fixed and auditable in this milestone.
-
-For intervention magnitude x in [0, 1], its feature is:
-
-x / (0.5 + x)
-
-and the learned coefficient remains bounded in [0, 1].
-
-The existing structural challenger generator does not synthesize saturating
-terms unless explicitly enabled, so older structural-search behavior remains
-unchanged by default.
-
-v1.32 mutates only one already validated local fragment at a time.
-
-The target fragment must currently contain exactly one validated structural
-term.
-
-For that fragment the bounded mutation grammar can consider:
-
-- the incumbent fragment unchanged;
-- the same topology with a refitted coefficient;
-- a linear replacement;
-- a saturating replacement;
-- a two-variable interaction with one observed context variable;
-- a latent-bias replacement.
-
-Candidate count, changed fragment count, coefficient range, observed variables,
-and grammar itself remain externally bounded.
-
-The controlled benchmark begins with:
+The controlled benchmark begins with two inherited fragments:
 
 linear(y), coefficient about 0.60
 
-plus a healthy:
+and:
 
-linear(z), coefficient about 0.20.
+linear(z), coefficient about 0.50.
 
-The changed environment instead behaves locally as:
-
-saturating(y), coefficient about 0.90
-
-where:
-
-effect(y) = 0.90 * y / (0.5 + y).
-
-The discovery observation:
-
-y = 0.50
-observed effect = 0.45
-
-is deliberately ambiguous.
-
-A linear parameter-drift model with coefficient about 0.90 predicts:
-
-0.90 * 0.50 = 0.45.
-
-The saturating structural model with coefficient about 0.90 also predicts:
-
-0.90 * 0.50 / (0.5 + 0.50)
-= 0.45.
-
-So discovery evidence alone cannot distinguish:
-
-same local topology, different coefficient
-
-from:
-
-different local topology, saturating response.
-
-A tight discovery-plausibility band removes clearly worse structural
-alternatives while keeping both of those explanations alive.
-
-The joint parameter-structure posterior therefore starts unresolved over:
+The local y discovery evidence leaves two plausible explanations:
 
 linear(y), coefficient about 0.90
 
@@ -375,185 +313,278 @@ versus:
 
 saturating(y), coefficient about 0.90.
 
-The posterior is maintained in log space.
+The local z discovery evidence leaves two plausible explanations:
 
-Mabojolu then synthesizes bounded diagnostic interventions and scores them by:
+the incumbent linear(z), coefficient about 0.50
 
-expected information gain
-minus cost penalty
-minus risk penalty.
+versus:
 
-In the controlled benchmark the safe full-y probe is:
+interaction(z,w), coefficient about 0.50.
 
-y = 1.00.
+Those two local uncertainties form exactly four bounded joint structural
+candidates.
 
-That intervention is highly discriminating because the two live explanations
-predict:
+The controlled benchmark true environment uses:
 
-linear parameter drift:
-0.90
+saturating(y), coefficient about 0.90
 
-saturating topology:
-0.60.
+plus:
 
-The controlled hidden benchmark environment returns:
+interaction(z,w), coefficient about 0.50.
 
-0.60.
+The runtime structural posterior is not given that truth label.
 
-The posterior then resolves the saturating structure above the configured
-confidence and margin thresholds.
+It receives only the candidate programs, an externally specified prior over the
+bounded joint candidates, safe diagnostic probes, and observed effects.
 
-The hidden saturating environment is used only by the controlled benchmark to
-produce the simulated observation.
+The controlled prior is deliberately asymmetric:
 
-The runtime posterior itself receives candidate programs and externally observed
-effects, not a hidden truth label.
+saturating(y) + interaction(z,w): about 0.35
+saturating(y) + incumbent z: about 0.35
+linear-refit y + incumbent z: about 0.29
+linear-refit y + interaction(z,w): about 0.01.
 
-Posterior resolution still does not authorize topology mutation.
+That prior does not identify the hidden truth.
 
-v1.32 converts the resolved candidate set into the existing protected local
-repair-validation surface.
+It only changes the expected decision value of diagnostic branches.
 
-Discovery evidence and the active structural diagnostic are excluded from the
-final protected reserve.
+The first bounded structural probe is:
 
-The protected reserve contains fresh interventions at:
-
-y = 0.25
-y = 0.50
 y = 1.00
-and
-y = 0.50 with z = 1.00.
 
-Under the controlled saturating mechanism their expected effects are about:
+with z held at 0.
 
-0.30
-0.45
-0.60
-0.65.
+That probe separates the two y explanations:
 
-The selected saturating candidate must remain the best candidate on that fresh
+linear-refit y predicts about 0.90
+
+while:
+
+saturating y predicts about 0.60.
+
+The important v1.33 change is that the second experiment is not predetermined.
+
+For a first-step observation supporting the high-probability linear branch, the
+posterior already crosses the configured confidence and margin thresholds.
+
+That branch stops after one experiment.
+
+For a first-step observation supporting the saturating branch, two joint
+hypotheses remain:
+
+saturating y + incumbent z
+
+versus:
+
+saturating y + interaction(z,w).
+
+That branch therefore schedules the more expensive context-sensitive second
+probe:
+
+z = 1.00
+w = 0.50.
+
+Under the two remaining z explanations the expected effects differ:
+
+incumbent linear(z) predicts about 0.50
+
+while:
+
+interaction(z,w) predicts about 0.25.
+
+The controlled hidden environment follows the saturating branch.
+
+The observed sequence is therefore:
+
+first probe y = 1.00
+-> observed effect about 0.60
+
+then:
+
+second probe z = 1.00, w = 0.50
+-> observed effect about 0.25.
+
+After those two observations the posterior resolves the joint topology:
+
+saturating(y), coefficient about 0.90
++
+interaction(z,w), coefficient about 0.50.
+
+The diagnostic planner is depth-two and bounded.
+
+It evaluates expected terminal posterior entropy, experiment cost, and maximum
+risk.
+
+A high-risk probe set causes fail-closed abstention.
+
+The hidden actual program is used only by the explicitly controlled benchmark
+helper that simulates observations.
+
+The runtime planner and posterior never receive the hidden joint-structure
+label.
+
+Posterior resolution still does not authorize installation.
+
+v1.33 converts the resolved joint candidate set into the existing protected
+local-repair validation surface.
+
+Both active diagnostic observations remain excluded from the final protected
 reserve.
 
-The adaptive protected-evidence formula also remains active.
+The controlled fresh protected reserve covers:
 
-For the controlled two-fragment repaired program and the remaining posterior
-uncertainty, the benchmark requires:
+y = 0.25
 
-4 fresh protected observations.
+y = 1.00
 
-A three-observation reserve is rejected.
+z = 1.00 with w = 0.50
 
-The complete four-observation reserve authorizes installation.
+z = 1.00 with w = 1.00
 
-The topology-changing replacement keeps the historical logical y fragment
-identity and origin but changes its active implementation to:
+and a combined:
+
+y = 0.50
+z = 1.00
+w = 0.50.
+
+Under the resolved joint structure those protected effects are about:
+
+0.30
+0.60
+0.25
+0.50
+0.70.
+
+The same saturating-plus-interaction candidate must remain the best joint
+structure on that independent reserve.
+
+The adaptive protected-evidence requirement remains active.
+
+An incomplete three-observation protected reserve is rejected.
+
+The full fresh reserve authorizes the joint revision only when count,
+intervention coverage, and protected superiority all pass.
+
+Both changed fragments then advance provenance independently.
+
+The y logical fragment keeps origin:
+
+rev-y
+
+while its active implementation becomes:
 
 rev-y:program-y-fragment:mutation:saturating:y:0.900.
 
-The healthy z fragment remains:
+The z logical fragment keeps origin:
 
-rev-z:program-z-fragment.
+rev-z
 
-Only y receives a repaired provenance event.
+while its active implementation becomes:
 
-z receives only a preserved-generation event.
+rev-z:program-z-fragment:mutation:interaction:z+w:0.500.
 
-The protected topology mutation then projects into the live control model.
+Both records preserve the protected evidence ids that authorized the joint
+revision.
+
+The protected joint structure is projected back into live control.
 
 Before structural revision:
 
-finish -> about 0.30
-boost-finish -> about 0.60
+finish -> about 0.80
+boost-finish -> about 1.10
 
 with terminal requirement:
 
-progress >= 0.40
+progress >= 0.79
 
-so the old plan requires:
-
-boost-finish.
-
-After the protected saturating mutation:
-
-finish -> about 0.45
-boost-finish -> about 0.60
-
-and the cheaper action:
-
-finish
-
-now clears the terminal target.
-
-The stale child goal branch is replaced while the terminal goal contract remains
-unchanged.
-
-The protected structural revision then feeds directly into receding-horizon
-control, whose next direct action becomes:
+so the incumbent model selects:
 
 finish.
 
-The v1.32 loop is therefore:
+After the protected joint revision:
 
-local mismatch or structural suspicion
--> synthesize bounded parameter and topology alternatives
--> keep only discovery-plausible candidates
--> maintain joint parameter-structure uncertainty in log space
--> synthesize safe structural diagnostics
--> choose the highest-value safe diagnostic
--> observe the real effect
--> update the joint posterior
--> require confidence and margin
--> convert the resolved local candidate set into protected validation
--> keep discovery and diagnostic evidence out of the protected reserve
--> require the same topology candidate to win independently
--> enforce adaptive protected count and intervention coverage
--> install only the protected local mutation
--> update fragment provenance
--> project the revised causal program into live planning
--> revise only the stale child goal branch
+finish -> about 0.70
+boost-finish -> about 0.85.
+
+The previously sufficient finish action is no longer enough.
+
+The revised plan becomes:
+
+boost-finish.
+
+Only the stale child goal branch is replaced.
+
+The terminal goal contract remains unchanged.
+
+The protected joint structure then feeds directly into receding-horizon control,
+whose next direct action is expected to become:
+
+boost-finish.
+
+The v1.33 loop is therefore:
+
+multiple bounded local structural uncertainties
+-> compose a bounded joint candidate set
+-> maintain a log-space posterior over joint structures
+-> compare depth-one and depth-two diagnostic value
+-> choose one safe first experiment
+-> observe its real effect
+-> stop early if the branch resolves
+or
+-> choose a branch-specific second structural probe
+-> observe the second effect
+-> resolve the joint topology
+-> convert the same bounded candidate set into protected validation
+-> keep all diagnostic observations out of the protected reserve
+-> require the same joint structure to win independently
+-> enforce adaptive protected evidence coverage
+-> install both local topology changes atomically
+-> advance per-fragment provenance
+-> project the joint structure into live planning
+-> revise only stale child goals
 -> continue receding-horizon control.
 
-This remains bounded local structural mutation rather than unrestricted model
-rewriting. Only one existing one-term fragment can mutate in this milestone.
-The structural grammar is finite, saturating shape is fixed, interactions use
-observed variables only, coefficients remain in [0, 1], candidate count is
-bounded, diagnostic risk and reversibility are externally constrained,
-posterior thresholds remain fixed, protected evidence remains independent, and
-the terminal goal contract remains outside the mutation process.
+This remains bounded multi-fragment structural revision rather than unrestricted
+self-rewriting. v1.33 requires pre-bounded local candidate sets, caps changed
+fragments and total joint candidates, supports only a depth-two diagnostic
+horizon, uses externally supplied candidate priors rather than hidden truth,
+enforces risk and reversibility ceilings, preserves evidence-role independence,
+and requires a fresh protected winner before any joint topology can enter the
+live lineage.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. multi-fragment structural mutation where more than one local topology may
-   change but the joint search remains combinatorially bounded;
-2. contingent two-step structural experiment policies rather than one isolated
-   diagnostic;
-3. posterior uncertainty over saturating-shape parameters instead of using one
-   fixed saturation transform;
-4. local replacement grammar that can add or remove a term inside a fragment
-   rather than replacing an entire one-term fragment;
-5. interaction mutation where active probes must distinguish true interaction
-   from correlated linear drift;
-6. latent-bias mutation where constant offsets compete against hidden
-   intervention-dependent structure;
-7. structural mutation priors informed by provenance and earlier successful
-   repairs without bypassing fresh protected validation;
-8. gradual topology drift where parameter and structural posteriors evolve on
-   different time scales;
-9. active protected-validation probes selected by expected falsification value
-   instead of receiving a fixed reserve;
-10. whether topology adaptation preserves bounded search, evidence-role
-    independence, terminal intent, hard risk ceilings, abstention, auditability,
-    and zero unsafe irreversible execution.
+1. adaptive joint-candidate pruning that learns which cross-fragment structural
+   combinations are implausible before full Cartesian composition;
+2. deeper contingent structural diagnosis with receding-horizon execution
+   rather than a fixed depth-two ceiling;
+3. joint parameter and topology posteriors where each changed fragment keeps
+   continuous coefficient uncertainty instead of one fitted coefficient per
+   local structure;
+4. active protected-validation planning that chooses the next falsification
+   probe after seeing earlier protected outcomes;
+5. interaction between structural revision and prerequisite uncertainty so a
+   topology change and action-threshold change can be diagnosed jointly;
+6. provenance-informed priors over joint structures without allowing historical
+   success to bypass fresh protected evidence;
+7. gradual multi-fragment topology drift with independent change-point clocks;
+8. structural revisions that add or remove terms within a multi-term fragment
+   rather than replacing whole one-term fragments;
+9. transfer of joint structural revision policies across renamed but
+   structurally equivalent domains;
+10. whether multi-fragment structural revision preserves bounded search,
+    branch-contingent diagnosis, evidence independence, terminal intent, hard
+    risk ceilings, abstention, auditability, and zero unsafe irreversible
+    execution.
 
-The next central milestone is multi-fragment structural revision with contingent
-active validation: Mabojolu should maintain uncertainty over a small set of
-simultaneous local topology changes, plan short diagnostic sequences whose
-second experiment depends on the first outcome, and authorize a multi-fragment
-topology revision only when independent protected evidence supports the same
-joint structure.
+The next central milestone is active protected-validation planning and
+receding-horizon structural revision: Mabojolu should choose protected
+falsification probes sequentially, update confidence after each protected
+observation, stop as soon as the revision is adequately supported or falsified,
+and reopen bounded structural search when the protected evidence rejects every
+currently retained joint candidate.
 
 ## Safety and audit principle
 
