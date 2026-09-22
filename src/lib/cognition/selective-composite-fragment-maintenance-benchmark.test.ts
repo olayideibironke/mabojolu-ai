@@ -107,10 +107,10 @@ describe(
             .progress,
         ).toMatchObject({
           finish:
-            0.8,
+            0.5,
 
           "boost-finish":
-            1,
+            0.8,
         });
       },
     );
