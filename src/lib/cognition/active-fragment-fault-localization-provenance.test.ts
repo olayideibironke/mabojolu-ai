@@ -936,14 +936,14 @@ describe(
         });
 
         expect(
-          result,
-        ).toMatchObject({
-          maintenance:
-            undefined,
+          result.reason,
+        ).toBe(
+          "localized-fragment-not-quarantined",
+        );
 
-          reason:
-            "localized-fragment-not-quarantined",
-        });
+        expect(
+          result.maintenance,
+        ).toBeUndefined();
       },
     );
 
