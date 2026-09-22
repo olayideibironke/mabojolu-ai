@@ -240,7 +240,13 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   previously validated fragments are eligible for composition, two-step
   protected probes can separate single-revision and composite explanations, and
   a composite enters the lineage only after disjoint protected validation plus
-  the adaptive protected-evidence budget.
+  the adaptive protected-evidence budget;
+- compositional revision maintenance with fragment-level reliability,
+  leave-one-fragment-out blame attribution, repeated-blame quarantine,
+  same-topology local repair or fragment-only rollback, structural preservation
+  of healthy inherited fragments, fresh adaptive protected maintenance
+  reserves, and immediate projection of the maintained composite back into live
+  goals and receding-horizon control.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -249,204 +255,213 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: probabilistic revision composition and active validation planning
+### Current milestone: compositional revision maintenance and selective fragment rollback
 
-Mabojolu G can now represent the case where no single retained historical
-revision explains all fresh causal regions.
+Mabojolu G can now maintain a previously installed composite revision at the
+fragment level rather than treating the entire composite as one indivisible
+model.
 
-The controlled lineage contains two retained revisions.
-
-rev-y contains a validated linear y fragment.
-
-rev-z contains a validated linear z fragment.
-
-Fresh composition-fitting evidence contains:
-
-- y-only observations best explained by rev-y;
-- z-only observations best explained by rev-z;
-- a joint y+z observation that neither single revision explains adequately.
-
-v1.27 first evaluates every retained revision globally.
-
-If one retained revision already has sufficiently low fitting error, composition
-is blocked and that single revision is retained.
-
-If no single revision is adequate, Mabojolu groups the fitting observations by
-intervention signature and scores every retained revision inside each region.
-
-Composition becomes eligible only when:
-
-- at least two causal regions have decisive support;
-- those regions favor at least two different retained revisions;
-- the selected source revisions have compatible base effects.
-
-Mabojolu does not synthesize arbitrary new structure.
-
-It collects only validated causal fragments already present in the supported
-retained revisions and passes those fragments through the existing bounded
-hierarchical-program composition search.
-
-In the benchmark the bounded search combines:
+The controlled composite contains two inherited validated fragments:
 
 linear(y), coefficient about 0.60
 +
 linear(z), coefficient about 0.50
 
-The resulting composed program predicts:
+The environment then changes only in the z mechanism.
 
-y-only -> about 0.60
-z-only -> about 0.50
-y+z -> about 1.10
+The new local truth is approximately:
 
-The composition-fitting observations are recorded by id.
+linear(y) remains 0.60
+linear(z) becomes 0.20
 
-Any attempt to reuse one of those same ids as protected composition validation
-evidence is rejected explicitly.
+v1.28 reuses the existing leave-one-fragment-out diagnosis and fragment
+reliability machinery.
 
-Protected validation also recalculates the strongest retained single ancestor on
-the protected reserve itself. The composition is therefore not compared only
-against whichever single revision happened to look best during fitting.
+Each monitoring observation is evaluated against the full composite and against
+versions with each fragment removed.
 
-v1.27 adds a probabilistic belief over three protected explanations:
+Repeated evidence can therefore distinguish:
 
-rev-y
-rev-z
-composite
+- a fragment whose removal materially reduces prediction error;
+- a fragment whose removal makes a correct prediction worse;
+- a fragment that is neutral to that observation.
 
-With only unary validation probes, no single probe fully separates all three
-explanations.
+The controlled monitoring sequence contains both:
 
-A y-only probe separates rev-z from rev-y/composite.
+z-only observations showing the old z mechanism is now wrong
+and
+y-only observations confirming the y mechanism remains useful.
 
-A z-only probe separates rev-y from rev-z/composite.
+After repeated episodes, the fragment reliability summary becomes approximately:
 
-The depth-two protected validation planner therefore lowers expected terminal
-explanation entropy relative to a one-step plan by choosing the second probe
-conditionally after the first protected observation.
+y fragment
+-> support episodes = 2
+-> blame episodes = 0
+-> remains active
 
-Unsafe validation probes remain filtered by the external risk and reversibility
-ceiling.
+z fragment
+-> blame episodes = 2
+-> posterior reliability about 0.25
+-> quarantined
 
-Posterior concentration is still not installation authority.
+A single surprising observation is not sufficient.
 
-After active validation, the candidate must independently beat the best retained
-single revision on a disjoint protected reserve.
+Monitoring evidence ids are tracked and duplicate monitoring observations are
+rejected.
 
-The controlled protected reserve gives:
+The monitor is also bound to the exact active composite-program id. Reliability
+accumulated under one causal program cannot be applied to a different active
+lineage revision.
 
-composite protected MSE = 0
+v1.28 keeps local maintenance deliberately narrow.
 
-while the best retained single ancestor has materially larger protected error.
+If more than one fragment becomes quarantined at the same time, Mabojolu does
+not attempt a sequence of local patches.
 
-The composition is promoted only because it wins that independent comparison.
+It returns:
 
-v1.27 then derives the adaptive protected-evidence requirement for the new
-composite revision.
+multiple-fragment-failure-requires-broader-search
 
-If the protected comparison technically favors the composition but the reserve
-is still too small or lacks enough intervention coverage for that complexity and
-uncertainty level, installation is refused.
+This preserves a boundary between local component maintenance and global model
+revision.
 
-Only after the protected reserve satisfies that adaptive budget can the new
-revision enter the bounded lineage.
+Once exactly one fragment is quarantined, two local candidates compete:
 
-The controlled installation creates:
+- remove only that fragment;
+- replace only that fragment with an already validated same-topology repair.
 
-rev-composite
+Healthy fragments are frozen.
 
-from source revisions:
+After local revision, every non-retired incumbent fragment must still exist with
+the same structural terms, variables, and coefficients. Any accidental change
+to a healthy fragment causes maintenance to fail.
 
-rev-y
-rev-z
+The controlled repair supplies a validated replacement:
 
-The lineage itself remains single-parent for audit simplicity in this milestone.
-The composition records its source revision ids separately; true multi-parent
-lineage topology remains future work.
+linear(z), coefficient about 0.20
 
-For live planning, the composite inherits the strictest compatible prerequisite
-among its source revisions.
+The incumbent composite, local rollback, and local replacement are compared on
+fresh protected maintenance evidence.
 
-The active rev-y branch originally requires readiness of about 0.35:
+Monitoring observations are forbidden from appearing in this protected reserve.
 
-prep-light
--> finish
+Protected evidence previously used to install any retained lineage revision is
+also excluded.
 
-The rev-z source requires readiness of about 0.70.
+The repaired program must then satisfy the adaptive protected-evidence budget
+derived from its complexity and installation uncertainty.
 
-The protected composite therefore adopts the conservative compatible threshold:
+The controlled reserve contains four fresh protected observations spanning
+multiple intervention regions.
 
-readiness >= about 0.70
+The local z repair reaches protected MSE approximately 0 while preserving the y
+fragment exactly.
 
-Its task effect is projected from the protected composite causal program.
+The resulting maintained composite is:
 
-The live plan becomes:
+linear(y), coefficient about 0.60
++
+linear(z), coefficient about 0.20
 
-prep-strong
--> finish
+Only the z fragment is retired from the incumbent revision and replaced.
 
-The stale prep-light branch is replaced in the goal hierarchy while the root
-terminal goal contract remains unchanged.
+v1.28 also supports fragment-only rollback.
 
-Finally the composite live hypothesis is passed directly into the existing
-receding-horizon controller.
+If fresh protected evidence instead shows the z mechanism disappeared entirely
+and no protected repair is better, Mabojolu can remove only z while leaving y
+active.
 
-The next real controller decision becomes:
+This produces a local rollback rather than restoring the entire pre-composite
+ancestor.
 
-prep-strong
+The maintained causal program is projected back into the live
+receding-control hypothesis.
 
-The v1.27 loop is therefore:
+Before maintenance:
 
-fresh composition-fitting evidence
--> score retained revisions by causal region
--> block composition if one ancestor already explains the evidence
--> select supported historical fragments
--> bounded hierarchical composition search
--> probabilistic protected explanation belief
--> one- or two-step safe protected validation planning
--> disjoint protected comparison against the best protected single ancestor
--> enforce adaptive protected count and intervention coverage
--> append protected composite revision
--> inherit conservative compatible prerequisite
--> replace stale goal branch
--> receding-horizon control.
+finish -> about 1.10 task progress
+boost-finish -> about 1.60 task progress
 
-This remains bounded historical recombination rather than unrestricted model
-synthesis. Candidate fragments must already be validated, source base effects
-must be compatible, maximum fragment count is bounded, fitting and protected
-evidence remain disjoint, validation risk and reversibility are externally
-limited, adaptive evidence thresholds remain fixed by governance rules, and the
-terminal goal contract remains protected.
+After selective z repair:
+
+finish -> about 0.80
+boost-finish -> about 1.00
+
+The terminal task still requires progress >= 1.00.
+
+Before the local repair, the cheapest valid branch is:
+
+finish
+
+After the protected local repair, finish is no longer sufficient.
+
+The new branch becomes:
+
+boost-finish
+
+The old goal child is retired and replaced while the terminal goal contract
+remains unchanged.
+
+The maintained composite is appended as a child revision in the bounded
+lineage, its protected reserve ids are recorded, and its live hypothesis
+replaces the stale composite hypothesis.
+
+The next receding-horizon decision becomes:
+
+boost-finish
+
+The v1.28 maintenance loop is therefore:
+
+live composite revision
+-> observe real outcomes
+-> leave-one-fragment-out attribution
+-> accumulate fragment-specific support and blame
+-> quarantine only after repeated evidence
+-> if multiple fragments fail, reopen broader search
+-> freeze healthy fragments
+-> compare fragment-only rollback and validated local repair
+-> require fresh disjoint adaptive protected evidence
+-> install only the local winning change
+-> project maintained causal effects into the live hypothesis
+-> revise only the stale goal branch
+-> continue receding-horizon control.
+
+This remains bounded local maintenance rather than unrestricted self-editing.
+The reliability prior, blame threshold, quarantine threshold, same-topology
+repair restriction, protected improvement threshold, adaptive evidence formula,
+repair catalog, control-intervention bindings, terminal goal contract, action
+catalog, and hard safety limits remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. true multi-parent lineage nodes rather than recording composite source ids
-   beside a single-parent audit chain;
-2. compositions containing interaction and latent-bias fragments from different
-   historical revisions;
-3. protected validation plans with horizons longer than two while executing only
-   one next probe;
-4. continuous-valued validation probes chosen to maximize separation between
-   single and composite explanations;
-5. region-specific posterior mixtures where different revisions remain useful
-   without requiring immediate global composition;
-6. composition rollback when one inherited fragment later regresses while other
-   inherited fragments remain valid;
-7. automatic retirement of redundant source fragments after repeated protected
-   evidence;
-8. transfer of composed revisions to structurally equivalent renamed domains;
-9. value-of-validation that trades protected probe cost and task delay against
-   expected benefit of a new composition;
-10. whether revision composition preserves evidence independence, protected
-    installation, terminal intent, hard risk ceilings, abstention, auditability,
-    and zero unsafe irreversible execution.
+1. active experiment selection specifically for causal localization of which
+   composite fragment is failing;
+2. same-fragment repair candidates with competing coefficients and structures
+   under probabilistic belief rather than one supplied repair;
+3. selective repair of interaction and latent-bias fragments, not only linear
+   inherited fragments;
+4. multi-parent provenance that records exactly which historical source produced
+   each surviving fragment;
+5. fragment-specific rollback lineage so one component can return to an older
+   source generation while neighboring components remain newer;
+6. gradual fragment drift where reliability changes slowly rather than through a
+   clean step change;
+7. fragment retirement when protected evidence shows a mechanism has become
+   redundant rather than wrong;
+8. repeated local repair cycles inside one long-lived composite revision;
+9. transfer of locally maintained composites across structurally equivalent
+   renamed domains;
+10. whether selective maintenance preserves protected evidence independence,
+    healthy-fragment invariants, terminal intent, hard risk ceilings,
+    abstention, auditability, and zero unsafe irreversible execution.
 
-The next central milestone is compositional revision maintenance and selective
-fragment rollback: Mabojolu should track reliability separately for every
-inherited fragment inside a composite revision, preserve the fragments that
-remain protected, retire or replace only the fragment that regresses, and avoid
-rolling back the entire composite when a local repair is sufficient.
+The next central milestone is active causal fault localization and
+fragment-specific provenance: Mabojolu should choose safe diagnostic
+interventions that maximally distinguish which inherited fragment is failing,
+maintain explicit provenance and rollback history per fragment, and synthesize a
+local repair only after the fault posterior is sufficiently resolved.
 
 ## Safety and audit principle
 
