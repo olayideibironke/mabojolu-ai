@@ -218,7 +218,12 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   quarantine a damaged fragment, trigger bounded topology repair on episode
   evidence, require disjoint protected installation, relearn action
   prerequisites, replace the live hypothesis, revise stale goal branches, and
-  immediately feed the revised model back into receding-horizon control.
+  immediately feed the revised model back into receding-horizon control;
+- autonomous outcome-blind evidence partitioning that separates repair fitting
+  from protected validation without inspecting measured outcomes, plus archived
+  online revisions that can be retained, rolled back on a fresh protected
+  reserve, or reopen model search when both installed and archived models are
+  inadequate.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -227,148 +232,175 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: online belief-model coevolution
+### Current milestone: autonomous evidence partitioning and online rollback
 
-Mabojolu G can now revise its live causal model inside an ongoing
-receding-horizon episode when real action outcomes repeatedly contradict the
-active hypothesis.
+Mabojolu G can now assign live structural observations to repair fitting and
+protected validation roles without a human labeling each observation as fit or
+holdout evidence.
 
-The update does not occur after one surprising observation.
+v1.24 uses a deterministic evidence schedule based on chronology and configured
+slot position.
 
-v1.23 adds an online prediction-mismatch tracker. Every real comparison records:
+The partitioning rule is outcome-blind.
 
-- predicted effect;
-- observed effect;
-- absolute residual;
-- whether that residual exceeds the configured mismatch threshold;
-- consecutive mismatch count.
+It can inspect:
 
-An isolated mismatch is retained as evidence but does not authorize repair.
-A later recovery observation resets the consecutive mismatch count.
+- sequence number;
+- experiment identity;
+- intervention metadata.
 
-The controlled benchmark requires three consecutive live mismatches before the
-damaged fragment is eligible for quarantine.
+It does not inspect measured effect when deciding the evidence role.
 
-Persistent mismatch is converted into bounded fragment-reliability evidence.
-With three blame observations, the benchmark fragment's Beta-style posterior
-reliability falls to 0.20 and the fragment enters quarantine.
+The controlled tests modify every measured outcome while preserving sequence and
+identity. The fit/protected assignments remain exactly unchanged.
 
-Quarantine still does not authorize model modification.
+This prevents a repair search from choosing an easier validation reserve after
+seeing the answers.
 
-The live episode then uses a repair-fitting evidence partition to generate
-bounded structural alternatives. The controlled incumbent contains the wrong
-linear-y fragment. The repair search recovers the pairwise interaction:
+The default bounded schedule alternates roles across the ordered live evidence
+stream.
 
-interaction(y,z), coefficient about 0.50
+One controlled installation epoch therefore becomes:
 
-Repair-fitting observation ids are kept disjoint from the protected installation
-reserve. The interaction repair must independently beat the incumbent and
-rollback on that protected reserve before the live hypothesis can change.
+repair-fit
+protected-validation
+repair-fit
+protected-validation
+...
 
-Once protected validation succeeds, v1.23 projects the repaired hierarchical
-causal program back into the active receding-control hypothesis. For the
-controlled finish action, the repaired task effect changes from the stale
-prediction of about 0.90 to the protected repaired prediction of about 0.70.
+The partitioner refuses to proceed when the resulting fit or protected side
+does not contain the configured minimum evidence.
 
-The same live episode also relearns the action prerequisite from action-effect
-observations.
+Once the partition is ready, the repair-fit side is routed into the existing
+bounded structural-repair synthesis. The protected side is routed independently
+into the existing protected installation validator.
 
-The stale branch was built around:
+The benchmark again recovers the interaction(y,z) repair from one live stream,
+but now no caller supplies separate repair and protected arrays.
 
-readiness >= about 0.35 before finish
+After protected installation, v1.24 archives:
 
-New evidence supports:
+- the pre-revision causal program;
+- the installed repaired program;
+- the pre-revision live hypothesis;
+- the installed live hypothesis;
+- the previous prerequisite;
+- the installed prerequisite;
+- the exact protected evidence ids used to authorize installation.
 
-readiness >= about 0.70 before finish
+This archive enables a later protected rollback decision.
 
-The repaired live hypothesis therefore changes three linked pieces together:
+A second, later evidence epoch is independently partitioned by the same
+outcome-blind rule.
 
-- repair identity;
-- finish task effect;
-- finish readiness prerequisite.
+Its protected side is required to be disjoint from the installation reserve.
+Reusing an installation holdout as rollback evidence is rejected explicitly.
 
-The old hypothesis id is removed from the active hypothesis catalog. Its belief
-mass is transferred to the protected revised hypothesis, preserving the live
-belief normalization rather than leaving both stale and revised versions active.
+The controlled environment then returns to the earlier linear regime.
 
-The task planner is then rerun from the same current vector state.
+On the fresh reserve:
 
-Before coevolution:
+archived linear model protected MSE = 0
+
+installed interaction repair protected MSE > 0.05
+
+The archived model therefore wins by more than the configured material rollback
+margin.
+
+Mabojolu authorizes rollback.
+
+Rollback restores the archived live hypothesis and previous prerequisite, moves
+belief mass away from the installed revision, rebuilds the action plan, and
+revises the currently materialized goal branch.
+
+The action sequence changes from:
+
+prep-strong
+-> finish
+
+back to:
 
 prep-light
 -> finish
 
-After protected model/prerequisite revision:
+The currently active revised goal branch is retired and replaced with a second
+auditable revision:
 
-prep-strong
--> finish
+prerequisite-revised-2-1
+-> prerequisite-revised-2-2
 
-The goal hierarchy is revised through the existing branch-replacement machinery.
-The stale prerequisite-aware child goals are blocked and abandoned, replacement
-children are inserted, and the root terminal goal contract remains unchanged.
+The root terminal goal contract remains unchanged.
 
-Finally, the updated hypothesis catalog is passed directly back into the v1.22
-receding-horizon controller.
+The restored hypothesis catalog is then passed directly into the
+receding-horizon controller. Its next real decision becomes prep-light.
 
-The next real control changes to:
+v1.24 also distinguishes rollback from model-search reopening.
 
-prep-strong
+If fresh protected evidence shows that the installed revision has materially
+regressed but the archived predecessor is not itself a meaningful improvement,
+Mabojolu does not roll back to a known-poor model.
 
-rather than continuing the stale prep-light branch.
+Instead it returns:
 
-The resulting live loop is now:
+reopen-search
 
-execute
--> observe
--> compare prediction with reality
--> accumulate repeated mismatch
--> quarantine damaged fragment
--> synthesize bounded repair
--> protected validation
--> relearn prerequisite
--> replace live hypothesis
--> revise goal branch
--> receding-horizon replan
--> execute the next control.
+This creates three protected post-installation outcomes:
 
-This milestone therefore closes the separation between model repair and control:
-a real action outcome can eventually change the model that selects the next real
-action, but only through repeated evidence and protected installation.
+retain
+-> installed revision remains supported by fresh protected evidence
 
-The system remains bounded. The repair grammar, repair variables, evidence
-partitioning, mismatch threshold, required consecutive mismatches, protected
-reserve, prerequisite candidate dimensions, control-to-repair intervention
-bindings, action catalog, vector goal, observation model, and safety ceilings
-remain human-specified.
+rollback
+-> archived predecessor materially beats the installed revision
+
+reopen search
+-> installed revision regressed but archived predecessor does not solve the
+   problem
+
+The resulting loop is:
+
+live evidence stream
+-> outcome-blind autonomous partition
+-> fit repair on fit partition
+-> validate on protected partition
+-> install and archive revision
+-> later live evidence epoch
+-> new outcome-blind partition
+-> fresh protected regression test
+-> retain, rollback, or reopen search
+-> synchronize belief, plan, goals, and receding-horizon control.
+
+This remains bounded evidence governance rather than unrestricted self-editing.
+The partition stride and offset, minimum evidence counts, structural repair
+grammar, repair variables, protected improvement threshold, rollback threshold,
+maximum acceptable installed error, archived candidate set, action catalog,
+goal contract, and hard safety constraints remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. automatically deriving repair-fitting interventions directly from live
-   receding-controller executions rather than supplying a separate mapping;
-2. protected validation reserves that are refreshed without contaminating them
-   with repair-fitting observations;
-3. several simultaneous damaged fragments rather than one quarantined fragment;
-4. competing online repair candidates that remain probabilistic until enough
-   live evidence accumulates;
-5. prerequisite revision from noisy and drifting thresholds instead of one
-   clean step change;
-6. repeated model revisions within one long episode;
-7. rollback when a newly installed online repair later regresses;
-8. automatic synchronization between every receding-control decision and the
-   goal hierarchy, including completed and partially executed branches;
-9. transfer of an online-repaired model to a structurally similar renamed
-   domain;
-10. whether online model coevolution preserves protected installation,
-    terminal intent, hard risk ceilings, abstention, auditability, and zero
-    unsafe irreversible execution.
+1. adaptive evidence-role schedules rather than a fixed deterministic stride;
+2. intervention-stratified protected reserves so fitting and validation both
+   cover important causal regions;
+3. protected evidence budgets that grow when repair complexity increases;
+4. multiple archived revisions and selection among more than one rollback
+   ancestor;
+5. rollback under noisy gradual regression rather than a clean regime return;
+6. automatic reopening of structural search after a rollback candidate is also
+   rejected;
+7. prerequisite-specific evidence partitioning alongside structural repair
+   partitioning;
+8. repeated install, rollback, and reinstall cycles in one long episode;
+9. transfer of evidence-governance policies across structurally similar domains;
+10. whether autonomous evidence partitioning and rollback preserve terminal
+    intent, protected validation, hard risk ceilings, abstention, auditability,
+    and zero unsafe irreversible execution.
 
-The next central milestone is autonomous evidence partitioning and online
-rollback: Mabojolu should decide which live observations can be used for repair
-fitting, which must remain protected for validation, and when a previously
-installed online revision has degraded enough to roll back or reopen model
-search.
+The next central milestone is adaptive evidence governance and revision lineage:
+Mabojolu should maintain a bounded lineage of installed and archived model
+revisions, adapt the amount and coverage of protected evidence to revision
+complexity and uncertainty, and choose among retain, rollback, branch to a prior
+revision, or reopen search without contaminating the validation reserves.
 
 ## Safety and audit principle
 
