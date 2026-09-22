@@ -140,10 +140,10 @@ const PREREQUISITE:
     0.02,
 
   activeMeanEffect:
-    1.1,
+    0.8,
 
   effectGap:
-    1.08,
+    0.78,
 
   evidenceCount:
     8,
@@ -163,9 +163,9 @@ const ACTIVE_HYPOTHESIS:
   dimensionEffects: {
     progress: {
       finish:
-        1.1,
+        0.8,
       "boost-finish":
-        1.6,
+        1.1,
     },
 
     exposure: {
@@ -241,7 +241,7 @@ const STATE = {
 const GOAL = {
   minimums: {
     progress:
-      1,
+      0.75,
   },
 
   maximums: {
@@ -411,7 +411,7 @@ function reasonerWithCurrentPlan() {
       "selective-terminal-goal",
 
     description:
-      "Reach progress >= 1.000 while exposure <= 0.300.",
+      "Reach progress >= 0.750 while exposure <= 0.300.",
 
     priority:
       100,
@@ -420,7 +420,7 @@ function reasonerWithCurrentPlan() {
       "active",
 
     successCriteria: [
-      "progress >= 1.000",
+      "progress >= 0.750",
       "exposure <= 0.300",
     ],
 
@@ -642,7 +642,7 @@ describe(
             {
               finish: {
                 y:
-                  1,
+                  0.5,
                 z:
                   1,
               },
@@ -651,7 +651,7 @@ describe(
                 y:
                   1,
                 z:
-                  2,
+                  1,
               },
             },
             STATE,
@@ -820,7 +820,7 @@ describe(
             {
               finish: {
                 y:
-                  1,
+                  0.5,
                 z:
                   1,
               },
@@ -829,7 +829,7 @@ describe(
                 y:
                   1,
                 z:
-                  2,
+                  1,
               },
             },
             STATE,
@@ -916,7 +916,7 @@ describe(
             {
               finish: {
                 y:
-                  1,
+                  0.5,
                 z:
                   1,
               },
@@ -978,7 +978,7 @@ describe(
             {
               finish: {
                 y:
-                  1,
+                  0.5,
                 z:
                   1,
               },
@@ -987,7 +987,7 @@ describe(
                 y:
                   1,
                 z:
-                  2,
+                  1,
               },
             },
             STATE,
@@ -1007,10 +1007,10 @@ describe(
             .progress,
         ).toMatchObject({
           finish:
-            0.8,
+            0.5,
 
           "boost-finish":
-            1,
+            0.8,
         });
 
         expect(
@@ -1070,7 +1070,7 @@ describe(
             {
               finish: {
                 y:
-                  1,
+                  0.5,
                 z:
                   1,
               },
@@ -1079,7 +1079,7 @@ describe(
                 y:
                   1,
                 z:
-                  2,
+                  1,
               },
             },
             STATE,
@@ -1256,7 +1256,7 @@ describe(
             {
               finish: {
                 y:
-                  1,
+                  0.5,
                 z:
                   1,
               },
@@ -1265,7 +1265,7 @@ describe(
                 y:
                   1,
                 z:
-                  2,
+                  1,
               },
             },
             STATE,
