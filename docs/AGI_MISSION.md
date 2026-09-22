@@ -228,7 +228,13 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   evidence count and intervention coverage scale with revision complexity and
   uncertainty, a shared fresh reserve compares multiple retained generations,
   and the controller can retain the current revision, roll back to its direct
-  parent, branch to an older ancestor, or reopen structural search.
+  parent, branch to an older ancestor, or reopen structural search;
+- active protected-evidence acquisition with probabilistic revision ancestry,
+  where existing protected observations condition a posterior over retained
+  revisions, missing causal regions are detected explicitly, safe validation
+  probes are synthesized to fill both coverage and sample-count gaps, and
+  lineage activation still requires the completed fresh reserve to pass the
+  protected historical comparison.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -237,189 +243,179 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: adaptive evidence governance and revision lineage
+### Current milestone: active protected-evidence acquisition and probabilistic revision ancestry
 
-Mabojolu G now maintains a bounded lineage of installed and archived model
-revisions instead of remembering only one predecessor.
+Mabojolu G can now respond actively when its protected validation reserve is too
+small or too narrow to support a lineage decision.
 
-Each lineage node stores:
+v1.26 begins by calculating the strictest adaptive protected-evidence
+requirement across every retained lineage revision.
 
-- revision id;
-- parent revision id when retained;
-- generation number;
-- causal program;
-- live receding-control hypothesis;
-- learned prerequisite;
-- protected evidence ids used at installation;
-- program complexity;
-- uncertainty at installation;
-- installed or archived status.
+The resulting protected budget still includes both:
 
-The lineage has a hard maximum size.
+- minimum observation count;
+- minimum distinct intervention signatures.
 
-When a new revision would exceed that bound, the oldest archived revision is
-pruned and any child ancestry is explicitly rewired to the pruned node's parent.
-The active revision is never selected as a pruning target.
+Mabojolu then compares that requirement with the fresh protected evidence
+already available.
 
-v1.25 also replaces the fixed protected-evidence requirement with a bounded
-adaptive budget.
+The controlled benchmark starts with only two fresh observations:
 
-For each retained revision, Mabojolu computes a requirement from:
+y-only
+z-only
 
-- a fixed base protected-evidence count;
-- a bounded complexity band derived from program complexity;
-- a bounded uncertainty band derived from installation uncertainty.
+Those observations are enough to make the old linear rev-0 highly implausible,
+but they do not separate the two retained interaction revisions.
 
-The requirement includes both:
+The probabilistic ancestry therefore begins approximately:
 
-minimum protected observations
-and
-minimum distinct intervention signatures.
+rev-0 -> near zero
+rev-1 -> about 0.50
+rev-2 -> about 0.50
 
-A large reserve containing only repeated copies of one intervention therefore
-does not satisfy the governance rule merely because its row count is high.
+The posterior is uncertain and the protected reserve is incomplete.
 
-The controlled benchmark gives the simple certain root revision:
+The coverage analyzer reports both kinds of missing evidence:
 
-minimum protected observations = 2
-minimum intervention signatures = 1
+- four additional protected observations are still required;
+- one additional intervention signature is missing.
 
-The more complex uncertain active revision requires:
+v1.26 synthesizes bounded protected-validation probes directly from the
+variables used by the retained revision programs.
 
-minimum protected observations = 6
-minimum intervention signatures = 3
+For the benchmark lineage it generates safe binary interventions over:
 
-When several lineage revisions are compared, all of them are evaluated on the
-same fresh reserve, and that reserve must satisfy the strictest protected
-requirement among the retained candidates.
+y
+z
+y + z
 
-This prevents an older simpler revision from receiving an easier validation
-test than the current complex model during lineage selection.
+The existing reserve already contains y-only and z-only observations, so the
+joint y+z intervention is marked as filling the missing protected causal region.
 
-Fresh lineage evidence is also checked against every protected observation id
-used to install any retained lineage revision. Reusing an installation holdout
-as lineage-selection evidence is rejected.
+Probe choice combines two bounded values:
 
-The benchmark maintains three generations:
+expected information gain over revision ancestry
++
+protected-reserve completion value
+-
+probe cost penalty.
 
-rev-0
--> simple linear program
--> readiness prerequisite about 0.35
--> prep-light then finish
+When a causal region is missing, a probe that fills that region receives the
+largest bounded coverage bonus.
+
+After intervention coverage is complete, missing protected row count still has
+a smaller completion value. This prevents Mabojolu from stopping merely because
+the posterior became sharp before the required reserve size was reached.
+
+The first controlled acquisition probe is therefore:
+
+protected-probe:y+z
+
+Its outcome strongly separates rev-1 from rev-2.
+
+Mabojolu continues collecting safe protected observations until the adaptive
+reserve contains six observations across at least three intervention
+signatures.
+
+The revision posterior then concentrates strongly on:
 
 rev-1
--> interaction repair
--> readiness prerequisite about 0.70
--> prep-strong then finish
 
-rev-2
--> more complex interaction revision
--> readiness prerequisite about 0.90
--> prep-ultra then finish
+while alternatives retain nonzero probability under the Gaussian likelihood
+model.
 
-rev-2 is initially active.
+Posterior confidence alone is not activation authority.
 
-Four separate fresh protected regimes demonstrate the full lineage decision
-surface.
+The completed fresh protected reserve is passed back through the existing v1.25
+lineage evaluator.
 
-When fresh evidence matches rev-2:
-
-retain rev-2
-
-When fresh evidence matches rev-1:
+Only after that protected comparison returns:
 
 rollback-parent
--> select rev-1
+-> rev-1
 
-When fresh evidence matches rev-0:
+can the lineage activation machinery replace the active rev-2 hypothesis.
 
-branch-ancestor
--> select rev-0 directly rather than stepping through rev-1
+The end-to-end benchmark therefore starts with:
 
-When all retained lineage revisions have unacceptable protected error:
-
-reopen-search
-
-The older-ancestor branch is executed end to end.
-
-Before lineage activation the materialized goal branch corresponds to the active
-rev-2 plan.
-
-Fresh protected evidence selects rev-0.
-
-Mabojolu then:
-
-- replaces the live rev-2 hypothesis with rev-0;
-- transfers live belief mass to the selected ancestor;
-- rebuilds the vector plan using rev-0's prerequisite;
-- retires the currently materialized revision-2 child branch;
-- creates revision-3 replacement goals;
-- keeps the root terminal goal contract unchanged;
-- feeds the selected ancestor directly back into receding-horizon control.
-
-The action sequence changes from:
-
+rev-2 active
 prep-ultra
 -> finish
 
-to:
+and, after active protected acquisition plus protected lineage selection,
+changes to:
 
-prep-light
+rev-1 active
+prep-strong
 -> finish
 
-and the next real controller decision becomes:
+The materialized rev-2 goal branch is retired and replaced by revision-3
+subgoals while the terminal contract remains unchanged.
 
-prep-light
+The selected rev-1 hypothesis is then passed directly back into receding-horizon
+control.
 
-The full v1.25 governance loop is therefore:
+The next real controller decision becomes:
 
-installed revision lineage
--> derive per-revision complexity/uncertainty evidence budgets
--> use the strictest retained-lineage budget
--> require fresh intervention coverage
--> score all retained revisions on the same protected reserve
--> retain current
-   or rollback direct parent
-   or branch to older ancestor
-   or reopen search
--> synchronize live belief, prerequisite, plan, goal branch, and receding control.
+prep-strong
 
-This remains bounded governance rather than unrestricted historical search.
-Maximum lineage size, complexity and uncertainty bands, base protected count,
-coverage ceiling, minimum material improvement, maximum acceptable protected
-error, retained revision set, goal contract, action catalog, and safety
-constraints remain human-specified.
+The full v1.26 loop is:
+
+existing fresh protected evidence
+-> condition probabilistic revision ancestry
+-> calculate adaptive reserve gap
+-> identify missing causal coverage
+-> synthesize bounded safe validation probes
+-> score probes by information gain and reserve-completion value
+-> execute one validation probe
+-> observe real effect
+-> update revision posterior
+-> continue until protected count and coverage are complete
+-> run the shared fresh reserve through protected lineage evaluation
+-> retain, rollback, branch, or reopen search
+-> synchronize goal branch and receding control.
+
+The hidden true revision is used only by the controlled benchmark simulator to
+generate synthetic observations. The runtime-facing planner does not receive the
+true revision id. It only sees the prior lineage, protected evidence, candidate
+safe probes, and observed effects.
+
+This remains bounded active validation rather than autonomous unrestricted
+experimentation. Variable set, intervention arity, binary intervention values,
+risk ceiling, reversibility requirement, observation noise, cost penalty,
+coverage bonus, posterior stopping thresholds, adaptive evidence formula,
+retained lineage, and final protected activation rules remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. intervention-stratified protected sampling that actively fills missing causal
-   regions instead of only checking whether coverage is adequate;
-2. uncertainty that evolves after installation instead of being frozen at the
-   installation snapshot;
-3. revision-lineage branching where a new repair descends from an older ancestor
-   rather than only from the currently active revision;
-4. probabilistic weighting over multiple lineage revisions rather than selecting
-   one deterministic historical winner;
-5. gradual drift where different ancestors dominate different protected
-   subregions;
-6. evidence budgets that account for structural term arity and number of revised
-   fragments rather than one aggregate complexity scalar;
-7. lineage pruning policies that preserve behaviorally unique ancestors rather
-   than simply the most recent bounded set;
-8. repeated branch, reinstall, and merge cycles over a long episode;
-9. transfer of revision-lineage evidence to structurally equivalent renamed
-   domains;
-10. whether adaptive evidence governance preserves protected validation,
+1. continuous-valued protected validation interventions rather than binary
+   variable activation;
+2. multi-step protected acquisition where the best first probe is chosen for the
+   information value of later validation probes;
+3. posterior uncertainty over lineage structure itself, including ambiguous
+   parent/ancestor relationships;
+4. region-specific revision mixtures where no single historical revision
+   explains every protected causal region;
+5. safe protected probes that simultaneously validate structural repair and
+   prerequisite thresholds;
+6. adaptive observation-noise estimation from repeated protected measurements;
+7. explicit value-of-validation that balances the benefit of more protected
+   certainty against delaying a real task action;
+8. branching new revisions from a probabilistically selected ancestor rather
+   than only activating an existing retained revision;
+9. active protected acquisition across renamed structurally equivalent domains;
+10. whether active protected validation preserves evidence independence,
     terminal intent, hard risk ceilings, abstention, auditability, and zero
     unsafe irreversible execution.
 
-The next central milestone is active protected-evidence acquisition and
-probabilistic revision ancestry: Mabojolu should identify which causal regions
-are missing from the protected reserve, synthesize safe validation probes to
-fill those gaps, and maintain uncertainty over several plausible historical
-revisions until protected evidence clearly separates them.
+The next central milestone is probabilistic revision composition and active
+validation planning: Mabojolu should represent the possibility that different
+historical revisions explain different causal subregions, plan short sequences
+of protected probes to distinguish those mixtures, and synthesize a bounded new
+revision only when no single retained ancestor adequately explains the fresh
+protected evidence.
 
 ## Safety and audit principle
 
