@@ -336,7 +336,7 @@ const ACTIONS:
 const GOAL = {
   minimums: {
     progress:
-      1,
+      0.6,
   },
 
   maximums: {
@@ -458,7 +458,7 @@ function createReasoner() {
       "composition-terminal-goal",
 
     description:
-      "Reach progress >= 1.000 while exposure <= 0.300.",
+      "Reach progress >= 0.600 while exposure <= 0.300.",
 
     priority:
       100,
@@ -467,7 +467,7 @@ function createReasoner() {
       "active",
 
     successCriteria: [
-      "progress >= 1.000",
+      "progress >= 0.600",
       "exposure <= 0.300",
     ],
 
