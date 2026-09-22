@@ -188,7 +188,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - self-revising hierarchical programs and goal chains with cross-episode
   fragment reliability, repeated-blame quarantine, protected repair or rollback,
   progress-divergence detection, and replacement of stale subgoals while
-  preserving the terminal goal contract and inherited safety constraints.
+  preserving the terminal goal contract and inherited safety constraints;
+- autonomous bounded repair synthesis that fits a replacement causal coefficient
+  directly from residual evidence after fragment quarantine, requires disjoint
+  protected installation evidence, and combines multidimensional constrained
+  planning with information-seeking and task-progress goals in one hierarchy.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -197,128 +201,130 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: self-revising hierarchical goals and causal programs
+### Current milestone: multidimensional self-revising planning and autonomous repair synthesis
 
-Mabojolu G can now accumulate reliability evidence for individual causal
-fragments across multiple episodes instead of treating every fragment diagnosis
-as an isolated event.
+Mabojolu G can now synthesize a bounded causal-fragment repair from evidence
+instead of requiring every repair candidate to be supplied in advance.
 
-The v1.16 reliability tracker uses a Beta-style evidence record per fragment.
-Each leave-one-fragment-out diagnosis contributes one of three evidence classes:
+Repair synthesis begins only after the existing cross-episode reliability system
+has quarantined a fragment. v1.17 currently supports a deliberately narrow
+repair grammar: a quarantined fragment must contain exactly one linear,
+pairwise-interaction, or latent-bias term.
 
-- blame, when removing the fragment materially reduces prediction error;
-- support, when removing the fragment materially increases prediction error;
-- neutral, when the observation does not distinguish the fragment.
+Mabojolu removes the damaged fragment, computes the residual prediction error on
+a repair-fitting evidence set, evaluates the damaged term's structural feature,
+and fits a replacement coefficient by bounded least squares. The fitted
+coefficient is clamped to the allowed [0,1] range and is represented as a new
+candidate fragment rather than mutating the damaged fragment in place.
 
-A fragment cannot be quarantined after one surprising episode. Quarantine
-requires both a minimum number of blame episodes and a sufficiently low
-posterior reliability.
+The controlled repair benchmark starts with a damaged yz interaction coefficient
+of 0.70. Repair evidence implies a coefficient of 0.30, and Mabojolu recovers
+that value directly from residual observations.
 
-The controlled benchmark presents the same damaged yz fragment with three
-separate yz failures and two independent xy-support episodes. The healthy xy
-fragment reaches posterior reliability 0.75 and remains active. The damaged yz
-fragment falls to posterior reliability 0.20 and is quarantined.
+Repair fitting is not validation. The observations used to estimate the
+replacement coefficient are explicitly disjoint from the protected reserve used
+to decide installation.
 
-Quarantine alone does not authorize model revision. Mabojolu constructs bounded
-alternatives and evaluates them on a separate protected observation reserve:
+The synthesized repair competes against the damaged incumbent and fragment
+rollback on protected x-only, y-only, z-only, yz, and full-joint interventions.
+The synthesized 0.30 yz interaction reaches zero protected program error and is
+installed only after winning that protected comparison.
 
-- keep the incumbent;
-- roll back the quarantined fragment;
-- replace it with a previously validated fragment having the same structural
-  signature.
+v1.17 also moves goal reasoning from a single scalar state to a bounded
+multidimensional state vector.
 
-The benchmark contains a validated repaired yz fragment. On protected x-only,
-y-only, z-only, yz, and full-joint interventions, the repair reaches zero
-prediction error and beats both the damaged incumbent and simple rollback. The
-repair is therefore promoted and the damaged fragment is explicitly retired.
+Each candidate world model can contain a separate hierarchical causal program
+for each state dimension. A terminal goal can specify simultaneous minimum and
+maximum constraints across those dimensions.
 
-If no validated repair is available, v1.16 can still roll back a quarantined
-fragment, but only when rollback improves protected evidence by the configured
-minimum margin.
+The controlled planning benchmark uses two dimensions:
 
-The goal system is now self-revising as well. Mabojolu compares observed progress
-after an executed action with the state predicted by the corresponding generated
-subgoal. Progress inside a bounded tolerance leaves the hierarchy untouched.
+- progress, which must reach at least 1.00;
+- exposure, which must remain at or below 0.30.
 
-When the miss exceeds tolerance, Mabojolu replans from the observed state using
-the current causal program posterior and the remaining safe action catalog. It
-does not overwrite the old goals silently. The stale goals are blocked, then
-retired as abandoned branches with auditable replacement links.
+A cheap shortcut reaches the progress threshold immediately but raises exposure
+to 0.80, so it is rejected despite its low monetary cost and low action-risk
+field. A cheap nuisance action is also rejected because it contributes no causal
+progress.
 
-In the controlled benchmark the repaired causal model initially predicts:
+Across the current model belief, Mabojolu selects:
 
-01-prepare-xy
--> state about 0.70
--> 02-bridge-yz
--> terminal state 1.00
+01-a
+-> intermediate expected vector state
+-> 02-b
+-> progress 1.00 and exposure 0.20
 
-Reality instead reports state 0.45 after the first action. The 0.25 prediction
-miss exceeds the 0.10 revision tolerance, so Mabojolu replaces the stale branch
-with:
+The generated subgoals therefore contain complete vector-state targets rather
+than scalar checkpoints.
 
-02-bridge-yz
--> revised intermediate state about 0.95
--> 03-finish-x
--> terminal state 1.00
+The milestone also integrates epistemic and task-progress goals in the same
+dependency-aware goal hierarchy.
 
-The replacement goals are inserted into the existing HierarchicalGoalReasoner.
-The first revised goal becomes actionable immediately and the second depends on
-its completion.
+When model entropy is above a configured threshold, Mabojolu evaluates safe
+reversible experiments by expected posterior entropy reduction. In the
+controlled benchmark a safe probe separates two multidimensional causal models,
+while an unsafe zero-cost probe is excluded.
 
-The terminal goal is treated as a protected contract during revision. Its id,
-description, priority, success criteria, and constraints must remain unchanged.
-The replacement subgoals also inherit the existing parent constraints and add an
-explicit requirement to preserve the terminal objective and safety boundaries.
+The hierarchy is then:
 
-This milestone therefore closes a longer feedback loop:
+terminal multidimensional objective
+-> epistemic-subgoal-1: run the safe diagnostic probe
+-> vector-subgoal-1: first task-progress vector target
+-> vector-subgoal-2: terminal vector target
 
-experience across episodes
--> fragment reliability
--> quarantine only after repeated blame
--> protected repair or rollback
--> causal plan
--> autonomous subgoals
--> real progress
--> divergence detection
--> stale-goal retirement
--> revised subgoals
--> continue toward the same terminal objective
+Before the epistemic goal is completed, it is the next actionable goal. After
+its result updates the causal-model posterior and the epistemic goal is marked
+complete, the first vector-progress goal becomes actionable.
 
-This remains bounded self-revision. Fragment repair candidates, structural
-signature matching, protected validation reserve, quarantine thresholds,
-divergence tolerance, remaining action catalog, scalar state representation,
-terminal objective, and safety ceilings remain human-specified.
+All generated epistemic and task-progress goals inherit the terminal goal's
+constraints. Task-progress goals additionally state that all multidimensional
+terminal constraints and hard safety limits must remain satisfied.
+
+This milestone therefore removes two earlier scaffolds:
+
+supplied repair candidate
+-> autonomous bounded coefficient repair synthesis
+
+scalar progress target
+-> multidimensional constrained state planning
+
+It remains bounded. Repair structure is inherited from the quarantined fragment;
+multi-term repair synthesis is not yet supported; the action and experiment
+catalogs, diagnostic dimension, state dimensions, terminal min/max constraints,
+entropy threshold, Gaussian observation family, confidence threshold, and hard
+risk ceilings remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. Bayesian fragment reliability with graded likelihood evidence rather than
-   discrete support/blame/neutral updates;
-2. automatic synthesis of fragment repairs instead of choosing only from a
-   supplied validated repair catalog;
-3. multi-fragment failure attribution when errors arise from interactions
-   between otherwise reliable components;
-4. rollback memory so previously retired fragments can be reconsidered when a
-   recurring environment returns;
-5. repeated subgoal revisions across a long episode rather than one controlled
-   correction;
-6. multidimensional state goals and constraint-aware intermediate target
-   generation;
-7. prerequisite discovery where Mabojolu learns which state predicates must hold
-   before a subgoal or action becomes effective;
-8. mixed epistemic subgoals whose purpose is to reduce uncertainty before
-   returning to task progress;
-9. cross-domain transfer of repaired fragment structures and subgoal schemas;
-10. whether repeated self-revision preserves terminal intent, inherited
-    constraints, hard risk ceilings, protected validation, auditability, and
-    zero unsafe irreversible execution.
+1. autonomous repair synthesis for multi-term fragments rather than one bounded
+   coefficient at a time;
+2. structural repair generation that can replace the damaged term topology when
+   repeated evidence shows the old structure itself is wrong;
+3. Bayesian posterior uncertainty over repair coefficients and repair
+   structures;
+4. multidimensional subgoal revision after observed vector progress diverges
+   from prediction;
+5. prerequisite discovery where action effectiveness depends on another state
+   dimension crossing a learned threshold;
+6. information-seeking subgoals whose experiment choice is optimized jointly
+   with the downstream multidimensional task plan;
+7. dynamic constraint discovery when repeated outcomes reveal an unmodeled
+   safety or feasibility boundary;
+8. repeated epistemic/task alternation across long episodes rather than one
+   diagnostic prerequisite;
+9. transfer of synthesized repairs and vector-goal schemas into differently
+   named domains;
+10. whether multidimensional autonomous self-repair preserves terminal intent,
+    every inherited constraint, hard risk ceilings, disjoint protected
+    validation, auditability, and zero unsafe irreversible execution.
 
-The next central milestone is multidimensional self-revising planning with
-autonomous repair synthesis: Mabojolu should generate candidate repairs for
-failing causal fragments, reason over several state dimensions and constraints,
-create information-seeking and task-progress subgoals in the same hierarchy,
-and revise those goals repeatedly as its causal model changes.
+The next central milestone is structural repair synthesis and prerequisite-aware
+vector planning: Mabojolu should revise not only a failed coefficient but the
+causal term structure itself, learn state prerequisites that make actions
+effective, and repeatedly revise multidimensional task and information goals as
+new evidence changes both feasibility and uncertainty.
 
 ## Safety and audit principle
 
