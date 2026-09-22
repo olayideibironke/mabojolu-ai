@@ -39,6 +39,10 @@ const HYPOTHESES:
             0.9,
           "finish-fast":
             0.1,
+          "blind-finish-slow":
+            0.9,
+          "blind-finish-fast":
+            0.1,
           "constraint-shortcut":
             1,
         },
@@ -49,6 +53,10 @@ const HYPOTHESES:
           "finish-slow":
             0.1,
           "finish-fast":
+            0.1,
+          "blind-finish-slow":
+            0.1,
+          "blind-finish-fast":
             0.1,
           "constraint-shortcut":
             0.8,
@@ -70,6 +78,16 @@ const HYPOTHESES:
         },
 
         "finish-fast": {
+          readiness:
+            0.4,
+        },
+
+        "blind-finish-slow": {
+          readiness:
+            0.4,
+        },
+
+        "blind-finish-fast": {
           readiness:
             0.4,
         },
@@ -97,6 +115,10 @@ const HYPOTHESES:
           "finish-slow":
             0.1,
           "finish-fast":
+            0.9,
+          "blind-finish-slow":
+            0.1,
+          "blind-finish-fast":
             0.9,
           "constraint-shortcut":
             1,
@@ -129,6 +151,16 @@ const HYPOTHESES:
         },
 
         "finish-fast": {
+          readiness:
+            0.7,
+        },
+
+        "blind-finish-slow": {
+          readiness:
+            0.7,
+        },
+
+        "blind-finish-fast": {
           readiness:
             0.7,
         },
@@ -245,6 +277,48 @@ const ACTIONS:
 
       observationDimension:
         "progress",
+    },
+  ];
+
+const READY_ACTIONS:
+  readonly RecedingVectorAction[] = [
+    {
+      id:
+        "blind-finish-slow",
+
+      risk:
+        0.1,
+
+      cost:
+        0.12,
+
+      delay:
+        0.1,
+
+      reversible:
+        true,
+
+      observationDimension:
+        "exposure",
+    },
+    {
+      id:
+        "blind-finish-fast",
+
+      risk:
+        0.1,
+
+      cost:
+        0.12,
+
+      delay:
+        0.1,
+
+      reversible:
+        true,
+
+      observationDimension:
+        "exposure",
     },
   ];
 
@@ -562,21 +636,12 @@ describe(
             PRIOR,
           );
 
-        const finishOnly =
-          ACTIONS.filter(
-            (action) =>
-              action.id ===
-                "finish-slow" ||
-              action.id ===
-                "finish-fast",
-          );
-
         const decision =
           chooseRecedingHorizonVectorControl(
             HYPOTHESES,
             controller,
             GOAL,
-            finishOnly,
+            READY_ACTIONS,
             EXPERIMENTS,
           );
 
