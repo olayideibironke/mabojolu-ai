@@ -545,6 +545,60 @@ describe(
     );
 
     it(
+      "rejects a monitor built for a different active composite program",
+      () => {
+        const otherProgram = {
+          ...COMPOSITE_PROGRAM,
+
+          id:
+            "different-composite-program",
+        };
+
+        const monitor =
+          new CompositeFragmentMonitor(
+            otherProgram,
+          );
+
+        const {
+          reasoner,
+          plan,
+        } =
+          reasonerWithCurrentPlan();
+
+        expect(
+          () =>
+            maintainCompositeRevisionSelectively(
+              lineage(),
+              monitor,
+              [
+                REPAIR_Z,
+              ],
+              PROTECTED_REPAIR,
+              "progress",
+              {
+                finish: {
+                  y:
+                    1,
+                  z:
+                    1,
+                },
+              },
+              STATE,
+              GOAL,
+              ACTIONS,
+              plan,
+              reasoner,
+              "selective-terminal-goal",
+              "rev-wrong-monitor",
+              1,
+            ),
+        ).toThrow(
+          "Composite fragment monitor does not match the active lineage program.",
+        );
+      },
+    );
+
+    it(
       "abstains from local maintenance when multiple fragments are repeatedly blamed",
       () => {
         const monitor =
@@ -681,6 +735,61 @@ describe(
         );
       },
     );
+    it(
+      "rejects reuse of lineage installation evidence as a maintenance reserve",
+      () => {
+        const monitor =
+          monitorWithLocalZFailure();
+
+        const {
+          reasoner,
+          plan,
+        } =
+          reasonerWithCurrentPlan();
+
+        expect(
+          () =>
+            maintainCompositeRevisionSelectively(
+              lineage(),
+              monitor,
+              [
+                REPAIR_Z,
+              ],
+              [
+                observation(
+                  "install-composite-a",
+                  1,
+                  0,
+                  0.6,
+                ),
+                ...PROTECTED_REPAIR.slice(
+                  1,
+                ),
+              ],
+              "progress",
+              {
+                finish: {
+                  y:
+                    1,
+                  z:
+                    1,
+                },
+              },
+              STATE,
+              GOAL,
+              ACTIONS,
+              plan,
+              reasoner,
+              "selective-terminal-goal",
+              "rev-reused-install",
+              1,
+            ),
+        ).toThrow(
+          "Adaptive protected evidence overlaps an excluded validation reserve.",
+        );
+      },
+    );
+
   },
 );
 
