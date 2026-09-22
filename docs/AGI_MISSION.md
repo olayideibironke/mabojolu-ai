@@ -267,7 +267,14 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   posterior, several repair candidates remain live until validation evidence
   resolves them, and a bounded decision rule chooses diagnosis, validation,
   protected repair, retention, or abstention according to uncertainty and
-  externally specified information/cost/risk values.
+  externally specified information/cost/risk values;
+- bounded local structural mutation with joint parameter-structure uncertainty,
+  where one validated local fragment at a time can compete across incumbent,
+  coefficient-refit, linear, saturating, interaction, and latent-bias
+  alternatives, safe experiments are selected by expected information gain,
+  topology-changing candidates require independent protected validation, and
+  only the protected winner may replace the live fragment while preserving
+  provenance and terminal intent.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -276,287 +283,277 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: adaptive fault-model synthesis and repair uncertainty
+### Current milestone: bounded local structural mutation and joint parameter-structure uncertainty
 
-Mabojolu G can now infer bounded fragment fault magnitudes from evidence rather
-than relying on one global human-specified fault scale.
+Mabojolu G can now distinguish bounded parameter drift from a bounded local
+change in causal form.
 
-The controlled composite begins with:
+The structural grammar now includes:
+
+- linear;
+- saturating;
+- interaction;
+- latent-bias.
+
+The saturating term is intentionally fixed and auditable in this milestone.
+
+For intervention magnitude x in [0, 1], its feature is:
+
+x / (0.5 + x)
+
+and the learned coefficient remains bounded in [0, 1].
+
+The existing structural challenger generator does not synthesize saturating
+terms unless explicitly enabled, so older structural-search behavior remains
+unchanged by default.
+
+v1.32 mutates only one already validated local fragment at a time.
+
+The target fragment must currently contain exactly one validated structural
+term.
+
+For that fragment the bounded mutation grammar can consider:
+
+- the incumbent fragment unchanged;
+- the same topology with a refitted coefficient;
+- a linear replacement;
+- a saturating replacement;
+- a two-variable interaction with one observed context variable;
+- a latent-bias replacement.
+
+Candidate count, changed fragment count, coefficient range, observed variables,
+and grammar itself remain externally bounded.
+
+The controlled benchmark begins with:
 
 linear(y), coefficient about 0.60
-+
-linear(z), coefficient about 0.50
 
-The changed environment behaves as if the inherited fragments have continuous
-scales:
+plus a healthy:
 
-y scale about 0.40
-z scale about 0.70
+linear(z), coefficient about 0.20.
 
-which implies effective coefficients:
+The changed environment instead behaves locally as:
 
-linear(y) about 0.24
-linear(z) about 0.35
+saturating(y), coefficient about 0.90
 
-Those scale values are not supplied to the posterior as a universal fault
-constant.
+where:
 
-v1.31 estimates each fragment scale from counterfactual contribution evidence.
+effect(y) = 0.90 * y / (0.5 + y).
 
-For each observation Mabojolu compares:
+The discovery observation:
 
-the incumbent prediction
+y = 0.50
+observed effect = 0.45
 
-against:
+is deliberately ambiguous.
 
-the same causal program with one fragment removed.
+A linear parameter-drift model with coefficient about 0.90 predicts:
 
-The difference is that fragment's predicted causal contribution.
+0.90 * 0.50 = 0.45.
 
-When that contribution is materially nonzero, the observed outcome identifies
-a bounded scale for that fragment.
+The saturating structural model with coefficient about 0.90 also predicts:
 
-The controlled half-strength y evidence therefore estimates:
+0.90 * 0.50 / (0.5 + 0.50)
+= 0.45.
 
-y scale about 0.40
+So discovery evidence alone cannot distinguish:
 
-and the controlled half-strength z evidence estimates:
+same local topology, different coefficient
 
-z scale about 0.70.
+from:
 
-The estimator also records:
+different local topology, saturating response.
 
-- effective evidence count;
-- weighted scale variance;
-- lower bounded scale;
-- upper bounded scale.
+A tight discovery-plausibility band removes clearly worse structural
+alternatives while keeping both of those explanations alive.
 
-When evidence drives a fragment sufficiently close to zero, model synthesis can
-include a local structural retirement candidate in addition to scaled
-coefficient candidates.
+The joint parameter-structure posterior therefore starts unresolved over:
 
-v1.31 then synthesizes a bounded neighborhood around the evidence-derived
-magnitudes.
+linear(y), coefficient about 0.90
 
-For the controlled case the model set includes combinations around:
+versus:
 
-y = 0.40
-z = 0.70
+saturating(y), coefficient about 0.90.
 
-plus nearby uncertainty bounds and the incumbent scale 1.00.
+The posterior is maintained in log space.
 
-The number of simultaneously changed fragments and total synthesized candidates
-remain externally bounded.
-
-Fault-model uncertainty is maintained in log space.
-
-This avoids repeated Gaussian likelihood multiplication underflow as evidence
-accumulates.
-
-Sparse magnitude evidence makes the 0.40/0.70 candidate the leading model but
-does not make it sufficiently certain.
-
-Mabojulu therefore does not immediately open repair.
-
-A safe diagnostic probe has positive expected information value under the
-adaptive fault-model posterior.
-
-The bounded action selector compares externally supplied:
+Mabojolu then synthesizes bounded diagnostic interventions and scores them by:
 
 expected information gain
-cost
-risk
+minus cost penalty
+minus risk penalty.
 
-and chooses:
+In the controlled benchmark the safe full-y probe is:
 
-diagnose
+y = 1.00.
 
-while fault-model uncertainty remains material.
+That intervention is highly discriminating because the two live explanations
+predict:
 
-The controlled full-strength y and z diagnostic observations then concentrate
-the adaptive fault posterior above the configured confidence and margin
-thresholds on:
+linear parameter drift:
+0.90
 
-y scale about 0.40
-z scale about 0.70.
+saturating topology:
+0.60.
 
-Fault resolution is still not repair authority.
+The controlled hidden benchmark environment returns:
 
-v1.31 converts the best bounded fault-model neighborhood into several local
-repair candidates and maintains a separate repair-candidate posterior.
+0.60.
 
-Before repair-selection evidence arrives, multiple candidate coefficient pairs
-remain plausible.
+The posterior then resolves the saturating structure above the configured
+confidence and margin thresholds.
 
-The decision selector therefore moves from:
+The hidden saturating environment is used only by the controlled benchmark to
+produce the simulated observation.
 
-diagnose
+The runtime posterior itself receives candidate programs and externally observed
+effects, not a hidden truth label.
 
-to:
+Posterior resolution still does not authorize topology mutation.
 
-validate
+v1.32 converts the resolved candidate set into the existing protected local
+repair-validation surface.
 
-rather than directly to repair.
+Discovery evidence and the active structural diagnostic are excluded from the
+final protected reserve.
 
-Fresh repair-selection observations then concentrate the repair posterior above
-its configured confidence and margin thresholds on the evidence-derived
-candidate:
+The protected reserve contains fresh interventions at:
 
-y adaptive scale 0.400
-z adaptive scale 0.700.
+y = 0.25
+y = 0.50
+y = 1.00
+and
+y = 0.50 with z = 1.00.
 
-The candidate ids preserve their inherited logical source while recording the
-new adaptive scale.
+Under the controlled saturating mechanism their expected effects are about:
 
-Candidate-selection evidence still cannot authorize installation.
+0.30
+0.45
+0.60
+0.65.
 
-Magnitude-discovery evidence, diagnostic evidence, repair-selection evidence,
-historical lineage installation evidence, and the final protected reserve remain
-separate validation roles.
+The selected saturating candidate must remain the best candidate on that fresh
+reserve.
 
-The selected repair candidate must remain the best candidate on a fresh
-protected reserve.
+The adaptive protected-evidence formula also remains active.
 
-The protected repaired program has:
+For the controlled two-fragment repaired program and the remaining posterior
+uncertainty, the benchmark requires:
 
-y coefficient about 0.24
-z coefficient about 0.35
+4 fresh protected observations.
 
-and protected MSE approximately zero in the controlled benchmark.
+A three-observation reserve is rejected.
 
-Installation uncertainty is taken from the repair-posterior normalized entropy,
-not a manually entered constant.
+The complete four-observation reserve authorizes installation.
 
-For the controlled posterior and two-fragment complexity, the adaptive evidence
-formula requires:
+The topology-changing replacement keeps the historical logical y fragment
+identity and origin but changes its active implementation to:
 
-4 fresh protected observations
+rev-y:program-y-fragment:mutation:saturating:y:0.900.
 
-and multiple intervention signatures.
+The healthy z fragment remains:
 
-A three-observation protected reserve is rejected.
+rev-z:program-z-fragment.
 
-The complete four-observation reserve is accepted.
+Only y receives a repaired provenance event.
 
-Only then does the action selector move from:
+z receives only a preserved-generation event.
 
-validate
+The protected topology mutation then projects into the live control model.
 
-to:
+Before structural revision:
 
-repair.
+finish -> about 0.30
+boost-finish -> about 0.60
 
-The protected adaptive repair is appended as a new bounded lineage revision.
+with terminal requirement:
 
-Fragment provenance advances independently.
+progress >= 0.40
 
-The y logical fragment keeps origin:
-
-rev-y
-
-while its active implementation becomes:
-
-rev-y:program-y-fragment:adaptive-scale-0.400
-
-The z logical fragment keeps origin:
-
-rev-z
-
-while its active implementation becomes:
-
-rev-z:program-z-fragment:adaptive-scale-0.700.
-
-The protected causal program is projected back into the live hypothesis.
-
-Before repair:
-
-finish -> about 0.80
-boost-finish -> about 1.10
-
-After adaptive repair:
-
-finish -> about 0.47
-boost-finish -> about 0.59
-
-The terminal task requires:
-
-progress >= 0.55
-
-so the live plan changes:
-
-finish
--> boost-finish.
-
-Only the stale child branch is replaced.
-
-The terminal contract remains unchanged.
-
-The protected adaptive repair then feeds directly into receding-horizon
-control, whose next decision becomes:
+so the old plan requires:
 
 boost-finish.
 
-The v1.31 loop is therefore:
+After the protected saturating mutation:
 
-counterfactual fragment contribution evidence
--> infer continuous bounded fault magnitudes
--> synthesize bounded magnitude neighborhoods
--> maintain a log-space posterior over fault models
--> choose further diagnosis while fault uncertainty is material
--> observe bounded diagnostics
--> resolve the fault-model posterior
--> maintain a separate posterior over repair candidates
--> choose validation rather than premature repair
--> resolve repair uncertainty from fresh selection evidence
--> require the same repair to win on disjoint protected evidence
--> derive adaptive evidence budget from repaired complexity and posterior entropy
--> install only after the protected reserve is ready
--> advance fragment provenance
--> update the live hypothesis and child goal branch
+finish -> about 0.45
+boost-finish -> about 0.60
+
+and the cheaper action:
+
+finish
+
+now clears the terminal target.
+
+The stale child goal branch is replaced while the terminal goal contract remains
+unchanged.
+
+The protected structural revision then feeds directly into receding-horizon
+control, whose next direct action becomes:
+
+finish.
+
+The v1.32 loop is therefore:
+
+local mismatch or structural suspicion
+-> synthesize bounded parameter and topology alternatives
+-> keep only discovery-plausible candidates
+-> maintain joint parameter-structure uncertainty in log space
+-> synthesize safe structural diagnostics
+-> choose the highest-value safe diagnostic
+-> observe the real effect
+-> update the joint posterior
+-> require confidence and margin
+-> convert the resolved local candidate set into protected validation
+-> keep discovery and diagnostic evidence out of the protected reserve
+-> require the same topology candidate to win independently
+-> enforce adaptive protected count and intervention coverage
+-> install only the protected local mutation
+-> update fragment provenance
+-> project the revised causal program into live planning
+-> revise only the stale child goal branch
 -> continue receding-horizon control.
 
-This remains bounded adaptive model synthesis rather than unrestricted causal
-program invention. v1.31 adjusts coefficients of already validated fragment
-structures and can propose near-zero fragment retirement. It does not yet invent
-arbitrary new term topology. Minimum contribution, uncertainty radius,
-retirement threshold, maximum changed fragments, candidate count, posterior
-thresholds, diagnostic and validation value estimates, cost/risk penalties,
-protected improvement threshold, adaptive evidence formula, action catalog, and
-terminal goal contract remain human-specified.
+This remains bounded local structural mutation rather than unrestricted model
+rewriting. Only one existing one-term fragment can mutate in this milestone.
+The structural grammar is finite, saturating shape is fixed, interactions use
+observed variables only, coefficients remain in [0, 1], candidate count is
+bounded, diagnostic risk and reversibility are externally constrained,
+posterior thresholds remain fixed, protected evidence remains independent, and
+the terminal goal contract remains outside the mutation process.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. bounded local topology mutation, allowing an inferred fragment to switch
-   among linear, interaction, saturating, and latent-bias structures rather than
-   only coefficient scaling or retirement;
-2. posterior synthesis directly over continuous fault magnitude parameters
-   instead of discretizing an evidence-derived uncertainty neighborhood;
-3. active experiment design that targets parameter uncertainty and structural
-   uncertainty simultaneously;
-4. expected decision value that computes downstream task benefit rather than
-   receiving diagnostic and validation information values as external inputs;
-5. repair-candidate posterior transfer from earlier successful local repairs
-   without bypassing fresh protected validation;
-6. correlated fragment drift where one parameter change alters the inferred
-   scale of another fragment;
-7. gradual online magnitude tracking with change-point detection and posterior
-   forgetting;
-8. protected validation policies that adaptively choose the next reserve
-   intervention instead of receiving a fixed protected set;
-9. transfer of adaptive fault magnitude priors across structurally equivalent
-   renamed domains;
-10. whether adaptive synthesis preserves evidence-role independence, no-fault
-    retention, terminal intent, hard risk ceilings, abstention, auditability,
+1. multi-fragment structural mutation where more than one local topology may
+   change but the joint search remains combinatorially bounded;
+2. contingent two-step structural experiment policies rather than one isolated
+   diagnostic;
+3. posterior uncertainty over saturating-shape parameters instead of using one
+   fixed saturation transform;
+4. local replacement grammar that can add or remove a term inside a fragment
+   rather than replacing an entire one-term fragment;
+5. interaction mutation where active probes must distinguish true interaction
+   from correlated linear drift;
+6. latent-bias mutation where constant offsets compete against hidden
+   intervention-dependent structure;
+7. structural mutation priors informed by provenance and earlier successful
+   repairs without bypassing fresh protected validation;
+8. gradual topology drift where parameter and structural posteriors evolve on
+   different time scales;
+9. active protected-validation probes selected by expected falsification value
+   instead of receiving a fixed reserve;
+10. whether topology adaptation preserves bounded search, evidence-role
+    independence, terminal intent, hard risk ceilings, abstention, auditability,
     and zero unsafe irreversible execution.
 
-The next central milestone is bounded local structural mutation and joint
-parameter-structure uncertainty: Mabojolu should maintain uncertainty over both
-continuous fragment parameters and a small grammar of alternative local causal
-structures, choose experiments that distinguish parameter drift from structural
-change, and protect any topology mutation with independent validation before it
-can enter the live lineage.
+The next central milestone is multi-fragment structural revision with contingent
+active validation: Mabojolu should maintain uncertainty over a small set of
+simultaneous local topology changes, plan short diagnostic sequences whose
+second experiment depends on the first outcome, and authorize a multi-fragment
+topology revision only when independent protected evidence supports the same
+joint structure.
 
 ## Safety and audit principle
 
