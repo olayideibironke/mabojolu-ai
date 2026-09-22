@@ -196,7 +196,12 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - topology-changing structural repair synthesis that searches bounded linear,
   pairwise-interaction, and latent-bias replacements after fragment quarantine,
   plus learned state prerequisites for action effectiveness and auditable
-  replanning when those prerequisites change.
+  replanning when those prerequisites change;
+- probabilistic joint belief over competing repair structures and prerequisite
+  thresholds, with safe active experiment selection by expected information
+  gain, marginal uncertainty tracking, protected repair installation after
+  posterior resolution, and downstream vector-plan revision from the resolved
+  prerequisite hypothesis.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -205,141 +210,144 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: structural repair synthesis and prerequisite-aware vector planning
+### Current milestone: probabilistic repair programs and active prerequisite discovery
 
-Mabojolu G can now revise the topology of a damaged causal fragment rather than
-assuming that the original term structure is still correct.
+Mabojolu G can now keep multiple causal repair structures and multiple
+prerequisite thresholds alive simultaneously instead of collapsing immediately
+to one deterministic winner.
 
-The v1.17 repair learner inherited the quarantined fragment's structural feature
-and fitted only a replacement coefficient. v1.18 starts from the program with
-the damaged fragment removed and searches a small bounded repair grammar:
+v1.19 constructs a joint hypothesis space:
 
-- one-variable linear terms;
-- pairwise interaction terms;
-- a latent-bias term.
+repair structure x prerequisite hypothesis
 
-Each candidate structure receives its own fitted coefficient from residual repair
-evidence. Candidate ranking includes repair-evidence prediction error plus an
-explicit structural complexity penalty.
+The controlled benchmark contains two competing repair structures and three
+competing readiness thresholds, creating six joint hypotheses with uniform
+initial probability and maximal normalized entropy.
 
-The controlled topology benchmark deliberately begins with the wrong structure:
+Repair hypotheses are complete repaired causal programs produced by the bounded
+structural-repair grammar. Prerequisite hypotheses are generated from action
+outcome evidence by retaining multiple thresholds that satisfy minimum evidence
+on both sides and exhibit a sufficiently large active-versus-inactive effect
+gap.
 
-linear(y), coefficient 0.60
+The prerequisite generator therefore no longer returns only the single best
+threshold. Each surviving hypothesis records:
 
-but the target environment actually contains:
+- action id;
+- target dimension;
+- candidate state dimension;
+- threshold;
+- inactive mean effect;
+- active mean effect;
+- effect gap;
+- evidence count;
+- threshold-fit mean squared error.
 
-interaction(y,z), coefficient 0.50
+The joint posterior is updated using Gaussian predictive likelihoods. It exposes
+both the complete joint distribution and separate marginal distributions over
+repair structures and prerequisite thresholds.
 
-Repair evidence contains joint and non-joint y/z interventions. A refitted
-linear-y term cannot explain the change in effect when z is absent, while the
-pairwise interaction explains the repair evidence exactly.
+v1.19 also performs active experiment selection over both uncertainty types.
 
-Repair fitting still does not authorize installation. Every structural candidate
-stores the ids of the observations used for fitting. Protected validation fails
-closed if any protected observation id overlaps that fitting evidence.
+A candidate active-discovery experiment can be:
 
-On a separate protected reserve containing y-only, z-only, partial-joint, and
-full-joint interventions, the interaction repair wins over the damaged
-incumbent, simple rollback, and the alternative bounded structures. Mabojolu
-therefore changes both the coefficient and the causal topology.
+- a repair probe, whose predicted observation comes from the repaired causal
+  program;
+- a prerequisite probe, whose predicted action effect depends on whether the
+  probe state lies above or below the prerequisite threshold.
 
-v1.18 also learns when an action requires a state prerequisite before it becomes
-effective.
+For every safe reversible experiment, Mabojolu evaluates expected posterior
+entropy under the current joint belief. It chooses the experiment with the best
+expected information gain after experiment cost, while hard-blocking experiments
+that violate the risk ceiling or reversibility requirement.
 
-Prerequisites are inferred from observed action outcomes rather than declared in
-the action catalog. For a candidate state dimension, Mabojolu searches bounded
-thresholds between observed state values and compares the target action effect
-above versus below each threshold. A prerequisite is accepted only when both
-sides contain sufficient evidence and the active-versus-inactive effect gap
-exceeds the configured minimum.
+The controlled benchmark deliberately includes an unsafe zero-cost probe. It is
+never selected.
 
-The controlled prerequisite benchmark gives Mabojolu observations of a finish
-action at different readiness and nuisance values. Nuisance does not predict the
-effect. Readiness does.
+A safe readiness probe can collapse the prerequisite marginal while leaving the
+repair marginal near 50/50. A separate structural probe then resolves the
+remaining repair ambiguity. This demonstrates factor-specific learning inside
+one joint posterior rather than a single opaque confidence score.
 
-The first evidence window supports:
+The benchmark's hidden joint state is:
 
-readiness >= about 0.35 before finish
+- interaction(y,z) repair;
+- readiness >= about 0.70 before finish.
 
-With that learned prerequisite, a direct finish action is modeled as ineffective
-from readiness zero. The cheapest safe multidimensional plan is therefore:
+After the active probes, posterior confidence on the complete joint hypothesis
+exceeds the configured resolution threshold.
 
-prep-light
--> readiness about 0.50
--> finish
--> progress 0.80 while exposure remains within the terminal limit
+Posterior resolution still does not authorize model installation.
 
-A cheaper shortcut reaches the progress target but violates the exposure
-constraint, so it remains rejected.
+The posterior-leading repair candidate is routed back through the existing
+protected structural-repair validator. Active-discovery observations do not
+replace the disjoint protected installation reserve. The interaction repair is
+installed only after it independently wins that protected comparison.
 
-A later evidence window changes the action-effect boundary and supports a
-stricter prerequisite:
+The resolved prerequisite hypothesis is then allowed to affect downstream
+planning. The benchmark contrasts:
 
-readiness >= about 0.70 before finish
+initial low-threshold assumption:
+prep-light -> finish
 
-Mabojolu then replans under the updated causal prerequisite. prep-light no longer
-enables finish, so the new plan becomes:
+resolved high-threshold posterior:
+prep-strong -> finish
 
-prep-strong
--> readiness about 0.80
--> finish
+The existing prerequisite-aware goal revision machinery retires the stale
+prep-light branch, inserts the stronger preparation branch, and verifies that
+the terminal vector goal contract is unchanged.
 
-The old prerequisite-aware vector-goal branch is not silently edited. Mabojolu
-blocks and retires the stale child goals, inserts a revised dependency chain, and
-preserves the terminal goal's id, description, priority, success criteria, and
-constraints.
+The resulting v1.19 loop is:
 
-The resulting feedback loop is:
-
-fragment failure
--> structural repair search
--> protected topology-changing promotion
--> action-effect observations
--> prerequisite induction
--> vector plan
--> new prerequisite evidence
--> plan invalidation
+competing repair structures
++
+competing prerequisite thresholds
+-> joint posterior
+-> safe information-gain experiment
+-> posterior update
+-> another targeted experiment when needed
+-> joint resolution
+-> protected repair validation
+-> resolved prerequisite
+-> vector-plan revision
 -> stale-goal retirement
--> revised vector-goal branch
 -> same terminal objective
 
-This remains bounded causal repair and prerequisite induction. The repair
-grammar is limited to linear, pairwise interaction, and latent-bias terms;
-candidate variables are supplied; one quarantined fragment is repaired at a
-time; prerequisites are one-dimensional threshold conditions; action effects
-are gated rather than modeled with arbitrary nonlinear prerequisite functions;
-the action catalog, vector dimensions, terminal constraints, evidence windows,
-and safety ceilings remain human-specified.
+This remains bounded probabilistic discovery. The repair candidate grammar,
+candidate variables, prerequisite state dimensions, experiment catalog,
+observation-noise scales, information-gain objective, resolution thresholds,
+protected installation reserve, action catalog, vector goal, and safety ceilings
+remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. multi-term structural repair programs rather than one replacement term;
-2. nonlinear structural repair operators such as thresholds, saturation,
-   piecewise responses, and delayed effects;
-3. Bayesian posterior uncertainty over competing repair topologies rather than
-   one deterministic protected winner;
-4. multi-dimensional and conjunctive prerequisites such as readiness >= x AND
-   capacity >= y;
-5. prerequisites whose threshold itself drifts gradually rather than changing
-   between fixed evidence windows;
-6. causal intervention selection specifically targeted at distinguishing
-   competing prerequisite hypotheses;
-7. repeated prerequisite discovery and goal-chain revision over long episodes;
-8. prerequisite transfer to differently named actions and state dimensions;
-9. joint synthesis where a failed plan can trigger both a structural repair and
-   a new prerequisite hypothesis;
-10. whether topology-changing repair and prerequisite-driven goal revision
-    preserve terminal intent, inherited constraints, disjoint protected
-    validation, hard risk ceilings, auditability, and zero unsafe irreversible
-    execution.
+1. active generation of discriminating experiments rather than selection only
+   from a supplied experiment catalog;
+2. Bayesian priors informed by repair-fit quality and prerequisite-fit quality
+   instead of uniform joint priors;
+3. noisy sequential evidence where no single experiment nearly resolves a
+   hypothesis dimension;
+4. multi-term repair-program posteriors rather than one-term repair alternatives;
+5. conjunctive and disjunctive prerequisite hypotheses across several state
+   dimensions;
+6. experiment planning over several future steps where the best first probe is
+   chosen for downstream information value;
+7. active probes whose result changes both the repair and prerequisite
+   marginals simultaneously;
+8. stopping rules that balance residual uncertainty against the value of acting
+   now;
+9. transfer of joint repair/prerequisite beliefs across renamed domains;
+10. whether probabilistic active discovery preserves terminal intent, disjoint
+    protected installation evidence, hard risk ceilings, abstention,
+    auditability, and zero unsafe irreversible execution.
 
-The next central milestone is probabilistic repair programs and active
-prerequisite discovery: Mabojolu should maintain probability over multiple
-candidate repair structures, choose safe experiments that maximally distinguish
-those structures and prerequisite hypotheses, and revise long-horizon vector
-plans as that joint causal uncertainty resolves.
+The next central milestone is autonomous experiment synthesis and multi-step
+epistemic planning: Mabojolu should generate bounded candidate interventions
+from the current competing hypotheses, choose short sequences of experiments
+for downstream information value, and stop experimenting when additional
+information no longer changes the safest high-value plan.
 
 ## Safety and audit principle
 
