@@ -156,10 +156,10 @@ const PREREQUISITE:
     0.02,
 
   activeMeanEffect:
-    1.1,
+    0.8,
 
   effectGap:
-    1.08,
+    0.78,
 
   evidenceCount:
     8,
@@ -179,9 +179,9 @@ const HYPOTHESIS:
   dimensionEffects: {
     progress: {
       finish:
-        1.1,
+        0.8,
       "boost-finish":
-        1.6,
+        1.1,
     },
 
     exposure: {
@@ -257,7 +257,7 @@ const STATE = {
 const GOAL = {
   minimums: {
     progress:
-      1,
+      0.75,
   },
 
   maximums: {
@@ -343,7 +343,7 @@ function createReasoner() {
       "selective-benchmark-terminal",
 
     description:
-      "Reach progress >= 1.000 while exposure <= 0.300.",
+      "Reach progress >= 0.750 while exposure <= 0.300.",
 
     priority:
       100,
@@ -352,7 +352,7 @@ function createReasoner() {
       "active",
 
     successCriteria: [
-      "progress >= 1.000",
+      "progress >= 0.750",
       "exposure <= 0.300",
     ],
 
@@ -469,7 +469,7 @@ export function runSelectiveCompositeFragmentMaintenanceBenchmark():
       {
         finish: {
           y:
-            1,
+            0.5,
           z:
             1,
         },
@@ -478,7 +478,7 @@ export function runSelectiveCompositeFragmentMaintenanceBenchmark():
           y:
             1,
           z:
-            2,
+            1,
         },
       },
       STATE,
