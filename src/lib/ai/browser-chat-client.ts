@@ -13,6 +13,7 @@ import {
   latestChromePrompt,
   startChromePromptSession,
   streamChromePrompt,
+  type ChromeMultimodalPromptMessage,
 } from "./chrome-prompt-client";
 
 import {
@@ -226,9 +227,9 @@ function clearBrowserComputeFailure():
 /**
  * Browser-owned text inference for Mabojolu Fast, Regular, and Quality.
  *
- * Each mode stays on user-owned WebGPU compute. Device capability controls the
- * model candidate set, while image requests are rejected explicitly until a
- * verified browser vision model is available.
+ * Each mode stays on user-owned browser compute. Text requests use Chrome's
+ * built-in model when available and WebLLM as the fallback. Image requests use
+ * Chrome's multimodal Prompt API so image bytes remain on the user's device.
  */
 export function shouldUseBrowserChat(
   body:
@@ -458,6 +459,173 @@ function browserContext(
   });
 }
 
+function imageDataUrlToBlob(
+  dataUrl:
+    string,
+): Blob {
+  const separator =
+    dataUrl.indexOf(
+      ",",
+    );
+
+  if (
+    separator <=
+      0
+  ) {
+    throw new Error(
+      "Invalid image data URL.",
+    );
+  }
+
+  const header =
+    dataUrl.slice(
+      0,
+      separator,
+    );
+
+  const encoded =
+    dataUrl.slice(
+      separator +
+        1,
+    );
+
+  const mimeMatch =
+    /^data:(image\/(?:png|jpeg|webp));base64$/i.exec(
+      header,
+    );
+
+  if (
+    !mimeMatch
+  ) {
+    throw new Error(
+      "Unsupported image data URL.",
+    );
+  }
+
+  const binary =
+    atob(
+      encoded,
+    );
+
+  const bytes =
+    new Uint8Array(
+      binary.length,
+    );
+
+  for (
+    let index =
+      0;
+    index <
+      binary.length;
+    index +=
+      1
+  ) {
+    bytes[
+      index
+    ] =
+      binary.charCodeAt(
+        index,
+      );
+  }
+
+  return new Blob(
+    [
+      bytes,
+    ],
+    {
+      type:
+        mimeMatch[
+          1
+        ]!
+          .toLowerCase(),
+    },
+  );
+}
+
+function latestImagePrompt(
+  body:
+    BrowserChatBody,
+):
+  ChromeMultimodalPromptMessage[] |
+  null {
+  const latestUser =
+    [
+      ...body
+        .messages,
+    ]
+      .reverse()
+      .find(
+        (message) =>
+          message.role ===
+          "user" &&
+          (
+            message
+              .attachments
+              ?.length ??
+            0
+          ) >
+            0,
+      );
+
+  if (
+    !latestUser ||
+    !latestUser
+      .attachments ||
+    latestUser
+      .attachments
+      .length ===
+      0
+  ) {
+    return null;
+  }
+
+  const content:
+    ChromeMultimodalPromptMessage[
+      "content"
+    ] = [
+      {
+        type:
+          "text",
+
+        value:
+          latestUser
+            .content
+            .trim()
+            .length >
+            0
+            ? latestUser
+                .content
+            : "Describe and analyze the attached image.",
+      },
+  ];
+
+  for (
+    const attachment of
+      latestUser
+        .attachments
+  ) {
+    content.push({
+      type:
+        "image",
+
+      value:
+        imageDataUrlToBlob(
+          attachment
+            .dataUrl,
+        ),
+    });
+  }
+
+  return [
+    {
+      role:
+        "user",
+
+      content,
+    },
+  ];
+}
+
 export async function streamBrowserChat(
   body:
     BrowserChatBody,
@@ -482,7 +650,7 @@ export async function streamBrowserChat(
       body.messages,
     );
 
-  if (
+  const hasImages =
     body.messages.some(
       (
         message,
@@ -494,29 +662,20 @@ export async function streamBrowserChat(
           0
         ) >
         0,
-    )
-  ) {
-    callbacks.onError({
-      code:
-        "provider_unavailable",
-
-      message:
-        "On-device image understanding is not available yet. Remove the image and send a text request instead.",
-
-      retryable:
-        false,
-    });
-
-    return;
-  }
+    );
 
   const chromeContext =
     !identityResponse &&
-    selectedMode ===
-      "mabojolu-fast"
+    (
+      selectedMode ===
+        "mabojolu-fast" ||
+      hasImages
+    )
       ? browserContext(
           body,
-          768,
+          hasImages
+            ? 1_024
+            : 768,
         )
       : null;
 
@@ -531,6 +690,15 @@ export async function streamBrowserChat(
 
           callbacks
             .onStatus,
+
+          hasImages
+            ? [
+                "text",
+                "image",
+              ]
+            : [
+                "text",
+              ],
         )
       : Promise.resolve(
           null,
@@ -631,6 +799,238 @@ export async function streamBrowserChat(
     });
 
     return;
+  }
+
+  if (
+    hasImages &&
+    chromeContext
+      ?.fits
+  ) {
+    const chromeSession =
+      await chromeSessionPromise;
+
+    if (
+      signal.aborted
+    ) {
+      chromeSession
+        ?.destroy?.();
+
+      await settlePersistence({
+        conversationId:
+          start.conversationId,
+
+        assistantMessageId:
+          start.messageId,
+
+        content:
+          "",
+
+        status:
+          "interrupted",
+      });
+
+      callbacks.onDone({
+        finishReason:
+          "aborted",
+      });
+
+      return;
+    }
+
+    let prompt:
+      ChromeMultimodalPromptMessage[] |
+      null = null;
+
+    try {
+      prompt =
+        latestImagePrompt(
+          body,
+        );
+    } catch {
+      chromeSession
+        ?.destroy?.();
+
+      await settlePersistence({
+        conversationId:
+          start.conversationId,
+
+        assistantMessageId:
+          start.messageId,
+
+        content:
+          "",
+
+        status:
+          "failed",
+
+        errorCode:
+          "invalid_image_data",
+      });
+
+      callbacks.onError({
+        code:
+          "invalid_request",
+
+        message:
+          "The attached image data could not be read.",
+
+        retryable:
+          false,
+      });
+
+      return;
+    }
+
+    if (
+      !chromeSession ||
+      !prompt
+    ) {
+      await settlePersistence({
+        conversationId:
+          start.conversationId,
+
+        assistantMessageId:
+          start.messageId,
+
+        content:
+          "",
+
+        status:
+          "failed",
+
+        errorCode:
+          "browser_multimodal_unavailable",
+      });
+
+      callbacks.onError({
+        code:
+          "provider_unavailable",
+
+        message:
+          "On-device image understanding is not available in this browser. Update Chrome and try again.",
+
+        retryable:
+          true,
+      });
+
+      return;
+    }
+
+    let chromeText =
+      "";
+
+    try {
+      callbacks
+        .onStatus?.(
+          "Analyzing image on this device...",
+        );
+
+      chromeText =
+        await streamChromePrompt(
+          chromeSession,
+          prompt,
+          signal,
+          (
+            text,
+          ) => {
+            chromeText +=
+              text;
+
+            callbacks.onDelta(
+              text,
+            );
+          },
+        );
+
+      chromeSession
+        .destroy?.();
+
+      await settlePersistence({
+        conversationId:
+          start.conversationId,
+
+        assistantMessageId:
+          start.messageId,
+
+        content:
+          chromeText,
+
+        status:
+          signal.aborted
+            ? "interrupted"
+            : "complete",
+      });
+
+      callbacks.onDone({
+        finishReason:
+          signal.aborted
+            ? "aborted"
+            : "end_turn",
+      });
+
+      return;
+    } catch {
+      chromeSession
+        .destroy?.();
+
+      if (
+        signal.aborted
+      ) {
+        await settlePersistence({
+          conversationId:
+            start.conversationId,
+
+          assistantMessageId:
+            start.messageId,
+
+          content:
+            chromeText,
+
+          status:
+            "interrupted",
+        });
+
+        callbacks.onDone({
+          finishReason:
+            "aborted",
+        });
+
+        return;
+      }
+
+      await settlePersistence({
+        conversationId:
+          start.conversationId,
+
+        assistantMessageId:
+          start.messageId,
+
+        content:
+          chromeText,
+
+        status:
+          "failed",
+
+        errorCode:
+          "browser_multimodal_failed",
+      });
+
+      callbacks.onError({
+        code:
+          "provider_unavailable",
+
+        message:
+          chromeText.length >
+            0
+            ? "On-device image analysis stopped unexpectedly after beginning the response."
+            : "On-device image analysis could not run in this browser.",
+
+        retryable:
+          true,
+      });
+
+      return;
+    }
   }
 
   if (
