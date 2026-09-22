@@ -1,6 +1,7 @@
 import {
   MultiFragmentStructuralPosterior,
   buildResolvedMultiFragmentStructuralSearch,
+  planContingentMultiFragmentStructuralDiagnostics,
   runControlledContingentStructuralDiagnosis,
   synthesizeBoundedMultiFragmentStructuralRevisions,
   type ContingentStructuralDiagnosticPlan,
@@ -802,10 +803,13 @@ export function runMultiFragmentStructuralRevisionBenchmark():
     );
 
   const initialPlan =
-    (
-      awaitPlan(
-        posterior,
-      )
+    planContingentMultiFragmentStructuralDiagnostics(
+      posterior,
+      PROBES,
+      {
+        horizon:
+          2,
+      },
     );
 
   const diagnosis =
@@ -1036,56 +1040,3 @@ export function runMultiFragmentStructuralRevisionBenchmark():
   };
 }
 
-function awaitPlan(
-  posterior:
-    MultiFragmentStructuralPosterior,
-): ContingentStructuralDiagnosticPlan {
-  const {
-    planContingentMultiFragmentStructuralDiagnostics,
-  } =
-    requirePlan();
-
-  return planContingentMultiFragmentStructuralDiagnostics(
-    posterior,
-    PROBES,
-    {
-      horizon:
-        2,
-    },
-  );
-}
-
-function requirePlan(): {
-  planContingentMultiFragmentStructuralDiagnostics:
-    (
-      posterior:
-        MultiFragmentStructuralPosterior,
-      probes:
-        readonly StructuralMutationProbe[],
-      options?: {
-        horizon?: 1 | 2;
-      },
-    ) =>
-      ContingentStructuralDiagnosticPlan;
-} {
-  return {
-    planContingentMultiFragmentStructuralDiagnostics:
-      (
-        posterior,
-        probes,
-        options,
-      ) => {
-        return (
-          // Kept as a local wrapper so the benchmark exposes the initial plan
-          // without introducing a second simulation path.
-          // eslint-disable-next-line @typescript-eslint/no-var-requires
-          require("./multi-fragment-structural-revision")
-            .planContingentMultiFragmentStructuralDiagnostics(
-              posterior,
-              probes,
-              options,
-            )
-        );
-      },
-  };
-}
