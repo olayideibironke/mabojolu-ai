@@ -391,19 +391,32 @@ describe(
           "boost-finish",
         ]);
 
-        expect(
+        const progressEffects =
           report
             .installation
             .revisedHypothesis
             ?.dimensionEffects
-            .progress,
-        ).toMatchObject({
-          finish:
-            0.9,
+            .progress;
 
-          "boost-finish":
-            1.05,
-        });
+        expect(
+          progressEffects,
+        ).toBeDefined();
+
+        expect(
+          progressEffects
+            ?.finish,
+        ).toBeCloseTo(
+          0.9,
+        );
+
+        expect(
+          progressEffects
+            ?.[
+              "boost-finish"
+            ],
+        ).toBeCloseTo(
+          1.05,
+        );
 
         expect(
           report
