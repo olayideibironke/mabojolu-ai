@@ -1053,7 +1053,12 @@ export class ProbabilisticRevisionAncestry {
         probe
           .fillsMissingCoverage
           ? coverageBonusWeight
-          : 0;
+          : gap
+              .missingEvidenceCount >
+              0
+            ? coverageBonusWeight *
+              0.25
+            : 0;
 
       const score =
         expectedInformationGain +
