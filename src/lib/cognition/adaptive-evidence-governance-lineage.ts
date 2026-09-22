@@ -832,15 +832,8 @@ export function evaluateRevisionLineage(
       (node) =>
         deriveAdaptiveEvidenceRequirement(
           node.program,
-          Math.max(
-            node
-              .uncertaintyAtInstall,
-            node.revisionId ===
-              active.revisionId
-              ? active
-                  .uncertaintyAtInstall
-              : 0,
-          ),
+          node
+            .uncertaintyAtInstall,
           {
             baseProtectedEvidence:
               options
