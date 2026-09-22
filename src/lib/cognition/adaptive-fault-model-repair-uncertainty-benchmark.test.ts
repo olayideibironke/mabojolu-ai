@@ -125,12 +125,17 @@ describe(
               4,
           },
 
-          candidateProtectedMeanSquaredError:
-            0,
-
           reason:
             "protected-local-repair-selected",
         });
+
+        expect(
+          report
+            .protectedDecision
+            .candidateProtectedMeanSquaredError,
+        ).toBeCloseTo(
+          0,
+        );
 
         expect(
           report
