@@ -1217,15 +1217,64 @@ export function activelyAcquireProtectedEvidence(
       lineage,
     );
 
+  const observationStdDev =
+    options
+      ?.observationStdDev ??
+    0.05;
+
+  for (
+    const observation of
+      evidence
+  ) {
+    ancestry.recordObservation(
+      {
+        id:
+          `existing-protected:${observation.experiment.id}`,
+
+        interventions: {
+          ...observation
+            .experiment
+            .interventions,
+        },
+
+        signature:
+          interventionSignature(
+            observation
+              .experiment
+              .interventions,
+          ),
+
+        fillsMissingCoverage:
+          false,
+
+        risk:
+          observation
+            .experiment
+            .risk,
+
+        cost:
+          observation
+            .experiment
+            .cost,
+
+        reversible:
+          observation
+            .experiment
+            .reversible,
+
+        observationStdDev,
+      },
+      observation
+        .measuredEffect,
+    );
+  }
+
   const templates =
     synthesizeProtectedValidationProbes(
       lineage,
       evidence,
       {
-        observationStdDev:
-          options
-            ?.observationStdDev ??
-          0.05,
+        observationStdDev,
       },
     );
 
