@@ -223,7 +223,12 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   from protected validation without inspecting measured outcomes, plus archived
   online revisions that can be retained, rolled back on a fresh protected
   reserve, or reopen model search when both installed and archived models are
-  inadequate.
+  inadequate;
+- adaptive evidence governance and bounded revision lineage, where protected
+  evidence count and intervention coverage scale with revision complexity and
+  uncertainty, a shared fresh reserve compares multiple retained generations,
+  and the controller can retain the current revision, roll back to its direct
+  parent, branch to an older ancestor, or reopen structural search.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -232,175 +237,189 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: autonomous evidence partitioning and online rollback
+### Current milestone: adaptive evidence governance and revision lineage
 
-Mabojolu G can now assign live structural observations to repair fitting and
-protected validation roles without a human labeling each observation as fit or
-holdout evidence.
+Mabojolu G now maintains a bounded lineage of installed and archived model
+revisions instead of remembering only one predecessor.
 
-v1.24 uses a deterministic evidence schedule based on chronology and configured
-slot position.
+Each lineage node stores:
 
-The partitioning rule is outcome-blind.
+- revision id;
+- parent revision id when retained;
+- generation number;
+- causal program;
+- live receding-control hypothesis;
+- learned prerequisite;
+- protected evidence ids used at installation;
+- program complexity;
+- uncertainty at installation;
+- installed or archived status.
 
-It can inspect:
+The lineage has a hard maximum size.
 
-- sequence number;
-- experiment identity;
-- intervention metadata.
+When a new revision would exceed that bound, the oldest archived revision is
+pruned and any child ancestry is explicitly rewired to the pruned node's parent.
+The active revision is never selected as a pruning target.
 
-It does not inspect measured effect when deciding the evidence role.
+v1.25 also replaces the fixed protected-evidence requirement with a bounded
+adaptive budget.
 
-The controlled tests modify every measured outcome while preserving sequence and
-identity. The fit/protected assignments remain exactly unchanged.
+For each retained revision, Mabojolu computes a requirement from:
 
-This prevents a repair search from choosing an easier validation reserve after
-seeing the answers.
+- a fixed base protected-evidence count;
+- a bounded complexity band derived from program complexity;
+- a bounded uncertainty band derived from installation uncertainty.
 
-The default bounded schedule alternates roles across the ordered live evidence
-stream.
+The requirement includes both:
 
-One controlled installation epoch therefore becomes:
+minimum protected observations
+and
+minimum distinct intervention signatures.
 
-repair-fit
-protected-validation
-repair-fit
-protected-validation
-...
+A large reserve containing only repeated copies of one intervention therefore
+does not satisfy the governance rule merely because its row count is high.
 
-The partitioner refuses to proceed when the resulting fit or protected side
-does not contain the configured minimum evidence.
+The controlled benchmark gives the simple certain root revision:
 
-Once the partition is ready, the repair-fit side is routed into the existing
-bounded structural-repair synthesis. The protected side is routed independently
-into the existing protected installation validator.
+minimum protected observations = 2
+minimum intervention signatures = 1
 
-The benchmark again recovers the interaction(y,z) repair from one live stream,
-but now no caller supplies separate repair and protected arrays.
+The more complex uncertain active revision requires:
 
-After protected installation, v1.24 archives:
+minimum protected observations = 6
+minimum intervention signatures = 3
 
-- the pre-revision causal program;
-- the installed repaired program;
-- the pre-revision live hypothesis;
-- the installed live hypothesis;
-- the previous prerequisite;
-- the installed prerequisite;
-- the exact protected evidence ids used to authorize installation.
+When several lineage revisions are compared, all of them are evaluated on the
+same fresh reserve, and that reserve must satisfy the strictest protected
+requirement among the retained candidates.
 
-This archive enables a later protected rollback decision.
+This prevents an older simpler revision from receiving an easier validation
+test than the current complex model during lineage selection.
 
-A second, later evidence epoch is independently partitioned by the same
-outcome-blind rule.
+Fresh lineage evidence is also checked against every protected observation id
+used to install any retained lineage revision. Reusing an installation holdout
+as lineage-selection evidence is rejected.
 
-Its protected side is required to be disjoint from the installation reserve.
-Reusing an installation holdout as rollback evidence is rejected explicitly.
+The benchmark maintains three generations:
 
-The controlled environment then returns to the earlier linear regime.
+rev-0
+-> simple linear program
+-> readiness prerequisite about 0.35
+-> prep-light then finish
 
-On the fresh reserve:
+rev-1
+-> interaction repair
+-> readiness prerequisite about 0.70
+-> prep-strong then finish
 
-archived linear model protected MSE = 0
+rev-2
+-> more complex interaction revision
+-> readiness prerequisite about 0.90
+-> prep-ultra then finish
 
-installed interaction repair protected MSE > 0.05
+rev-2 is initially active.
 
-The archived model therefore wins by more than the configured material rollback
-margin.
+Four separate fresh protected regimes demonstrate the full lineage decision
+surface.
 
-Mabojolu authorizes rollback.
+When fresh evidence matches rev-2:
 
-Rollback restores the archived live hypothesis and previous prerequisite, moves
-belief mass away from the installed revision, rebuilds the action plan, and
-revises the currently materialized goal branch.
+retain rev-2
+
+When fresh evidence matches rev-1:
+
+rollback-parent
+-> select rev-1
+
+When fresh evidence matches rev-0:
+
+branch-ancestor
+-> select rev-0 directly rather than stepping through rev-1
+
+When all retained lineage revisions have unacceptable protected error:
+
+reopen-search
+
+The older-ancestor branch is executed end to end.
+
+Before lineage activation the materialized goal branch corresponds to the active
+rev-2 plan.
+
+Fresh protected evidence selects rev-0.
+
+Mabojolu then:
+
+- replaces the live rev-2 hypothesis with rev-0;
+- transfers live belief mass to the selected ancestor;
+- rebuilds the vector plan using rev-0's prerequisite;
+- retires the currently materialized revision-2 child branch;
+- creates revision-3 replacement goals;
+- keeps the root terminal goal contract unchanged;
+- feeds the selected ancestor directly back into receding-horizon control.
 
 The action sequence changes from:
 
-prep-strong
+prep-ultra
 -> finish
 
-back to:
+to:
 
 prep-light
 -> finish
 
-The currently active revised goal branch is retired and replaced with a second
-auditable revision:
+and the next real controller decision becomes:
 
-prerequisite-revised-2-1
--> prerequisite-revised-2-2
+prep-light
 
-The root terminal goal contract remains unchanged.
+The full v1.25 governance loop is therefore:
 
-The restored hypothesis catalog is then passed directly into the
-receding-horizon controller. Its next real decision becomes prep-light.
+installed revision lineage
+-> derive per-revision complexity/uncertainty evidence budgets
+-> use the strictest retained-lineage budget
+-> require fresh intervention coverage
+-> score all retained revisions on the same protected reserve
+-> retain current
+   or rollback direct parent
+   or branch to older ancestor
+   or reopen search
+-> synchronize live belief, prerequisite, plan, goal branch, and receding control.
 
-v1.24 also distinguishes rollback from model-search reopening.
-
-If fresh protected evidence shows that the installed revision has materially
-regressed but the archived predecessor is not itself a meaningful improvement,
-Mabojolu does not roll back to a known-poor model.
-
-Instead it returns:
-
-reopen-search
-
-This creates three protected post-installation outcomes:
-
-retain
--> installed revision remains supported by fresh protected evidence
-
-rollback
--> archived predecessor materially beats the installed revision
-
-reopen search
--> installed revision regressed but archived predecessor does not solve the
-   problem
-
-The resulting loop is:
-
-live evidence stream
--> outcome-blind autonomous partition
--> fit repair on fit partition
--> validate on protected partition
--> install and archive revision
--> later live evidence epoch
--> new outcome-blind partition
--> fresh protected regression test
--> retain, rollback, or reopen search
--> synchronize belief, plan, goals, and receding-horizon control.
-
-This remains bounded evidence governance rather than unrestricted self-editing.
-The partition stride and offset, minimum evidence counts, structural repair
-grammar, repair variables, protected improvement threshold, rollback threshold,
-maximum acceptable installed error, archived candidate set, action catalog,
-goal contract, and hard safety constraints remain human-specified.
+This remains bounded governance rather than unrestricted historical search.
+Maximum lineage size, complexity and uncertainty bands, base protected count,
+coverage ceiling, minimum material improvement, maximum acceptable protected
+error, retained revision set, goal contract, action catalog, and safety
+constraints remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. adaptive evidence-role schedules rather than a fixed deterministic stride;
-2. intervention-stratified protected reserves so fitting and validation both
-   cover important causal regions;
-3. protected evidence budgets that grow when repair complexity increases;
-4. multiple archived revisions and selection among more than one rollback
-   ancestor;
-5. rollback under noisy gradual regression rather than a clean regime return;
-6. automatic reopening of structural search after a rollback candidate is also
-   rejected;
-7. prerequisite-specific evidence partitioning alongside structural repair
-   partitioning;
-8. repeated install, rollback, and reinstall cycles in one long episode;
-9. transfer of evidence-governance policies across structurally similar domains;
-10. whether autonomous evidence partitioning and rollback preserve terminal
-    intent, protected validation, hard risk ceilings, abstention, auditability,
-    and zero unsafe irreversible execution.
+1. intervention-stratified protected sampling that actively fills missing causal
+   regions instead of only checking whether coverage is adequate;
+2. uncertainty that evolves after installation instead of being frozen at the
+   installation snapshot;
+3. revision-lineage branching where a new repair descends from an older ancestor
+   rather than only from the currently active revision;
+4. probabilistic weighting over multiple lineage revisions rather than selecting
+   one deterministic historical winner;
+5. gradual drift where different ancestors dominate different protected
+   subregions;
+6. evidence budgets that account for structural term arity and number of revised
+   fragments rather than one aggregate complexity scalar;
+7. lineage pruning policies that preserve behaviorally unique ancestors rather
+   than simply the most recent bounded set;
+8. repeated branch, reinstall, and merge cycles over a long episode;
+9. transfer of revision-lineage evidence to structurally equivalent renamed
+   domains;
+10. whether adaptive evidence governance preserves protected validation,
+    terminal intent, hard risk ceilings, abstention, auditability, and zero
+    unsafe irreversible execution.
 
-The next central milestone is adaptive evidence governance and revision lineage:
-Mabojolu should maintain a bounded lineage of installed and archived model
-revisions, adapt the amount and coverage of protected evidence to revision
-complexity and uncertainty, and choose among retain, rollback, branch to a prior
-revision, or reopen search without contaminating the validation reserves.
+The next central milestone is active protected-evidence acquisition and
+probabilistic revision ancestry: Mabojolu should identify which causal regions
+are missing from the protected reserve, synthesize safe validation probes to
+fill those gaps, and maintain uncertainty over several plausible historical
+revisions until protected evidence clearly separates them.
 
 ## Safety and audit principle
 
