@@ -87,6 +87,12 @@ const attachmentName = z
 
 const imageAttachment = z
   .strictObject({
+    kind:
+      z.literal(
+        "image",
+      )
+        .optional(),
+
     id: attachmentId,
 
     name: attachmentName,
