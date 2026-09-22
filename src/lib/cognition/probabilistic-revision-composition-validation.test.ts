@@ -782,6 +782,101 @@ describe(
     );
 
     it(
+      "rejects reuse of composition fitting evidence for protected validation",
+      () => {
+        const currentLineage =
+          lineage();
+
+        const proposal =
+          proposeRevisionComposition(
+            currentLineage,
+            COMPOSITION_FIT,
+          );
+
+        expect(
+          () =>
+            validateRevisionComposition(
+              currentLineage,
+              proposal,
+              [
+                COMPOSITION_FIT[
+                  0
+                ]!,
+                COMPOSITION_FIT[
+                  2
+                ]!,
+              ],
+            ),
+        ).toThrow(
+          "Composition fitting evidence must remain disjoint from protected validation evidence.",
+        );
+      },
+    );
+
+    it(
+      "refuses installation when protected validation wins but the adaptive reserve is still undersized",
+      () => {
+        const currentLineage =
+          lineage();
+
+        const proposal =
+          proposeRevisionComposition(
+            currentLineage,
+            COMPOSITION_FIT,
+          );
+
+        const shortProtected =
+          PROTECTED_COMPOSITE.slice(
+            0,
+            3,
+          );
+
+        const protectedDecision =
+          validateRevisionComposition(
+            currentLineage,
+            proposal,
+            shortProtected,
+          );
+
+        expect(
+          protectedDecision.decision,
+        ).toBe(
+          "installed",
+        );
+
+        const installation =
+          installCompositeRevision(
+            currentLineage,
+            protectedDecision,
+            shortProtected,
+            "rev-composite-short",
+            {
+              y:
+                1,
+              z:
+                1,
+            },
+            0.2,
+          );
+
+        expect(
+          installation,
+        ).toMatchObject({
+          decision:
+            "abstained",
+
+          requirement: {
+            minimumProtectedEvidence:
+              4,
+          },
+
+          reason:
+            "adaptive-protected-composition-reserve-insufficient",
+        });
+      },
+    );
+
+    it(
       "appends the protected composite with the strictest compatible prerequisite from its source revisions",
       () => {
         const currentLineage =
@@ -804,6 +899,7 @@ describe(
           installCompositeRevision(
             currentLineage,
             protectedDecision,
+            PROTECTED_COMPOSITE,
             "rev-composite",
             {
               y:
