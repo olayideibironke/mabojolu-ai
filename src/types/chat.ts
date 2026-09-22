@@ -70,6 +70,10 @@ export interface ChatSource {
  * Only validated JPEG, PNG, and WebP images should reach this structure.
  */
 export interface ChatImageAttachment {
+  /** Optional discriminator retained for backward compatibility with older turns. */
+  kind?:
+    "image";
+
   /** Client-generated stable identifier. */
   id: string;
 
@@ -90,6 +94,54 @@ export interface ChatImageAttachment {
    * data:image/png;base64,iVBORw0KGgo...
    */
   dataUrl: string;
+}
+
+export interface ChatTextDocumentAttachment {
+  kind:
+    "document";
+
+  id: string;
+  name: string;
+
+  mimeType:
+    | "text/plain"
+    | "text/markdown"
+    | "text/csv"
+    | "application/json";
+
+  sizeBytes: number;
+
+  /**
+   * Browser-extracted UTF-8 text. This is bounded by request validation before
+   * it is allowed into model context.
+   */
+  textContent: string;
+}
+
+export type ChatAttachment =
+  | ChatImageAttachment
+  | ChatTextDocumentAttachment;
+
+export function isChatImageAttachment(
+  attachment:
+    ChatAttachment,
+): attachment is
+  ChatImageAttachment {
+  return "dataUrl" in
+    attachment;
+}
+
+export function isChatTextDocumentAttachment(
+  attachment:
+    ChatAttachment,
+): attachment is
+  ChatTextDocumentAttachment {
+  return (
+    "textContent" in
+      attachment &&
+    attachment.kind ===
+      "document"
+  );
 }
 
 export interface ChatMessage {
@@ -115,7 +167,7 @@ export interface ChatMessage {
    *
    * Assistant messages normally leave this undefined.
    */
-  attachments?: ChatImageAttachment[];
+  attachments?: ChatAttachment[];
 
   /** Present on assistant messages after a provider starts responding. */
   model?: string;
