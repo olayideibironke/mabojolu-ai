@@ -543,29 +543,38 @@ function buildFaultExplanations(
       maximumFaultFragments,
       fragmentIds.length,
     ),
-  ).map(
-    (fragmentIdsForFault) => ({
-      id:
-        fragmentIdsForFault.length ===
-          0
-          ? "fault:none"
-          : `fault:${fragmentIdsForFault.join(
-              "+",
-            )}`,
+  )
+    .map(
+      (fragmentIdsForFault) => ({
+        id:
+          fragmentIdsForFault.length ===
+            0
+            ? "fault:none"
+            : `fault:${fragmentIdsForFault.join(
+                "+",
+              )}`,
 
-      kind:
-        fragmentIdsForFault.length ===
-          0
-          ? "no-fault"
-          : fragmentIdsForFault.length ===
-              1
-            ? "single-fragment"
-            : "multi-fragment",
+        kind:
+          fragmentIdsForFault.length ===
+            0
+            ? "no-fault"
+            : fragmentIdsForFault.length ===
+                1
+              ? "single-fragment"
+              : "multi-fragment",
 
-      fragmentIds:
-        fragmentIdsForFault,
-    }),
-  );
+        fragmentIds:
+          fragmentIdsForFault,
+      }),
+    )
+    .sort(
+      (left, right) =>
+        left.fragmentIds.length -
+          right.fragmentIds.length ||
+        left.id.localeCompare(
+          right.id,
+        ),
+    );
 }
 
 function summarizeBelief(
