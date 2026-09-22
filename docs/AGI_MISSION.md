@@ -201,7 +201,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   thresholds, with safe active experiment selection by expected information
   gain, marginal uncertainty tracking, protected repair installation after
   posterior resolution, and downstream vector-plan revision from the resolved
-  prerequisite hypothesis.
+  prerequisite hypothesis;
+- autonomous bounded experiment synthesis from competing repair/prerequisite
+  hypotheses, depth-two contingent epistemic lookahead, and decision-aware
+  stopping when residual causal uncertainty no longer changes the safest
+  cost-minimizing vector plan.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -210,144 +214,128 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: probabilistic repair programs and active prerequisite discovery
+### Current milestone: autonomous experiment synthesis and multi-step epistemic planning
 
-Mabojolu G can now keep multiple causal repair structures and multiple
-prerequisite thresholds alive simultaneously instead of collapsing immediately
-to one deterministic winner.
+Mabojolu G can now generate a bounded active-discovery experiment catalog from
+its current competing hypotheses instead of requiring every diagnostic probe to
+be named in advance.
 
-v1.19 constructs a joint hypothesis space:
+The v1.20 experiment synthesizer operates over two hypothesis families.
 
-repair structure x prerequisite hypothesis
+For competing structural-repair candidates, Mabojolu collects the variables that
+appear in the candidate causal terms and generates bounded binary interventions
+over single variables and small variable combinations.
 
-The controlled benchmark contains two competing repair structures and three
-competing readiness thresholds, creating six joint hypotheses with uniform
-initial probability and maximal normalized entropy.
+For competing prerequisite thresholds, Mabojolu groups hypotheses by action,
+target dimension, and candidate prerequisite dimension. It then places candidate
+probe states at midpoints between adjacent surviving thresholds.
 
-Repair hypotheses are complete repaired causal programs produced by the bounded
-structural-repair grammar. Prerequisite hypotheses are generated from action
-outcome evidence by retaining multiple thresholds that satisfy minimum evidence
-on both sides and exhibit a sufficiently large active-versus-inactive effect
-gap.
+The controlled benchmark therefore synthesizes its own repair probes over y and
+z and its own readiness probes between the competing prerequisite thresholds. No
+named repair or readiness probe is supplied to the active planner.
 
-The prerequisite generator therefore no longer returns only the single best
-threshold. Each surviving hypothesis records:
+Synthesized experiments are not self-authorizing. They still carry explicit
+risk, cost, reversibility, and observation-noise metadata. The epistemic planner
+applies an external maximum-risk ceiling and refuses every synthesized
+experiment when all candidates exceed that ceiling.
 
-- action id;
-- target dimension;
-- candidate state dimension;
-- threshold;
-- inactive mean effect;
-- active mean effect;
-- effect gap;
-- evidence count;
-- threshold-fit mean squared error.
+v1.20 adds bounded multi-step epistemic lookahead.
 
-The joint posterior is updated using Gaussian predictive likelihoods. It exposes
-both the complete joint distribution and separate marginal distributions over
-repair structures and prerequisite thresholds.
+The scientific-identification planner supports horizons one and two. For each
+candidate first experiment it evaluates representative observations under every
+currently possible joint repair/prerequisite truth. At horizon two, the second
+experiment is selected conditionally from the posterior produced by the first
+observation.
 
-v1.19 also performs active experiment selection over both uncertainty types.
+The controlled benchmark shows lower expected terminal joint entropy under the
+two-step policy than under the best one-step probe. At least one contingent
+branch therefore uses a second diagnostic experiment, while all selected probes
+remain inside the hard risk limit.
 
-A candidate active-discovery experiment can be:
+v1.20 also separates scientific identification from decision sufficiency.
 
-- a repair probe, whose predicted observation comes from the repaired causal
-  program;
-- a prerequisite probe, whose predicted action effect depends on whether the
-  probe state lies above or below the prerequisite threshold.
+A scientific objective may justify continuing experiments until repair and
+prerequisite uncertainty are both sharply reduced. A task objective should not
+necessarily spend more cost merely to identify a causal detail that cannot
+change the current safe plan.
 
-For every safe reversible experiment, Mabojolu evaluates expected posterior
-entropy under the current joint belief. It chooses the experiment with the best
-expected information gain after experiment cost, while hard-blocking experiments
-that violate the risk ceiling or reversibility requirement.
+Mabojolu therefore aggregates joint posterior mass by the safe vector-plan
+signature implied by each prerequisite hypothesis.
 
-The controlled benchmark deliberately includes an unsafe zero-cost probe. It is
-never selected.
+Before experimentation, the controlled benchmark has two competing action plans:
 
-A safe readiness probe can collapse the prerequisite marginal while leaving the
-repair marginal near 50/50. A separate structural probe then resolves the
-remaining repair ambiguity. This demonstrates factor-specific learning inside
-one joint posterior rather than a single opaque confidence score.
+- prep-light -> finish;
+- prep-strong -> finish.
 
-The benchmark's hidden joint state is:
+The posterior does not yet put enough mass on either plan to act without more
+information.
 
-- interaction(y,z) repair;
-- readiness >= about 0.70 before finish.
+For decision-aware discovery, Mabojolu first filters the synthesized experiment
+catalog by expected reduction in plan entropy. A repair-only probe is excluded
+at this stage because repair identity does not affect the current action
+sequence. A synthesized prerequisite probe remains decision-relevant and is
+selected.
 
-After the active probes, posterior confidence on the complete joint hypothesis
-exceeds the configured resolution threshold.
+Under the benchmark's hidden high-readiness-threshold environment, that one
+probe shifts more than the configured stopping probability onto:
 
-Posterior resolution still does not authorize model installation.
-
-The posterior-leading repair candidate is routed back through the existing
-protected structural-repair validator. Active-discovery observations do not
-replace the disjoint protected installation reserve. The interaction repair is
-installed only after it independently wins that protected comparison.
-
-The resolved prerequisite hypothesis is then allowed to affect downstream
-planning. The benchmark contrasts:
-
-initial low-threshold assumption:
-prep-light -> finish
-
-resolved high-threshold posterior:
 prep-strong -> finish
 
-The existing prerequisite-aware goal revision machinery retires the stale
-prep-light branch, inserts the stronger preparation branch, and verifies that
-the terminal vector goal contract is unchanged.
+Repair identity deliberately remains unresolved at approximately 50/50, so the
+complete joint posterior is not yet sufficiently certain for scientific
+identification.
 
-The resulting v1.19 loop is:
+Nevertheless, every posterior-supported prerequisite hypothesis with material
+mass now implies the same safe action sequence. Mabojolu therefore stops
+experimenting in decision mode.
 
-competing repair structures
-+
-competing prerequisite thresholds
--> joint posterior
--> safe information-gain experiment
--> posterior update
--> another targeted experiment when needed
--> joint resolution
--> protected repair validation
--> resolved prerequisite
--> vector-plan revision
--> stale-goal retirement
--> same terminal objective
+This produces an explicit distinction:
 
-This remains bounded probabilistic discovery. The repair candidate grammar,
-candidate variables, prerequisite state dimensions, experiment catalog,
-observation-noise scales, information-gain objective, resolution thresholds,
-protected installation reserve, action catalog, vector goal, and safety ceilings
-remain human-specified.
+scientific identification mode
+-> continue bounded epistemic probing when additional information is valuable
+
+decision mode
+-> stop when remaining uncertainty cannot change the safest high-value plan
+
+The benchmark thus avoids two opposite failure modes: acting too early while
+decision-relevant uncertainty remains, and experimenting indefinitely after the
+decision is already invariant.
+
+This remains bounded experiment synthesis and bounded epistemic planning.
+Repair-variable combinations are binary and arity-limited; prerequisite probes
+are threshold midpoints; observation-noise scales, experiment risk/cost
+defaults, planning horizon, information-gain objective, plan-invariance
+probability, causal hypothesis grammar, action catalog, vector goal, and hard
+safety ceilings remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. active generation of discriminating experiments rather than selection only
-   from a supplied experiment catalog;
-2. Bayesian priors informed by repair-fit quality and prerequisite-fit quality
-   instead of uniform joint priors;
-3. noisy sequential evidence where no single experiment nearly resolves a
-   hypothesis dimension;
-4. multi-term repair-program posteriors rather than one-term repair alternatives;
-5. conjunctive and disjunctive prerequisite hypotheses across several state
-   dimensions;
-6. experiment planning over several future steps where the best first probe is
-   chosen for downstream information value;
-7. active probes whose result changes both the repair and prerequisite
-   marginals simultaneously;
-8. stopping rules that balance residual uncertainty against the value of acting
-   now;
-9. transfer of joint repair/prerequisite beliefs across renamed domains;
-10. whether probabilistic active discovery preserves terminal intent, disjoint
-    protected installation evidence, hard risk ceilings, abstention,
-    auditability, and zero unsafe irreversible execution.
+1. continuous-valued intervention synthesis rather than binary repair probes;
+2. adaptive experiment synthesis where candidate interventions are generated
+   from posterior disagreement gradients rather than fixed combinatorial rules;
+3. deeper contingent experiment trees beyond horizon two;
+4. noisy repeated probes where one observation cannot sharply separate the
+   hypotheses;
+5. explicit value-of-information measured in downstream task utility rather than
+   entropy or plan identity alone;
+6. mixed experiment/action policies where a task action can simultaneously make
+   progress and reveal causal information;
+7. experiment reuse and transfer when a structurally equivalent uncertainty
+   appears in a renamed domain;
+8. learned experiment cost and reliability models from past outcomes;
+9. stopping rules that compare expected information value directly with delay,
+   task opportunity cost, and safety margin;
+10. whether autonomous experiment synthesis preserves protected model
+    installation, hard risk ceilings, reversibility, abstention, auditability,
+    and zero unsafe irreversible execution.
 
-The next central milestone is autonomous experiment synthesis and multi-step
-epistemic planning: Mabojolu should generate bounded candidate interventions
-from the current competing hypotheses, choose short sequences of experiments
-for downstream information value, and stop experimenting when additional
-information no longer changes the safest high-value plan.
+The next central milestone is value-of-information dual control with mixed
+action-experiment policies: Mabojolu should reason about task actions that both
+advance the goal and teach it about the world, compare pure experiments against
+informative actions, and choose information gathering only when its expected
+downstream task value exceeds its cost and delay.
 
 ## Safety and audit principle
 
