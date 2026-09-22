@@ -292,6 +292,35 @@ function termFeature(
       ] ??
         0;
 
+    case "saturating":
+      if (
+        term.variables.length !==
+          1
+      ) {
+        throw new Error(
+          "Autonomous repair saturating terms require exactly one variable.",
+        );
+      }
+
+      {
+        const magnitude =
+          interventions[
+            term.variables[
+              0
+            ]!
+          ] ??
+          0;
+
+        return magnitude <=
+          0
+          ? 0
+          : magnitude /
+            (
+              0.5 +
+              magnitude
+            );
+      }
+
     case "interaction":
       if (
         term.variables.length !==
