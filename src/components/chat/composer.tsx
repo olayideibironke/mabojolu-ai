@@ -16,21 +16,27 @@ import { useBrowserDeviceProfile } from "@/hooks/use-browser-device-profile";
 import {
   browserModePlan,
 } from "@/lib/ai/browser-mode-policy";
-import type { ChatImageAttachment } from "@/types/chat";
+import {
+  isChatImageAttachment,
+  isChatTextDocumentAttachment,
+  type ChatAttachment,
+  type ChatImageAttachment,
+  type ChatTextDocumentAttachment,
+} from "@/types/chat";
 
 interface ComposerProps {
   isStreaming: boolean;
 
   onSend: (
     content: string,
-    attachments: ChatImageAttachment[],
+    attachments: ChatAttachment[],
   ) => void;
 
   onStop: () => void;
   focusKey?: number;
   disabled?: boolean;
   disabledReason?: string;
-  imageAttachmentsEnabled?: boolean;
+  attachmentsEnabled?: boolean;
   computeStatus?: string | null;
   selectedModelId: MabojoluModelId;
 
@@ -129,9 +135,23 @@ const ACCEPTED_IMAGE_TYPES = new Set<
   "image/webp",
 ]);
 
+const ACCEPTED_TEXT_DOCUMENT_TYPES = new Set<
+  ChatTextDocumentAttachment["mimeType"]
+>([
+  "text/plain",
+  "text/markdown",
+  "text/csv",
+  "application/json",
+]);
+
+const MAX_ATTACHMENT_COUNT = 6;
 const MAX_IMAGE_COUNT = 4;
 const MAX_IMAGE_BYTES =
   10 * 1024 * 1024;
+const MAX_DOCUMENT_BYTES =
+  2 * 1024 * 1024;
+const MAX_DOCUMENT_TEXT_CHARS =
+  200_000;
 
 function createAttachmentId(): string {
   if (
@@ -191,6 +211,94 @@ function readFileAsDataUrl(
       reader.readAsDataURL(file);
     },
   );
+}
+
+function documentMimeType(
+  file:
+    File,
+):
+  ChatTextDocumentAttachment["mimeType"] |
+  null {
+  if (
+    ACCEPTED_TEXT_DOCUMENT_TYPES.has(
+      file.type as
+        ChatTextDocumentAttachment[
+          "mimeType"
+        ],
+    )
+  ) {
+    return file.type as
+      ChatTextDocumentAttachment[
+        "mimeType"
+      ];
+  }
+
+  const extension =
+    file.name
+      .split(
+        ".",
+      )
+      .pop()
+      ?.toLowerCase();
+
+  switch (
+    extension
+  ) {
+    case "txt":
+    case "text":
+      return "text/plain";
+
+    case "md":
+    case "markdown":
+      return "text/markdown";
+
+    case "csv":
+      return "text/csv";
+
+    case "json":
+      return "application/json";
+
+    default:
+      return null;
+  }
+}
+
+async function readTextDocument(
+  file:
+    File,
+): Promise<string> {
+  const text =
+    await file.text();
+
+  if (
+    text.length ===
+      0
+  ) {
+    throw new Error(
+      "The document is empty.",
+    );
+  }
+
+  if (
+    text.includes(
+      "\u0000",
+    )
+  ) {
+    throw new Error(
+      "The document does not appear to be readable text.",
+    );
+  }
+
+  if (
+    text.length >
+      MAX_DOCUMENT_TEXT_CHARS
+  ) {
+    throw new Error(
+      "The document contains too much text.",
+    );
+  }
+
+  return text;
 }
 
 function removeTextareaChrome(
@@ -445,7 +553,7 @@ export function Composer({
   focusKey = 0,
   disabled = false,
   disabledReason,
-  imageAttachmentsEnabled = false,
+  attachmentsEnabled = false,
   computeStatus = null,
   selectedModelId,
   onModelChange,
@@ -460,7 +568,7 @@ export function Composer({
     attachments,
     setAttachments,
   ] = useState<
-    ChatImageAttachment[]
+    ChatAttachment[]
   >([]);
 
   const [
@@ -804,12 +912,12 @@ export function Composer({
       ],
     );
 
-  const openImagePicker =
+  const openAttachmentPicker =
     useCallback(() => {
       if (
         disabled ||
         isStreaming ||
-        !imageAttachmentsEnabled
+        !attachmentsEnabled
       ) {
         return;
       }
@@ -819,11 +927,11 @@ export function Composer({
       fileInputRef.current?.click();
     }, [
       disabled,
-      imageAttachmentsEnabled,
+      attachmentsEnabled,
       isStreaming,
     ]);
 
-  const handleImageSelection =
+  const handleAttachmentSelection =
     useCallback(
       async (
         event:
@@ -845,14 +953,14 @@ export function Composer({
         }
 
         const remainingSlots =
-          MAX_IMAGE_COUNT -
+          MAX_ATTACHMENT_COUNT -
           attachments.length;
 
         if (
           remainingSlots <= 0
         ) {
           setAttachmentError(
-            `You can attach up to ${MAX_IMAGE_COUNT} images to one message.`,
+            `You can attach up to ${MAX_ATTACHMENT_COUNT} files to one message.`,
           );
 
           return;
@@ -869,27 +977,108 @@ export function Composer({
           remainingSlots
         ) {
           setAttachmentError(
-            `Only ${remainingSlots} more image${
-              remainingSlots === 1
-                ? ""
-                : "s"
-            } can be added.`,
+            `Only ${remainingSlots} more file${remainingSlots === 1 ? "" : "s"} can be added.`,
           );
         } else {
-          setAttachmentError(null);
+          setAttachmentError(
+            null,
+          );
         }
 
-        const nextAttachments:
-          ChatImageAttachment[] = [];
+        const existingImageCount =
+          attachments.filter(
+            isChatImageAttachment,
+          ).length;
 
-        for (const file of filesToRead) {
+        let nextImageCount =
+          existingImageCount;
+
+        const nextAttachments:
+          ChatAttachment[] = [];
+
+        for (
+          const file of
+            filesToRead
+        ) {
           if (
-            !ACCEPTED_IMAGE_TYPES.has(
-              file.type as ChatImageAttachment["mimeType"],
+            ACCEPTED_IMAGE_TYPES.has(
+              file.type as
+                ChatImageAttachment[
+                  "mimeType"
+                ],
             )
           ) {
+            if (
+              nextImageCount >=
+                MAX_IMAGE_COUNT
+            ) {
+              setAttachmentError(
+                `You can attach up to ${MAX_IMAGE_COUNT} images to one message.`,
+              );
+
+              continue;
+            }
+
+            if (
+              file.size >
+                MAX_IMAGE_BYTES
+            ) {
+              setAttachmentError(
+                `${file.name} is ${formatMegabytes(file.size)}. Each image must be 10 MB or smaller.`,
+              );
+
+              continue;
+            }
+
+            try {
+              const dataUrl =
+                await readFileAsDataUrl(
+                  file,
+                );
+
+              nextAttachments.push({
+                kind:
+                  "image",
+
+                id:
+                  createAttachmentId(),
+
+                name:
+                  file.name,
+
+                mimeType:
+                  file.type as
+                    ChatImageAttachment[
+                      "mimeType"
+                    ],
+
+                sizeBytes:
+                  file.size,
+
+                dataUrl,
+              });
+
+              nextImageCount +=
+                1;
+            } catch {
+              setAttachmentError(
+                `${file.name} could not be read.`,
+              );
+            }
+
+            continue;
+          }
+
+          const mimeType =
+            documentMimeType(
+              file,
+            );
+
+          if (
+            !mimeType
+          ) {
             setAttachmentError(
-              "Only JPEG, PNG, and WebP images are supported.",
+              `${file.name} is not supported yet. Use JPEG, PNG, WebP, TXT, Markdown, CSV, or JSON.`,
             );
 
             continue;
@@ -897,50 +1086,67 @@ export function Composer({
 
           if (
             file.size >
-            MAX_IMAGE_BYTES
+              MAX_DOCUMENT_BYTES
           ) {
             setAttachmentError(
-              `${file.name} is ${formatMegabytes(
-                file.size,
-              )}. Each image must be 10 MB or smaller.`,
+              `${file.name} is ${formatMegabytes(file.size)}. Text documents must be 2 MB or smaller.`,
             );
 
             continue;
           }
 
           try {
-            const dataUrl =
-              await readFileAsDataUrl(
+            const textContent =
+              await readTextDocument(
                 file,
               );
 
             nextAttachments.push({
-              id: createAttachmentId(),
-              name: file.name,
-              mimeType:
-                file.type as ChatImageAttachment["mimeType"],
-              sizeBytes: file.size,
-              dataUrl,
+              kind:
+                "document",
+
+              id:
+                createAttachmentId(),
+
+              name:
+                file.name,
+
+              mimeType,
+
+              sizeBytes:
+                file.size,
+
+              textContent,
             });
-          } catch {
+          } catch (
+            cause
+          ) {
             setAttachmentError(
-              `${file.name} could not be read.`,
+              cause instanceof
+                Error
+                ? `${file.name}: ${cause.message}`
+                : `${file.name} could not be read.`,
             );
           }
         }
 
         if (
-          nextAttachments.length > 0
+          nextAttachments.length >
+            0
         ) {
           setAttachments(
-            (current) => [
+            (
+              current,
+            ) => [
               ...current,
               ...nextAttachments,
             ],
           );
         }
       },
-      [attachments.length],
+      [
+        attachments,
+      ],
     );
 
   const removeAttachment =
@@ -1252,7 +1458,7 @@ export function Composer({
         "Message Mabojolu"
       )
     : attachments.length > 0
-      ? "Ask Mabojolu about these images"
+      ? "Ask Mabojolu about these files"
       : isListening
         ? "Listening..."
         : "Message Mabojolu";
@@ -1276,10 +1482,10 @@ export function Composer({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp"
+            accept="image/jpeg,image/png,image/webp,text/plain,text/markdown,text/csv,application/json,.txt,.text,.md,.markdown,.csv,.json"
             multiple
             onChange={
-              handleImageSelection
+              handleAttachmentSelection
             }
             className="sr-only"
             tabIndex={-1}
@@ -1290,44 +1496,83 @@ export function Composer({
           0 ? (
             <div
               className="mb-3 flex gap-2 overflow-x-auto pb-1"
-              aria-label="Selected images"
+              aria-label="Selected files"
             >
               {attachments.map(
-                (attachment) => (
-                  <div
-                    key={
-                      attachment.id
-                    }
-                    className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border-subtle bg-surface-base"
-                  >
-                    <Image
-                      src={
-                        attachment.dataUrl
-                      }
-                      alt={
-                        attachment.name
-                      }
-                      fill
-                      unoptimized
-                      sizes="64px"
-                      className="object-cover"
-                    />
+                (
+                  attachment,
+                ) =>
+                  isChatImageAttachment(
+                    attachment,
+                  )
+                    ? (
+                        <div
+                          key={
+                            attachment.id
+                          }
+                          className="group relative h-16 w-16 shrink-0 overflow-hidden rounded-xl border border-border-subtle bg-surface-base"
+                        >
+                          <Image
+                            src={
+                              attachment.dataUrl
+                            }
+                            alt={
+                              attachment.name
+                            }
+                            fill
+                            unoptimized
+                            sizes="64px"
+                            className="object-cover"
+                          />
 
-                    <button
-                      type="button"
-                      onClick={() =>
-                        removeAttachment(
-                          attachment.id,
+                          <button
+                            type="button"
+                            onClick={() =>
+                              removeAttachment(
+                                attachment.id,
+                              )
+                            }
+                            aria-label={`Remove ${attachment.name}`}
+                            title={`Remove ${attachment.name}`}
+                            className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/75 text-white shadow-sm transition-transform hover:scale-105"
+                          >
+                            <CloseIcon />
+                          </button>
+                        </div>
+                      )
+                    : isChatTextDocumentAttachment(
+                        attachment,
+                      )
+                      ? (
+                          <div
+                            key={
+                              attachment.id
+                            }
+                            className="group relative flex h-16 max-w-48 shrink-0 items-center rounded-xl border border-border-subtle bg-surface-base px-3 pr-8"
+                            title={
+                              attachment.name
+                            }
+                          >
+                            <span className="truncate text-xs font-medium text-text-primary">
+                              {attachment.name}
+                            </span>
+
+                            <button
+                              type="button"
+                              onClick={() =>
+                                removeAttachment(
+                                  attachment.id,
+                                )
+                              }
+                              aria-label={`Remove ${attachment.name}`}
+                              title={`Remove ${attachment.name}`}
+                              className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/75 text-white shadow-sm transition-transform hover:scale-105"
+                            >
+                              <CloseIcon />
+                            </button>
+                          </div>
                         )
-                      }
-                      aria-label={`Remove ${attachment.name}`}
-                      title={`Remove ${attachment.name}`}
-                      className="absolute right-1 top-1 inline-flex h-5 w-5 items-center justify-center rounded-full bg-black/75 text-white shadow-sm transition-transform hover:scale-105"
-                    >
-                      <CloseIcon />
-                    </button>
-                  </div>
-                ),
+                      : null,
               )}
             </div>
           ) : null}
@@ -1370,24 +1615,24 @@ export function Composer({
             <button
               type="button"
               onClick={
-                openImagePicker
+                openAttachmentPicker
               }
               disabled={
                 disabled ||
                 isStreaming ||
-                !imageAttachmentsEnabled ||
+                !attachmentsEnabled ||
                 attachments.length >=
                   MAX_IMAGE_COUNT
               }
               aria-label={
-                imageAttachmentsEnabled
-                  ? "Attach images"
-                  : "Image understanding is coming soon"
+                attachmentsEnabled
+                  ? "Attach files"
+                  : "File attachments are unavailable"
               }
               title={
-                imageAttachmentsEnabled
-                  ? "Attach images"
-                  : "On-device image understanding is coming soon"
+                attachmentsEnabled
+                  ? "Attach images or text documents"
+                  : "File attachments are unavailable"
               }
               className="inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-base hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
             >
@@ -1551,8 +1796,8 @@ export function Composer({
         >
           Press Enter to send. Press Shift plus Enter
           for a new line. Use the microphone for voice
-          input. You may attach up to four JPEG, PNG, or
-          WebP images.
+          input. You may attach JPEG, PNG, WebP, TXT,
+          Markdown, CSV, or JSON files.
         </p>
       </div>
     </div>
