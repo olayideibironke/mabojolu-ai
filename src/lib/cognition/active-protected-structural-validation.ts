@@ -2002,7 +2002,6 @@ export function runControlledActiveProtectedStructuralValidation(
 
     const gap =
       analyzeProtectedStructuralCoverageGap(
-        lineage,
         search
           .selectedCandidate,
         uncertaintyAtInstall,
@@ -2150,7 +2149,6 @@ export function runControlledActiveProtectedStructuralValidation(
 
     const updatedGap =
       analyzeProtectedStructuralCoverageGap(
-        lineage,
         search
           .selectedCandidate,
         uncertaintyAtInstall,
