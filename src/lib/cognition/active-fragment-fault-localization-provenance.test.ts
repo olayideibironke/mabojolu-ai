@@ -8,7 +8,7 @@ import {
   ProbabilisticFragmentFaultLocalizer,
   conditionFaultPosteriorOnEvidence,
   initializeFragmentProvenance,
-  localizeAndMaintainCompositeFragment,
+  runControlledLocalizedCompositeMaintenance,
   runControlledFragmentFaultLocalization,
   synthesizeFragmentFaultProbes,
   updateFragmentProvenanceAfterMaintenance,
@@ -802,7 +802,7 @@ describe(
           reasonerAndPlan();
 
         const result =
-          localizeAndMaintainCompositeFragment(
+          runControlledLocalizedCompositeMaintenance(
             lineage(),
             ACTUAL_PROGRAM,
             [],
@@ -878,7 +878,7 @@ describe(
           reasonerAndPlan();
 
         const result =
-          localizeAndMaintainCompositeFragment(
+          runControlledLocalizedCompositeMaintenance(
             lineage(),
             ACTUAL_PROGRAM,
             INITIAL_MONITORING,
@@ -956,7 +956,7 @@ describe(
           reasonerAndPlan();
 
         const result =
-          localizeAndMaintainCompositeFragment(
+          runControlledLocalizedCompositeMaintenance(
             lineage(),
             ACTUAL_PROGRAM,
             INITIAL_MONITORING,
@@ -1320,7 +1320,7 @@ describe(
           reasonerAndPlan();
 
         const result =
-          localizeAndMaintainCompositeFragment(
+          runControlledLocalizedCompositeMaintenance(
             lineage(),
             ACTUAL_PROGRAM,
             INITIAL_MONITORING,
