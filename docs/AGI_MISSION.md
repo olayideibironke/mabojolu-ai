@@ -259,7 +259,15 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   expected terminal uncertainty, repair search opens only after every implicated
   fragment is both probabilistically resolved and independently quarantined,
   and a combinatorial local repair winner must remain best on a fresh adaptive
-  protected reserve before installation.
+  protected reserve before installation;
+- adaptive fault-model synthesis and repair uncertainty, where fragment fault
+  magnitudes are inferred continuously from counterfactual contribution
+  evidence instead of using one fixed fault scale, a bounded neighborhood of
+  coefficient-scale and near-zero retirement models competes in a log-space
+  posterior, several repair candidates remain live until validation evidence
+  resolves them, and a bounded decision rule chooses diagnosis, validation,
+  protected repair, retention, or abstention according to uncertainty and
+  externally specified information/cost/risk values.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -268,275 +276,287 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: multi-step fault diagnosis and probabilistic local repair search
+### Current milestone: adaptive fault-model synthesis and repair uncertainty
 
-Mabojolu G can now diagnose bounded composite failures without assuming either
-that a fault definitely exists or that exactly one inherited fragment failed.
+Mabojolu G can now infer bounded fragment fault magnitudes from evidence rather
+than relying on one global human-specified fault scale.
 
-For the controlled two-fragment composite the fault hypothesis space is:
-
-no fault
-y fragment fault
-z fragment fault
-y + z multi-fragment fault
-
-Each fault explanation is represented by a bounded counterfactual program.
-
-In this milestone a fault scales the implicated fragment contribution by a
-human-specified bounded factor rather than deleting it completely.
-
-The controlled benchmark uses a fault scale of about 0.25.
-
-The installed composite begins with:
+The controlled composite begins with:
 
 linear(y), coefficient about 0.60
 +
 linear(z), coefficient about 0.50
 
-The hidden controlled environment changes both fragments to:
+The changed environment behaves as if the inherited fragments have continuous
+scales:
 
-linear(y), coefficient about 0.15
-+
-linear(z), coefficient about 0.125
+y scale about 0.40
+z scale about 0.70
 
-Two passive half-strength observations are supplied first.
+which implies effective coefficients:
 
-Those observations favor the two-fragment fault, but the posterior remains
-unresolved at only about 0.52 confidence.
+linear(y) about 0.24
+linear(z) about 0.35
 
-No repair search is allowed at that point.
+Those scale values are not supplied to the posterior as a universal fault
+constant.
 
-v1.30 evaluates both one-step and two-step diagnostic policies.
+v1.31 estimates each fragment scale from counterfactual contribution evidence.
 
-The one-step policy can reduce uncertainty, but with four competing
-explanations one unary intervention cannot fully distinguish:
+For each observation Mabojolu compares:
 
-no fault
-single y fault
-single z fault
-double fault
+the incumbent prediction
 
-The depth-two planner evaluates the information value of a second diagnostic
-conditional on each possible first observation.
+against:
 
-The controlled policy chooses:
+the same causal program with one fragment removed.
 
-fault-probe:y
+The difference is that fragment's predicted causal contribution.
 
-first because its value under the contingent two-step objective is higher even
-though the z probe has lower configured risk and cost.
+When that contribution is materially nonzero, the observed outcome identifies
+a bounded scale for that fragment.
 
-After the y observation the two-fragment explanation rises to roughly 0.68
-confidence but remains below the repair threshold.
+The controlled half-strength y evidence therefore estimates:
 
-The controller then replans and chooses:
+y scale about 0.40
 
-fault-probe:z
+and the controlled half-strength z evidence estimates:
 
-After that second observation, the bounded two-fragment explanation rises to
-roughly 0.977 confidence.
+z scale about 0.70.
 
-The controlled benchmark therefore resolves the fault only after two
-diagnostic steps.
+The estimator also records:
 
-The diagnostic probes remain:
+- effective evidence count;
+- weighted scale variance;
+- lower bounded scale;
+- upper bounded scale.
 
-- reversible;
-- unit-bounded;
-- under the external risk ceiling;
-- costed explicitly.
+When evidence drives a fragment sufficiently close to zero, model synthesis can
+include a local structural retirement candidate in addition to scaled
+coefficient candidates.
 
-If every available diagnostic exceeds the risk ceiling, diagnosis abstains.
+v1.31 then synthesizes a bounded neighborhood around the evidence-derived
+magnitudes.
 
-v1.30 also includes an explicit no-fault explanation.
+For the controlled case the model set includes combinations around:
 
-When observations match the incumbent composite strongly enough, the posterior
-can resolve:
+y = 0.40
+z = 0.70
 
-no fault
+plus nearby uncertainty bounds and the incumbent scale 1.00.
 
-and the local repair search returns:
+The number of simultaneously changed fragments and total synthesized candidates
+remain externally bounded.
 
-retain-no-fault
+Fault-model uncertainty is maintained in log space.
 
-No repair candidate is evaluated merely because a diagnostic process was
-started.
+This avoids repeated Gaussian likelihood multiplication underflow as evidence
+accumulates.
 
-Fault-posterior confidence is still not repair authority.
+Sparse magnitude evidence makes the 0.40/0.70 candidate the leading model but
+does not make it sufficiently certain.
 
-The two passive half-strength observations each provide one deterministic blame
-episode for the corresponding damaged fragment.
+Mabojulu therefore does not immediately open repair.
 
-The active y and z diagnostics provide the second blame episodes.
+A safe diagnostic probe has positive expected information value under the
+adaptive fault-model posterior.
 
-Only after the posterior resolves the multi-fragment explanation and both y and
-z independently satisfy the existing repeated-blame quarantine rule may repair
-search begin.
+The bounded action selector compares externally supplied:
 
-If even one probabilistically implicated fragment is not quarantined, the repair
-search abstains.
+expected information gain
+cost
+risk
 
-The local repair search then constructs bounded combinations for every
-implicated fragment.
+and chooses:
 
-For each failed fragment the choices are:
+diagnose
 
-- fragment-only rollback;
-- validated same-topology local repair candidates.
+while fault-model uncertainty remains material.
 
-The controlled repair catalog contains:
+The controlled full-strength y and z diagnostic observations then concentrate
+the adaptive fault posterior above the configured confidence and margin
+thresholds on:
 
-y -> 0.15
-y alternative -> 0.30
-z -> 0.125
-z alternative -> 0.25
+y scale about 0.40
+z scale about 0.70.
 
-Because both y and z are implicated, Mabojolu evaluates combinations of these
-choices rather than choosing each repair independently.
+Fault resolution is still not repair authority.
 
-The discovery reserve selects the exact pair:
+v1.31 converts the best bounded fault-model neighborhood into several local
+repair candidates and maintains a separate repair-candidate posterior.
 
-linear(y), coefficient about 0.15
-+
-linear(z), coefficient about 0.125
+Before repair-selection evidence arrives, multiple candidate coefficient pairs
+remain plausible.
 
-with discovery MSE approximately zero.
+The decision selector therefore moves from:
 
-Discovery evidence cannot authorize installation.
+diagnose
 
-Repair-search evidence, passive/active diagnostic evidence, previous lineage
-installation evidence, and the final protected reserve are kept disjoint.
+to:
 
-The selected repair combination must remain the best candidate on the fresh
+validate
+
+rather than directly to repair.
+
+Fresh repair-selection observations then concentrate the repair posterior above
+its configured confidence and margin thresholds on the evidence-derived
+candidate:
+
+y adaptive scale 0.400
+z adaptive scale 0.700.
+
+The candidate ids preserve their inherited logical source while recording the
+new adaptive scale.
+
+Candidate-selection evidence still cannot authorize installation.
+
+Magnitude-discovery evidence, diagnostic evidence, repair-selection evidence,
+historical lineage installation evidence, and the final protected reserve remain
+separate validation roles.
+
+The selected repair candidate must remain the best candidate on a fresh
 protected reserve.
 
-A dedicated falsification test makes the discovery-selected pair lose to an
-alternative coefficient pair on protected evidence.
+The protected repaired program has:
 
-Expected result:
+y coefficient about 0.24
+z coefficient about 0.35
 
-repair-search-selection-not-protected
+and protected MSE approximately zero in the controlled benchmark.
 
-and no installation.
+Installation uncertainty is taken from the repair-posterior normalized entropy,
+not a manually entered constant.
 
-When the discovery winner also wins protected validation, it must still satisfy
-the adaptive protected-evidence requirement derived from the repaired program's
-complexity and posterior uncertainty.
+For the controlled posterior and two-fragment complexity, the adaptive evidence
+formula requires:
 
-In the controlled benchmark the repaired two-fragment program requires four
-fresh protected observations.
+4 fresh protected observations
 
-A three-observation reserve is rejected.
+and multiple intervention signatures.
 
-The four-observation reserve passes and selects the exact repair pair with
-protected MSE approximately zero.
+A three-observation protected reserve is rejected.
 
-The protected multi-fragment repair is appended as a new bounded lineage
-revision.
+The complete four-observation reserve is accepted.
 
-Fragment provenance advances independently for both damaged mechanisms.
+Only then does the action selector move from:
 
-The y logical fragment keeps its historical origin in rev-y but changes active
-fragment to:
+validate
 
-repair-y-0.15
+to:
 
-The z logical fragment keeps its historical origin in rev-z but changes active
-fragment to:
+repair.
 
-repair-z-0.125
+The protected adaptive repair is appended as a new bounded lineage revision.
 
-Both provenance records advance one generation and retain the protected
-evidence ids that authorized the repair.
+Fragment provenance advances independently.
 
-The protected repaired causal program is then projected into the live
-receding-control hypothesis.
+The y logical fragment keeps origin:
 
-Before the multi-fragment repair:
+rev-y
+
+while its active implementation becomes:
+
+rev-y:program-y-fragment:adaptive-scale-0.400
+
+The z logical fragment keeps origin:
+
+rev-z
+
+while its active implementation becomes:
+
+rev-z:program-z-fragment:adaptive-scale-0.700.
+
+The protected causal program is projected back into the live hypothesis.
+
+Before repair:
 
 finish -> about 0.80
 boost-finish -> about 1.10
 
-After repair:
+After adaptive repair:
 
-finish -> about 0.20
-boost-finish -> about 0.275
+finish -> about 0.47
+boost-finish -> about 0.59
 
-The terminal goal requires:
+The terminal task requires:
 
-progress >= 0.25
+progress >= 0.50
 
 so the live plan changes:
 
 finish
--> boost-finish
+-> boost-finish.
 
-Only the stale child goal branch is replaced.
+Only the stale child branch is replaced.
 
-The terminal goal contract remains unchanged.
+The terminal contract remains unchanged.
 
-The protected multi-fragment repair then feeds directly into receding-horizon
+The protected adaptive repair then feeds directly into receding-horizon
 control, whose next decision becomes:
 
-boost-finish
+boost-finish.
 
-The v1.30 loop is therefore:
+The v1.31 loop is therefore:
 
-passive mismatch evidence
--> posterior over no-fault, single-fault, and bounded multi-fault explanations
--> evaluate one-step versus contingent two-step diagnostics
--> execute one safe diagnostic
--> update posterior
--> replan the remaining diagnostic horizon
--> require posterior confidence and margin
--> require repeated-blame quarantine for every implicated fragment
--> open bounded combinatorial repair search
--> select repair combination on discovery evidence
--> require the same selection to win on disjoint protected evidence
--> enforce adaptive protected count and intervention coverage
--> install repaired child revision
--> advance per-fragment provenance
--> update live hypothesis and goal branch
+counterfactual fragment contribution evidence
+-> infer continuous bounded fault magnitudes
+-> synthesize bounded magnitude neighborhoods
+-> maintain a log-space posterior over fault models
+-> choose further diagnosis while fault uncertainty is material
+-> observe bounded diagnostics
+-> resolve the fault-model posterior
+-> maintain a separate posterior over repair candidates
+-> choose validation rather than premature repair
+-> resolve repair uncertainty from fresh selection evidence
+-> require the same repair to win on disjoint protected evidence
+-> derive adaptive evidence budget from repaired complexity and posterior entropy
+-> install only after the protected reserve is ready
+-> advance fragment provenance
+-> update the live hypothesis and child goal branch
 -> continue receding-horizon control.
 
-This remains bounded diagnostic and repair search rather than unrestricted
-self-modification. Maximum fault cardinality, fault scale, diagnostic horizon,
-probe set, risk ceiling, observation noise, posterior thresholds, quarantine
-thresholds, repair catalog, candidate count, topology matching, complexity
-penalty, protected improvement threshold, adaptive evidence formula, action
-catalog, and terminal goal contract remain human-specified.
+This remains bounded adaptive model synthesis rather than unrestricted causal
+program invention. v1.31 adjusts coefficients of already validated fragment
+structures and can propose near-zero fragment retirement. It does not yet invent
+arbitrary new term topology. Minimum contribution, uncertainty radius,
+retirement threshold, maximum changed fragments, candidate count, posterior
+thresholds, diagnostic and validation value estimates, cost/risk penalties,
+protected improvement threshold, adaptive evidence formula, action catalog, and
+terminal goal contract remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. fault-model structure learning rather than using one human-specified fault
-   scale for every fragment;
-2. diagnostic horizons longer than two while executing only the next probe and
-   replanning after every observation;
-3. probe synthesis that can use safe joint interventions when unary diagnostics
-   leave interaction-fragment faults unresolved;
-4. posterior mass over several repair combinations instead of deterministic
-   discovery selection;
-5. repair-search value-of-information that decides whether another diagnostic
-   is worth more than immediately validating the current repair candidates;
-6. interaction and latent-bias multi-fragment faults;
-7. provenance-aware repair priors that favor previously successful local
-   coefficients without bypassing protected validation;
-8. gradual faults where no discrete explanation dominates immediately;
-9. transfer of bounded multi-fault diagnosis and repair priors across
-   structurally equivalent renamed domains;
-10. whether multi-step diagnosis and repair search preserve evidence
-    independence, no-fault retention, repeated-blame authority, terminal intent,
-    hard risk ceilings, abstention, auditability, and zero unsafe irreversible
-    execution.
+1. bounded local topology mutation, allowing an inferred fragment to switch
+   among linear, interaction, saturating, and latent-bias structures rather than
+   only coefficient scaling or retirement;
+2. posterior synthesis directly over continuous fault magnitude parameters
+   instead of discretizing an evidence-derived uncertainty neighborhood;
+3. active experiment design that targets parameter uncertainty and structural
+   uncertainty simultaneously;
+4. expected decision value that computes downstream task benefit rather than
+   receiving diagnostic and validation information values as external inputs;
+5. repair-candidate posterior transfer from earlier successful local repairs
+   without bypassing fresh protected validation;
+6. correlated fragment drift where one parameter change alters the inferred
+   scale of another fragment;
+7. gradual online magnitude tracking with change-point detection and posterior
+   forgetting;
+8. protected validation policies that adaptively choose the next reserve
+   intervention instead of receiving a fixed protected set;
+9. transfer of adaptive fault magnitude priors across structurally equivalent
+   renamed domains;
+10. whether adaptive synthesis preserves evidence-role independence, no-fault
+    retention, terminal intent, hard risk ceilings, abstention, auditability,
+    and zero unsafe irreversible execution.
 
-The next central milestone is adaptive fault-model synthesis and repair
-uncertainty: Mabojolu should infer bounded fault magnitudes and local structural
-changes from evidence instead of relying on a fixed fault scale, maintain a
-posterior over several protected repair candidates, and decide whether to
-diagnose further, validate a candidate, or defer repair based on expected
-decision value.
+The next central milestone is bounded local structural mutation and joint
+parameter-structure uncertainty: Mabojolu should maintain uncertainty over both
+continuous fragment parameters and a small grammar of alternative local causal
+structures, choose experiments that distinguish parameter drift from structural
+change, and protect any topology mutation with independent validation before it
+can enter the live lineage.
 
 ## Safety and audit principle
 
