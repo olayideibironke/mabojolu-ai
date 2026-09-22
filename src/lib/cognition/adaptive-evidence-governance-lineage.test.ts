@@ -21,6 +21,7 @@ import {
   materializePrerequisiteAwareSubgoals,
   revisePrerequisiteAwareGoalChain,
   type LearnedActionPrerequisite,
+  type PrerequisiteAwarePlan,
 } from "./structural-repair-prerequisite-planning";
 
 import {
@@ -567,6 +568,49 @@ function lineage() {
   );
 }
 
+function remapPlan(
+  plan: PrerequisiteAwarePlan,
+  revisionNumber: number,
+): PrerequisiteAwarePlan {
+  return {
+    ...plan,
+
+    actionIds: [
+      ...plan.actionIds,
+    ],
+
+    subgoals:
+      plan.subgoals.map(
+        (subgoal, index) => ({
+          ...subgoal,
+
+          id:
+            `prerequisite-revised-${revisionNumber}-${index + 1}`,
+
+          targetState: {
+            ...subgoal.targetState,
+          },
+
+          prerequisiteDescriptions: [
+            ...subgoal.prerequisiteDescriptions,
+          ],
+
+          dependsOnGoalIds:
+            index ===
+              0
+              ? []
+              : [
+                  `prerequisite-revised-${revisionNumber}-${index}`,
+                ],
+        }),
+      ),
+
+    expectedFinalState: {
+      ...plan.expectedFinalState,
+    },
+  };
+}
+
 function createReasonerWithCurrentPlan() {
   let tick =
     0;
@@ -689,7 +733,10 @@ function createReasonerWithCurrentPlan() {
     revisePrerequisiteAwareGoalChain(
       reasoner,
       "lineage-terminal-goal",
-      plan1,
+      remapPlan(
+        plan1,
+        1,
+      ),
       plan2,
       2,
     );
