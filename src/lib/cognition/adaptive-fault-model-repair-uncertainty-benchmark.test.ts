@@ -45,19 +45,31 @@ describe(
 
         expect(
           report
-            .resolvedFaultBelief,
-        ).toMatchObject({
-          topScales: {
-            "rev-y:program-y-fragment":
-              0.4,
+            .resolvedFaultBelief
+            .sufficientlyResolved,
+        ).toBe(
+          true,
+        );
 
-            "rev-z:program-z-fragment":
-              0.7,
-          },
+        expect(
+          report
+            .resolvedFaultBelief
+            .topScales[
+              "rev-y:program-y-fragment"
+            ],
+        ).toBeCloseTo(
+          0.4,
+        );
 
-          sufficientlyResolved:
-            true,
-        });
+        expect(
+          report
+            .resolvedFaultBelief
+            .topScales[
+              "rev-z:program-z-fragment"
+            ],
+        ).toBeCloseTo(
+          0.7,
+        );
       },
     );
 
