@@ -383,10 +383,23 @@ export function buildOnlineReliabilitySummary(
     mismatchStatus
       .mismatchCount;
 
+  const supportEpisodes =
+    mismatchStatus
+      .records
+      .filter(
+        (record) =>
+          !record.mismatch,
+      )
+      .length;
+
   const posteriorReliability =
-    1 /
+    (
+      1 +
+      supportEpisodes
+    ) /
     (
       2 +
+      supportEpisodes +
       blameEpisodes
     );
 
@@ -405,14 +418,7 @@ export function buildOnlineReliabilitySummary(
             .records
             .length,
 
-        supportEpisodes:
-          mismatchStatus
-            .records
-            .filter(
-              (record) =>
-                !record.mismatch,
-            )
-            .length,
+        supportEpisodes,
 
         blameEpisodes,
 
