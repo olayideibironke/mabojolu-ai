@@ -3,6 +3,11 @@ import type {
   ChatMessage,
 } from "@/types/chat";
 
+import {
+  contentWithAttachmentContext,
+  imageAttachments,
+} from "./attachment-context";
+
 import { chatError } from "./errors";
 import {
   estimateTokens,
@@ -90,7 +95,9 @@ function normalizeImages(
   message: ChatMessage,
 ): NormalizedImage[] {
   const attachments =
-    message.attachments ?? [];
+    imageAttachments(
+      message,
+    );
 
   if (
     attachments.length === 0
@@ -126,15 +133,14 @@ function normalizeImages(
 function messageHasUsableContent(
   message: ChatMessage,
 ): boolean {
-  const hasText =
-    message.content.trim()
-      .length > 0;
-
-  const hasImages =
-    (message.attachments?.length ??
-      0) > 0;
-
-  return hasText || hasImages;
+  return (
+    contentWithAttachmentContext(
+      message,
+    )
+      .trim()
+      .length >
+    0
+  );
 }
 
 function estimateMessageCost(
@@ -142,12 +148,15 @@ function estimateMessageCost(
 ): number {
   const textTokens =
     estimateTokens(
-      message.content,
+      contentWithAttachmentContext(
+        message,
+      ),
     );
 
   const imageTokens =
-    (message.attachments?.length ??
-      0) *
+    imageAttachments(
+      message,
+    ).length *
     ESTIMATED_TOKENS_PER_IMAGE;
 
   return (
@@ -166,10 +175,9 @@ function normalizeMessage(
     role: message.role,
 
     content:
-      message.content.trim()
-        .length > 0
-        ? message.content
-        : "Please describe and analyze the attached image.",
+      contentWithAttachmentContext(
+        message,
+      ),
 
     ...(images.length > 0
       ? {
@@ -202,8 +210,9 @@ export function buildContext(input: {
         message,
       ) =>
         total +
-        (message.attachments
-          ?.length ?? 0),
+        imageAttachments(
+          message,
+        ).length,
       0,
     );
 
