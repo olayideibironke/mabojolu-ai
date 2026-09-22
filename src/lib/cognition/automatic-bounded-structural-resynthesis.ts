@@ -726,7 +726,6 @@ function candidateVariables(
             ),
         ]),
       ),
-    ),
   ).sort();
 }
 
