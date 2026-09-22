@@ -137,6 +137,10 @@ const HYPOTHESES:
             0.1,
           "finish-fast":
             0.1,
+          "blind-finish-slow":
+            0.1,
+          "blind-finish-fast":
+            0.1,
           "constraint-shortcut":
             0.8,
         },
