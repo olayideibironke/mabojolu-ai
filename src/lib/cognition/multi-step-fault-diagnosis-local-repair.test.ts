@@ -958,9 +958,6 @@ describe(
 
               quarantinedFragmentIds:
                 [],
-
-              shouldRepair:
-                false,
             },
             [
               REPAIR_Y,
@@ -1017,9 +1014,6 @@ describe(
                 Y_FRAGMENT.id,
                 Z_FRAGMENT.id,
               ],
-
-              shouldRepair:
-                true,
             },
             [
               REPAIR_Y,
@@ -1070,9 +1064,6 @@ describe(
               quarantinedFragmentIds: [
                 Y_FRAGMENT.id,
               ],
-
-              shouldRepair:
-                true,
             },
             [
               REPAIR_Y,
