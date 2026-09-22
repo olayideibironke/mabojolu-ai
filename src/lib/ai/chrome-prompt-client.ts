@@ -10,6 +10,46 @@ export interface ChromePromptMessage {
     string;
 }
 
+export type ChromeExpectedInputType =
+  | "text"
+  | "image"
+  | "audio";
+
+export type ChromePromptContentPart =
+  | {
+      type:
+        "text";
+
+      value:
+        string;
+    }
+  | {
+      type:
+        "image";
+
+      value:
+        Blob;
+    }
+  | {
+      type:
+        "audio";
+
+      value:
+        Blob;
+    };
+
+export interface ChromeMultimodalPromptMessage {
+  role:
+    "user";
+
+  content:
+    ChromePromptContentPart[];
+}
+
+export type ChromePromptInput =
+  | string
+  | ChromeMultimodalPromptMessage[];
+
 interface DownloadProgressEventLike {
   loaded:
     number;
@@ -32,7 +72,7 @@ interface DownloadMonitorLike {
 export interface ChromeLanguageModelSession {
   promptStreaming(
     prompt:
-      string,
+      ChromePromptInput,
 
     options?: {
       signal?:
@@ -56,13 +96,23 @@ interface ChromeLanguageModelApi {
       initialPrompts?:
         ChromePromptMessage[];
 
-      expectedInputs?: Array<{
-        type:
-          "text";
+      expectedInputs?: Array<
+        | {
+            type:
+              "text";
 
-        languages:
-          string[];
-      }>;
+            languages:
+              string[];
+          }
+        | {
+            type:
+              "image";
+          }
+        | {
+            type:
+              "audio";
+          }
+      >;
 
       expectedOutputs?: Array<{
         type:
@@ -156,6 +206,11 @@ export function startChromePromptSession(
       label:
         string,
     ) => void,
+
+  expectedInputTypes:
+    readonly ChromeExpectedInputType[] = [
+      "text",
+    ],
 ):
   Promise<
     ChromeLanguageModelSession |
@@ -189,16 +244,29 @@ export function startChromePromptSession(
 
         initialPrompts,
 
-        expectedInputs: [
-          {
-            type:
-              "text",
+        expectedInputs:
+          Array.from(
+            new Set(
+              expectedInputTypes,
+            ),
+          ).map(
+            (
+              type,
+            ) =>
+              type ===
+                "text"
+                ? {
+                    type:
+                      "text" as const,
 
-            languages: [
-              "en",
-            ],
-          },
-        ],
+                    languages: [
+                      "en",
+                    ],
+                  }
+                : {
+                    type,
+                  },
+          ),
 
         expectedOutputs: [
           {
@@ -245,7 +313,7 @@ export async function streamChromePrompt(
     ChromeLanguageModelSession,
 
   prompt:
-    string,
+    ChromePromptInput,
 
   signal:
     AbortSignal,
