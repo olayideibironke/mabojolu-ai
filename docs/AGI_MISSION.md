@@ -379,15 +379,15 @@ receding-control hypothesis.
 
 Before maintenance:
 
-finish -> about 1.10 task progress
-boost-finish -> about 1.60 task progress
+finish -> about 0.80 task progress
+boost-finish -> about 1.10 task progress
 
 After selective z repair:
 
-finish -> about 0.80
-boost-finish -> about 1.00
+finish -> about 0.50
+boost-finish -> about 0.80
 
-The terminal task still requires progress >= 1.00.
+The terminal task still requires progress >= 0.75.
 
 Before the local repair, the cheapest valid branch is:
 
