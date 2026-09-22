@@ -132,6 +132,198 @@ describe("chatRequestSchema", () => {
   it("rejects an array body", () => {
     expect(parseJsonBody(chatRequestSchema, [{ role: "user" }]).ok).toBe(false);
   });
+
+  it("accepts a discriminated image attachment", () => {
+    const result = parseJsonBody(
+      chatRequestSchema,
+      validBody({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "Analyze this.",
+            attachments: [
+              {
+                kind: "image",
+                id: "image-1",
+                name: "image.png",
+                mimeType: "image/png",
+                sizeBytes: 3,
+                dataUrl: "data:image/png;base64,AAAA",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts a bounded text document attachment", () => {
+    const result = parseJsonBody(
+      chatRequestSchema,
+      validBody({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "Summarize this file.",
+            attachments: [
+              {
+                kind: "document",
+                id: "doc-1",
+                name: "notes.md",
+                mimeType: "text/markdown",
+                sizeBytes: 24,
+                textContent: "# Notes\nImportant finding.",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+  });
+
+  it("rejects an empty or oversized text document", () => {
+    const empty = parseJsonBody(
+      chatRequestSchema,
+      validBody({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "",
+            attachments: [
+              {
+                kind: "document",
+                id: "doc-1",
+                name: "empty.txt",
+                mimeType: "text/plain",
+                sizeBytes: 1,
+                textContent: "",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(empty.ok).toBe(false);
+
+    const oversized = parseJsonBody(
+      chatRequestSchema,
+      validBody({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "Read this.",
+            attachments: [
+              {
+                kind: "document",
+                id: "doc-2",
+                name: "large.txt",
+                mimeType: "text/plain",
+                sizeBytes: 2 * 1024 * 1024 + 1,
+                textContent: "content",
+              },
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(oversized.ok).toBe(false);
+  });
+
+  it("rejects more than four images even when the total file count is allowed", () => {
+    const attachments = Array.from(
+      { length: 5 },
+      (_, index) => ({
+        kind: "image" as const,
+        id: `image-${index}`,
+        name: `image-${index}.png`,
+        mimeType: "image/png" as const,
+        sizeBytes: 3,
+        dataUrl: "data:image/png;base64,AAAA",
+      }),
+    );
+
+    const result = parseJsonBody(
+      chatRequestSchema,
+      validBody({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "Analyze these.",
+            attachments,
+          },
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(false);
+
+    if (!result.ok) {
+      expect(result.message).toMatch(/up to 4 images/i);
+    }
+  });
+
+  it("accepts six mixed files when the image ceiling is respected", () => {
+    const images = Array.from(
+      { length: 4 },
+      (_, index) => ({
+        kind: "image" as const,
+        id: `image-${index}`,
+        name: `image-${index}.png`,
+        mimeType: "image/png" as const,
+        sizeBytes: 3,
+        dataUrl: "data:image/png;base64,AAAA",
+      }),
+    );
+
+    const documents = [
+      {
+        kind: "document" as const,
+        id: "doc-1",
+        name: "notes.txt",
+        mimeType: "text/plain" as const,
+        sizeBytes: 5,
+        textContent: "notes",
+      },
+      {
+        kind: "document" as const,
+        id: "doc-2",
+        name: "data.csv",
+        mimeType: "text/csv" as const,
+        sizeBytes: 7,
+        textContent: "a,b\n1,2",
+      },
+    ];
+
+    const result = parseJsonBody(
+      chatRequestSchema,
+      validBody({
+        messages: [
+          {
+            id: "m1",
+            role: "user",
+            content: "Compare everything.",
+            attachments: [
+              ...images,
+              ...documents,
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+  });
 });
 
 describe("conversationRenameSchema", () => {
