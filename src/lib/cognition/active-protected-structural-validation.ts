@@ -564,8 +564,6 @@ function candidateVariables(
 }
 
 export function analyzeProtectedStructuralCoverageGap(
-  lineage:
-    RevisionLineage,
   selectedCandidate:
     LocalRepairSearchCandidate,
   uncertaintyAtInstall:
@@ -1562,7 +1560,6 @@ function protectedTerminalState(
 
   const gap =
     analyzeProtectedStructuralCoverageGap(
-      lineage,
       search
         .selectedCandidate,
       uncertaintyAtInstall,
@@ -1824,7 +1821,6 @@ export function runControlledActiveProtectedStructuralValidation(
 
   const initialGap =
     analyzeProtectedStructuralCoverageGap(
-      lineage,
       search
         .selectedCandidate,
       uncertaintyAtInstall,
@@ -1872,7 +1868,6 @@ export function runControlledActiveProtectedStructuralValidation(
 
       finalGap:
         analyzeProtectedStructuralCoverageGap(
-          lineage,
           search
             .selectedCandidate!,
           uncertaintyAtInstall,
