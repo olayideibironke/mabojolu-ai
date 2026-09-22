@@ -613,6 +613,57 @@ describe(
         );
       },
     );
+    it(
+      "does not authorize synthesized probes that exceed the external risk ceiling",
+      () => {
+        const setup =
+          setupHypotheses();
+
+        const posterior =
+          new JointRepairPrerequisitePosterior(
+            FLAWED_PROGRAM,
+            setup.repairs,
+            setup.prerequisites,
+          );
+
+        const synthesized =
+          synthesizeJointDiscoveryExperiments(
+            setup.repairs,
+            setup.prerequisites,
+            {
+              repairRisk:
+                0.9,
+
+              prerequisiteRisk:
+                0.9,
+            },
+          );
+
+        const plan =
+          planMultiStepEpistemicPolicy(
+            FLAWED_PROGRAM,
+            setup.repairs,
+            setup.prerequisites,
+            posterior,
+            synthesized.experiments,
+            {
+              maximumRisk:
+                0.3,
+            },
+          );
+
+        expect(
+          plan,
+        ).toMatchObject({
+          decision:
+            "abstained",
+
+          reason:
+            "no-safe-informative-plan",
+        });
+      },
+    );
+
   },
 );
 
