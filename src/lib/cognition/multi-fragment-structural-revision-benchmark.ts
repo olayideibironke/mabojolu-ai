@@ -280,6 +280,13 @@ const DISCOVERY:
     ),
   ];
 
+const LOCAL_DISCOVERY:
+  readonly StructuralMechanismObservation[] =
+    DISCOVERY.slice(
+      0,
+      2,
+    );
+
 const PROTECTED:
   readonly StructuralMechanismObservation[] = [
     observation(
@@ -510,7 +517,7 @@ function localCandidates() {
     synthesizeBoundedLocalStructuralMutations(
       PROGRAM,
       Y_FRAGMENT.id,
-      DISCOVERY,
+      LOCAL_DISCOVERY,
       [
         "y",
         "z",
@@ -548,7 +555,7 @@ function localCandidates() {
     synthesizeBoundedLocalStructuralMutations(
       PROGRAM,
       Z_FRAGMENT.id,
-      DISCOVERY,
+      LOCAL_DISCOVERY,
       [
         "y",
         "z",
