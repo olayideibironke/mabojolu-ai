@@ -293,7 +293,13 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   time, strongly contradicted candidates leave the active planning set through
   reversible audit events, the next structural experiment is replanned after
   every observation, and inadequacy of the retained set reopens structural
-  synthesis instead of forcing selection from a collapsed model family.
+  synthesis instead of forcing selection from a collapsed model family;
+- automatic bounded structural re-synthesis after candidate-family collapse,
+  where accumulated non-protected evidence localizes which active fragments are
+  actually mismatched, a broader finite grammar is searched only around those
+  targets, healthy fragments are frozen, the fresh family is linked to the
+  failed family through explicit generation provenance, and receding diagnosis
+  restarts automatically before any independent protected installation check.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -302,341 +308,345 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: adaptive joint-candidate pruning and deeper receding structural diagnosis
+### Current milestone: automatic bounded structural re-synthesis after candidate-family collapse
 
-Mabojolu G can now shrink its active structural hypothesis set during an
-extended diagnostic episode instead of carrying every bounded candidate through
-every later experiment.
+Mabojolu G can now close the structural reopen-search handoff automatically.
 
-v1.35 begins with already bounded local structural alternatives.
-
-The controlled benchmark contains three independent local uncertainties:
-
-y:
-linear-refit, coefficient about 0.90
-versus
-saturating, coefficient about 0.90
-
-z:
-incumbent linear, coefficient about 0.50
-versus
-interaction(z,w), coefficient about 0.50
-
-q:
-linear-refit, coefficient about 0.60
-versus
-saturating, coefficient about 0.60.
-
-Those three binary local uncertainties form exactly:
-
-8 bounded joint structural candidates.
-
-The discovery interventions are deliberately ambiguous.
-
-For y at 0.50:
-
-linear-refit y predicts about 0.45
-
-and:
-
-saturating y predicts about 0.45.
-
-For z at 1.00 with w at 1.00:
-
-incumbent linear z predicts about 0.50
-
-and:
-
-interaction(z,w) predicts about 0.50.
-
-For q at 0.50:
-
-linear-refit q predicts about 0.30
-
-and:
-
-saturating q predicts about 0.30.
-
-The combined ambiguous discovery observation therefore does not collapse the
-eight-candidate joint set.
-
-v1.35 executes only one diagnostic probe at a time.
-
-After each real observation it:
-
-- updates active candidate probabilities in log likelihood space;
-- checks whether the retained set is still absolutely adequate;
-- identifies strongly contradicted non-top candidates;
-- prunes only candidates below both absolute and relative posterior thresholds;
-- preserves a configurable minimum retained set;
-- records every pruning event;
-- renormalizes the surviving posterior;
-- rebuilds the structural planner over only active candidates;
-- replans the next experiment.
-
-The controlled probe catalog contains:
-
-y = 1.00
-
-q = 1.00
-
-and:
-
-z = 1.00 with w = 0.50.
-
-All three probes are informative initially.
-
-Because their information value is initially comparable, the externally bounded
-cost and risk terms make the y probe the first choice.
-
-The controlled true environment contains:
-
-saturating y
-+
-interaction(z,w)
-+
-saturating q.
-
-The y = 1.00 observation is about:
-
-0.60.
-
-The competing linear-refit y candidates predict about:
-
-0.90.
-
-With observation standard deviation about 0.03, that difference produces a
-likelihood penalty on the wrong y half of roughly:
-
-exp(-50).
-
-Those four contradicted joint candidates fall below the pruning thresholds.
-
-The active set therefore contracts:
-
-8
--> 4.
-
-Mabojolu does not continue a precomputed three-step tree.
-
-It rebuilds the posterior and replans from those four survivors.
-
-The next best remaining diagnostic is:
-
-q = 1.00.
-
-The true saturating q mechanism predicts about:
-
-0.40.
-
-The linear-refit q alternatives predict about:
-
-0.60.
-
-That difference again makes the wrong q branch negligibly probable.
-
-The active set contracts:
-
-4
--> 2.
-
-Mabojolu replans again.
-
-The final remaining uncertainty is the z structure.
-
-The next diagnostic is:
-
-z = 1.00
-w = 0.50.
-
-The interaction model predicts about:
-
-0.25.
-
-The incumbent linear z model predicts about:
-
-0.50.
-
-The wrong branch is pruned.
-
-The active set contracts:
-
-2
--> 1.
-
-The controlled deeper receding path is therefore:
-
-8 candidates
--> observe y
--> prune 4
--> replan
--> observe q
--> prune 2
--> replan
--> observe z,w
--> prune 1
--> resolve one structural candidate.
-
-Candidate pruning is explicitly reversible.
-
-Each pruning event records:
-
-- sequence number;
-- candidate id;
-- every evidence id available at pruning time;
-- candidate probability at pruning;
-- top probability at pruning;
-- reversible = true;
-- reason.
-
-Restoring a candidate does not delete its pruning event.
-
-Instead Mabojolu appends a new:
-
-restored
-
-audit event.
-
-The history therefore remains:
-
-pruned
--> restored
-
-rather than rewriting history as though the candidate had never been removed.
-
-v1.35 also protects a minimum retained-candidate count.
-
-The current top candidate can never be pruned by the contradiction rule.
-
-The system therefore cannot accidentally erase every active candidate merely
-because probabilities become numerically extreme.
-
-A separate absolute adequacy test handles model-family collapse.
-
-In the controlled regime-change benchmark, the environment changes to a program
-outside all eight retained structures.
-
-After enough observations have accumulated, Mabojolu evaluates the best
-mean-squared error among the currently active candidates.
-
-If even that best retained candidate exceeds the externally specified adequacy
-ceiling, the system reports:
+Before v1.36, the v1.35 diagnosis loop could correctly conclude:
 
 all-retained-structural-candidates-inadequate
 
-and returns:
+and return:
 
 reopen-search.
 
-It does not continue pruning until one arbitrary least-bad candidate remains.
+But a new candidate family still had to be supplied externally.
 
-The resolved winner still does not receive installation authority from v1.35.
+v1.36 now performs a bounded re-synthesis cycle from that collapse result.
 
-The selected three-fragment structure is converted into the existing protected
-structural search surface and passed into the v1.34 active protected-validation
-loop.
+The re-synthesis input is limited to:
 
-All receding diagnostic observation ids remain excluded from protected
-validation.
+- the currently active causal program;
+- the failed bounded structural family;
+- the accumulated non-protected collapse evidence;
+- a finite structural grammar;
+- explicit bounds on target count, local candidates, joint candidates, risk,
+  cost, and diagnostic horizon.
 
-The v1.34 planner then actively acquires a fresh adaptive protected reserve.
+Protected evidence is not allowed into this synthesis role.
 
-Only after that independent reserve is complete and the existing protected
-validator authorizes the same candidate can installation proceed.
+Any overlap with explicitly excluded protected evidence fails closed before the
+new family is generated.
 
-The controlled live planning benchmark begins with:
+The first task is local mismatch attribution.
 
-finish -> about 1.30
-boost-finish -> about 1.60
+For each active fragment Mabojolu constructs the same active program with that
+fragment removed.
 
-and terminal requirement:
+An observation is eligible as local synthesis evidence only when:
 
-progress >= 1.20.
+- the target fragment is actually activated by the intervention; and
+- the predicted contribution from the rest of the active program is below the
+  externally bounded background-magnitude ceiling.
 
-The incumbent model therefore chooses:
+This isolates local structural mismatch and reduces cross-fragment residual
+contamination.
+
+The controlled active program contains three fragments:
+
+linear(y), coefficient about 0.60
+
+linear(z), coefficient about 0.50
+
+linear(q), coefficient about 0.20.
+
+The changed controlled environment instead contains:
+
+saturating(y), coefficient about 0.90
+
+interaction(z,w), coefficient about 0.50
+
+linear(q), coefficient about 0.20.
+
+The stale family is intentionally narrower.
+
+It contains only four linear y/z combinations.
+
+Across the accumulated collapse evidence, the best stale candidate still has
+mean-squared error about:
+
+0.0147.
+
+The collapse ceiling is:
+
+0.005.
+
+The v1.35 retained-family adequacy check therefore returns:
+
+reopen-search.
+
+v1.36 then analyzes fragment-local mismatch.
+
+For y, accumulated isolated evidence covers:
+
+y = 0.25
+y = 0.50
+y = 0.75
+y = 1.00.
+
+The actual saturating effects are approximately:
+
+0.30
+0.45
+0.54
+0.60.
+
+The inherited linear(y)=0.60*y fragment has local mean-squared error about:
+
+0.0133.
+
+That exceeds the local re-synthesis threshold.
+
+For z, isolated evidence fixes z at 1.00 while varying context w across:
+
+0.25
+0.50
+0.75
+1.00.
+
+The actual interaction effects are:
+
+0.125
+0.25
+0.375
+0.50.
+
+The inherited linear(z)=0.50*z fragment has local mean-squared error about:
+
+0.0547.
+
+That also exceeds the local threshold.
+
+The healthy q fragment receives isolated q evidence and remains accurately
+predicted.
+
+It is not selected as a re-synthesis target.
+
+The automatic target set is therefore:
+
+y
++
+z
+
+while q is frozen.
+
+Only those selected targets receive the broader local grammar.
+
+The bounded local grammar can consider:
+
+- incumbent;
+- same-topology coefficient refit;
+- linear;
+- saturating;
+- pairwise interaction using observed variables;
+- latent-bias.
+
+Local candidate counts and objective-gap retention remain externally bounded.
+
+For y, the fresh search recovers a saturating candidate near coefficient:
+
+0.90.
+
+For z, the fresh search recovers interaction(z,w) near coefficient:
+
+0.50.
+
+The healthy q fragment is structurally identical in every new joint candidate.
+
+v1.36 then composes the retained local alternatives into a bounded fresh joint
+family.
+
+The fresh family is not anonymous.
+
+It receives an explicit candidate-family revision record containing:
+
+- new family id;
+- parent failed-family id;
+- generation number;
+- every failed candidate id;
+- every targeted logical fragment id;
+- every preserved healthy fragment id;
+- every non-protected synthesis evidence id;
+- every newly synthesized candidate id;
+- every structural grammar kind represented.
+
+The controlled family id advances from:
+
+v1.35-stale-family
+
+to:
+
+v1.35-stale-family:resynthesis:1.
+
+This creates provenance across candidate families before any new live model is
+installed.
+
+The accumulated collapse evidence is used only to generate the fresh family.
+
+Receding diagnosis restarts with fresh diagnostic interventions.
+
+v1.36 automatically extracts the variables represented by the new candidate
+programs and synthesizes bounded unary and pairwise interventions using levels:
+
+0.50
+and
+1.00.
+
+A probe is retained only when the fresh candidates make materially different
+predictions under that intervention.
+
+Probe arity, total count, risk, cost, and observation noise remain bounded.
+
+The v1.35 receding diagnostic engine then starts again over the fresh family.
+
+It can:
+
+- update candidate probabilities;
+- prune contradicted fresh candidates reversibly;
+- replan after every new observation;
+- resolve one candidate;
+- reopen search again if the new family is also inadequate;
+- or abstain if no safe informative probe remains.
+
+The controlled recovery resolves the candidate containing:
+
+saturating(y), coefficient about 0.90
+
+plus:
+
+interaction(z,w), coefficient about 0.50
+
+while preserving:
+
+linear(q), coefficient about 0.20.
+
+Resolution still does not authorize installation.
+
+The accumulated collapse/synthesis evidence ids are recorded as repair evidence.
+
+Every newly acquired re-diagnosis observation id is separately passed as
+diagnostic evidence.
+
+Both roles remain excluded from the fresh protected reserve.
+
+The resolved re-synthesized candidate is then handed to the v1.34 active
+protected-validation loop.
+
+That loop independently chooses fresh protected falsification probes and still
+delegates final installation authority to the existing protected local-repair
+validator.
+
+Only after the re-synthesized winner survives that independent reserve can
+fragment provenance and the live world model change.
+
+The controlled live planning path begins with the stale active model predicting:
+
+finish -> about 1.00
+boost-finish -> about 1.30
+
+with terminal requirement:
+
+progress >= 1.00.
+
+The incumbent plan therefore selects:
 
 finish.
 
-After the protected three-fragment revision, the live causal effects become:
+After protected installation of the re-synthesized structure:
 
-finish -> about 1.00
-boost-finish -> about 1.25.
+finish -> about 0.90
+boost-finish -> about 1.05.
 
 The previous finish action is no longer sufficient.
 
-The revised plan becomes:
+The revised live plan becomes:
 
 boost-finish.
 
-The receding-horizon controller also prefers boost-finish after cost and delay
-penalties.
+The receding-horizon controller also selects:
 
-Fragment provenance advances only after protected installation.
+boost-finish.
+
+Only y and z advance to replacement fragments.
+
+The healthy q logical fragment keeps its original active implementation and
+receives only the preserved-generation provenance transition.
 
 The terminal goal contract remains unchanged.
 
-The v1.35 loop is therefore:
+The v1.36 loop is therefore:
 
-bounded joint structural candidate set
--> initialize active posterior
--> execute one safe diagnostic
--> update candidate probabilities
--> test retained-set adequacy
--> prune strongly contradicted candidates with reversible audit history
--> renormalize surviving candidates
--> rebuild the planner
--> choose the next diagnostic from the new active set
--> repeat until one candidate remains
-or
--> reopen structural synthesis if every survivor is inadequate
-or
--> abstain if no safe informative probe remains
--> pass the resolved winner into independent active protected validation
--> install only after the existing protected validator authorizes it
--> advance provenance
--> revise stale child goals
+retained structural family becomes absolutely inadequate
+-> return reopen-search
+-> inspect accumulated non-protected evidence
+-> identify locally mismatched active fragments
+-> freeze healthy fragments
+-> broaden the bounded grammar only around mismatch targets
+-> synthesize local alternatives
+-> compose a new bounded joint family
+-> create candidate-family generation provenance
+-> synthesize fresh informative diagnostic probes
+-> restart receding diagnosis automatically
+-> resolve, abstain, or reopen again
+-> convert the resolved candidate into the protected search surface
+-> exclude collapse/synthesis and fresh diagnostic evidence from protection
+-> run active protected validation
+-> install only if the existing protected validator authorizes the same winner
+-> advance fragment provenance
+-> revise stale live child goals
 -> continue receding-horizon control.
 
-This remains bounded candidate management rather than destructive hypothesis
-deletion or unrestricted search. The starting candidate set is finite,
-posterior pruning requires minimum evidence plus absolute and relative
-probability thresholds, a configurable minimum retained set is preserved,
-pruning is auditable and reversible, active diagnostics remain risk bounded,
-absolute inadequacy reopens search instead of forcing a winner, and protected
-installation authority remains outside the pruning subsystem.
+This remains bounded structural re-synthesis rather than unrestricted
+self-programming. Re-synthesis can begin only after an explicit
+all-candidates-inadequate collapse result, local target selection requires
+minimum isolated evidence and minimum mismatch, target count is capped, the
+grammar is finite, healthy fragments are frozen, local and joint candidate
+counts are capped, probes are bounded and reversible, failed-family ancestry is
+retained, and protected installation authority remains outside the re-synthesis
+subsystem.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. candidate resurrection driven automatically by later contradictory evidence
-   rather than explicit audit restoration;
-2. pruning thresholds calibrated from sequential false-prune guarantees instead
-   of fixed posterior cutoffs;
-3. richer candidate-family compression that merges structurally equivalent
-   hypotheses before active diagnosis;
-4. continuous parameter uncertainty inside each surviving topology rather than
-   one point coefficient per candidate;
-5. receding diagnosis over more than three structural factors with bounded beam
-   search instead of full Cartesian composition;
-6. automatic local candidate synthesis immediately after retained-set
-   inadequacy, closing the current reopen-search handoff;
-7. environment change-point detection that distinguishes stale evidence from a
-   genuinely falsified structural hypothesis;
-8. evidence aging so old diagnostic support decays without deleting historical
-   audit records;
-9. transfer of pruning and experiment policies across renamed structurally
-   equivalent domains;
-10. whether dynamic candidate management preserves protected independence,
-    terminal intent, hard risk ceilings, abstention, auditability, reversible
-    pruning, and zero unsafe irreversible execution.
+1. repeated automatic re-synthesis generations when the first replacement
+   family also collapses;
+2. automatic resurrection of previously pruned candidates when a later regime
+   returns to an earlier structural family;
+3. change-point-aware evidence partitioning so stale pre-change observations do
+   not contaminate fresh local grammar fitting;
+4. candidate-family ancestry with probabilistic priors transferred between
+   generations without allowing ancestry to bypass fresh diagnosis;
+5. continuous parameter uncertainty inside automatically re-synthesized
+   topologies;
+6. bounded multi-term fragment mutation so a failed fragment can add or remove
+   one causal term rather than replacing one whole one-term fragment;
+7. structural grammar expansion learned from repeated family collapses while
+   preserving explicit grammar-size and complexity bounds;
+8. cross-domain transfer of re-synthesis targets and grammar priors across
+   structurally equivalent renamed environments;
+9. active experiment selection jointly optimized for target localization,
+   family synthesis, and downstream protected-validation value;
+10. whether repeated automatic re-synthesis preserves healthy-fragment
+    invariance, evidence-role independence, terminal intent, hard risk ceilings,
+    abstention, auditability, and zero unsafe irreversible execution.
 
-The next central milestone is automatic bounded structural re-synthesis after
-candidate-set collapse: when the retained family becomes inadequate, Mabojolu
-should diagnose which local fragments need a new grammar search, generate a
-fresh bounded candidate family from the accumulated non-protected evidence,
-link the new candidates to the failed family through provenance, and restart
-receding diagnosis without human selection of the replacement hypothesis set.
+The next central milestone is change-point-aware multi-generation structural
+adaptation: Mabojolu should distinguish a genuinely new regime from noisy
+contradiction, partition evidence around the inferred change point, choose
+between resurrecting a previously successful family and synthesizing a new
+bounded family, and maintain auditable ancestry across repeated structural
+generations.
 
 ## Safety and audit principle
 
