@@ -790,6 +790,24 @@ export function synthesizeProtectedStructuralValidationProbes(
           interventions,
         );
 
+      const relevant =
+        candidates.some(
+          (candidate) =>
+            Math.abs(
+              predictHierarchicalProgramEffect(
+                candidate.program,
+                interventions,
+              ),
+            ) >
+              Number.EPSILON,
+        );
+
+      if (
+        !relevant
+      ) {
+        continue;
+      }
+
       output.push({
         id:
           `protected-structure:${signature}`,
@@ -1277,10 +1295,17 @@ export class ProtectedStructuralPosterior {
           ? coverageBonusWeight
           : gap
               .missingEvidenceCount >
-              0
+              0 &&
+            probe
+              .fillsMissingCoverage
             ? coverageBonusWeight *
               0.25
-            : 0;
+            : gap
+                .missingEvidenceCount >
+                0
+              ? coverageBonusWeight *
+                0.1
+              : 0;
 
       if (
         expectedInformationGain <
