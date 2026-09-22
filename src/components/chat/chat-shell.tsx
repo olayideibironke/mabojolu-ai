@@ -1153,7 +1153,7 @@ export function ChatShell({
             disabledReason={
               composerDisabledReason
             }
-            imageAttachmentsEnabled={
+            attachmentsEnabled={
               true
             }
             computeStatus={
