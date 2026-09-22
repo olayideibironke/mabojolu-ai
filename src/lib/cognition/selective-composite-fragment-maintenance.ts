@@ -261,6 +261,11 @@ export class CompositeFragmentMonitor {
       .getSummary();
   }
 
+  getProgramId():
+    string {
+    return this.program.id;
+  }
+
   getMonitoringEvidenceIds():
     string[] {
     return Array.from(
@@ -451,6 +456,15 @@ export function maintainCompositeRevisionSelectively(
   if (!active) {
     throw new Error(
       "Selective composite maintenance requires an active lineage revision.",
+    );
+  }
+
+  if (
+    monitor.getProgramId() !==
+    active.program.id
+  ) {
+    throw new Error(
+      "Composite fragment monitor does not match the active lineage program.",
     );
   }
 
