@@ -12,15 +12,13 @@ import {
   type OnlineHypothesisCatalogRevision,
 } from "./online-belief-model-coevolution";
 
-import {
-  updateFragmentProvenanceAfterMaintenance,
-  type FragmentFaultProbe,
-  type FragmentProvenanceLedger,
+import type {
+  FragmentFaultProbe,
+  FragmentProvenanceLedger,
 } from "./active-fragment-fault-localization-provenance";
 
 import type {
   FragmentReliabilitySummary,
-  HierarchicalProgramRevision,
 } from "./self-revising-hierarchical-program";
 
 import {
@@ -2636,141 +2634,161 @@ function provenanceAfterSearch(
     decision
       .selectedCandidate;
 
-  const preserved =
+  const retired =
     new Set(
-      candidate.program.fragments
-        .map(
-          (fragment) =>
-            fragment.id,
-        )
-        .filter(
-          (id) =>
-            !Object.values(
-              candidate
-                .replacementFragmentIds,
-            ).includes(
-              id,
-            ),
-        ),
+      candidate
+        .retiredFragmentIds,
     );
 
-  const pseudoRevision:
-    HierarchicalProgramRevision = {
-    decision:
-      Object.keys(
-        candidate
-          .replacementFragmentIds,
-      ).length >
-        0
-        ? "repaired"
-        : "rolled-back",
+  return {
+    records:
+      ledger.records.map(
+        (record) => {
+          const activeFragmentId =
+            record
+              .activeFragmentId;
 
-    program:
-      candidate.program,
+          if (
+            !activeFragmentId
+          ) {
+            return {
+              ...record,
 
-    previousProgramId:
-      "",
+              currentRevisionId:
+                revisionId,
 
-    retiredFragmentIds: [
-      ...candidate
-        .retiredFragmentIds,
-    ],
+              generation:
+                record.generation +
+                1,
+            };
+          }
 
-    replacementFragmentIds: {
-      ...candidate
-        .replacementFragmentIds,
-    },
+          if (
+            !retired.has(
+              activeFragmentId,
+            )
+          ) {
+            return {
+              ...record,
 
-    incumbentProtectedMeanSquaredError:
-      decision
-        .incumbentProtectedMeanSquaredError ??
-      0,
+              currentRevisionId:
+                revisionId,
 
-    revisedProtectedMeanSquaredError:
-      decision
-        .candidateProtectedMeanSquaredError ??
-      0,
+              generation:
+                record.generation +
+                1,
 
-    improvement:
-      decision.improvement ??
-      0,
+              history: [
+                ...record.history,
 
-    reason:
-      Object.keys(
-        candidate
-          .replacementFragmentIds,
-      ).length >
-        0
-        ? "protected-repair-promoted"
-        : "protected-rollback-promoted",
-  };
+                {
+                  kind:
+                    "preserved" as const,
 
-  const maintenance = {
-    decision:
-      pseudoRevision.decision ===
-        "repaired"
-        ? "repaired" as const
-        : "rolled-back-fragment" as const,
+                  revisionId,
 
-    reliability: {
-      fragments:
-        [],
+                  fromFragmentId:
+                    activeFragmentId,
 
-      quarantinedFragmentIds: [
-        ...candidate
-          .retiredFragmentIds,
-      ],
+                  toFragmentId:
+                    activeFragmentId,
 
-      shouldRepair:
-        true,
-    },
+                  protectedEvidenceIds: [
+                    ...decision
+                      .protectedEvidenceIds,
+                  ],
+                },
+              ],
+            };
+          }
 
-    programRevision:
-      pseudoRevision,
+          const replacement =
+            candidate
+              .replacementFragmentIds[
+                activeFragmentId
+              ];
 
-    preservedFragmentIds:
-      Array.from(
-        preserved,
-      ).sort(),
+          if (
+            replacement
+          ) {
+            return {
+              ...record,
 
-    retiredFragmentIds: [
-      ...candidate
-        .retiredFragmentIds,
-    ],
+              currentRevisionId:
+                revisionId,
 
-    replacementFragmentIds: {
-      ...candidate
-        .replacementFragmentIds,
-    },
+              activeFragmentId:
+                replacement,
 
-    lineage:
-      {
-        nodes: [
-          {
-            revisionId,
+              generation:
+                record.generation +
+                1,
 
-            installationProtectedEvidenceIds: [
-              ...decision
-                .protectedEvidenceIds,
+              status:
+                "active" as const,
+
+              history: [
+                ...record.history,
+
+                {
+                  kind:
+                    "repaired" as const,
+
+                  revisionId,
+
+                  fromFragmentId:
+                    activeFragmentId,
+
+                  toFragmentId:
+                    replacement,
+
+                  protectedEvidenceIds: [
+                    ...decision
+                      .protectedEvidenceIds,
+                  ],
+                },
+              ],
+            };
+          }
+
+          return {
+            ...record,
+
+            currentRevisionId:
+              revisionId,
+
+            activeFragmentId:
+              undefined,
+
+            generation:
+              record.generation +
+                1,
+
+            status:
+              "retired" as const,
+
+            history: [
+              ...record.history,
+
+              {
+                kind:
+                  "rolled-back" as const,
+
+                revisionId,
+
+                fromFragmentId:
+                  activeFragmentId,
+
+                protectedEvidenceIds: [
+                  ...decision
+                    .protectedEvidenceIds,
+                ],
+              },
             ],
-          },
-        ],
-      },
-
-    reason:
-      pseudoRevision.decision ===
-        "repaired"
-        ? "selective-fragment-repair-installed" as const
-        : "selective-fragment-rollback-installed" as const,
-  } as unknown as import(
-    "./selective-composite-fragment-maintenance"
-  ).SelectiveFragmentMaintenanceResult;
-
-  return updateFragmentProvenanceAfterMaintenance(
-    ledger,
-    maintenance,
-    revisionId,
-  );
+          };
+        },
+      ),
+  };
 }
 
 export function installProbabilisticLocalRepair(
