@@ -780,6 +780,17 @@ export function coevolveOnlineBeliefModelAndGoals(
   revisionNumber = 1,
 ): OnlineBeliefModelCoevolutionDecision {
   if (
+    currentPrerequisite.actionId !==
+      prerequisiteActionId ||
+    currentPrerequisite.targetDimension !==
+      prerequisiteTargetDimension
+  ) {
+    throw new Error(
+      "Current prerequisite does not match the live plan revision target.",
+    );
+  }
+
+  if (
     !mismatchStatus.triggered
   ) {
     return {
