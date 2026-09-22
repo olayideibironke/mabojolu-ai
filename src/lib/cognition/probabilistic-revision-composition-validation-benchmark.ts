@@ -728,6 +728,7 @@ export function runProbabilisticRevisionCompositionValidationBenchmark():
     installCompositeRevision(
       currentLineage,
       protectedDecision,
+      protectedEvidence,
       "rev-composite",
       {
         y:
