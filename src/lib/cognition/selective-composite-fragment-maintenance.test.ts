@@ -1196,9 +1196,55 @@ describe(
           );
         }
 
+        let tick =
+          0;
+
         const reasoner =
-          reasonerWithCurrentPlan()
-            .reasoner;
+          new HierarchicalGoalReasoner(
+            () =>
+              `2026-09-22T11:15:${String(
+                tick++,
+              ).padStart(
+                2,
+                "0",
+              )}Z`,
+          );
+
+        reasoner.registerRoot({
+          id:
+            "selective-rollback-terminal",
+
+          description:
+            "Reach progress >= 0.600 while exposure <= 0.300.",
+
+          priority:
+            100,
+
+          status:
+            "active",
+
+          successCriteria: [
+            "progress >= 0.600",
+            "exposure <= 0.300",
+          ],
+
+          constraints: [
+            "Preserve healthy validated composite fragments.",
+            "Use fresh protected evidence for local rollback.",
+          ],
+
+          createdAt:
+            "2026-09-22T11:15:00Z",
+
+          updatedAt:
+            "2026-09-22T11:15:00Z",
+        });
+
+        materializePrerequisiteAwareSubgoals(
+          reasoner,
+          "selective-rollback-terminal",
+          rollbackPlan,
+        );
 
         const result =
           maintainCompositeRevisionSelectively(
@@ -1227,7 +1273,7 @@ describe(
             ACTIONS,
             rollbackPlan,
             reasoner,
-            "selective-terminal-goal",
+            "selective-rollback-terminal",
             "rev-composite-local-rollback",
             2,
           );
