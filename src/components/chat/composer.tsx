@@ -1622,7 +1622,7 @@ export function Composer({
                 isStreaming ||
                 !attachmentsEnabled ||
                 attachments.length >=
-                  MAX_IMAGE_COUNT
+                  MAX_ATTACHMENT_COUNT
               }
               aria-label={
                 attachmentsEnabled
