@@ -13,6 +13,9 @@ export const MAX_MESSAGE_CHARS = 32_000;
 export const MAX_CONVERSATION_MESSAGES = 400;
 export const MAX_TITLE_CHARS = 120;
 
+/** Maximum number of attachments allowed on one user message. */
+export const MAX_CHAT_ATTACHMENTS = 6;
+
 /** Maximum number of images allowed on one user message. */
 export const MAX_CHAT_IMAGE_ATTACHMENTS = 4;
 
@@ -31,6 +34,14 @@ export const MAX_CHAT_IMAGE_DATA_URL_CHARS =
     MAX_CHAT_IMAGE_BYTES * 1.38,
   ) + 128;
 
+/** Maximum browser-extracted UTF-8 text carried by one text document. */
+export const MAX_CHAT_DOCUMENT_TEXT_CHARS =
+  200_000;
+
+/** Maximum original size of one directly readable text document. */
+export const MAX_CHAT_DOCUMENT_BYTES =
+  2 * 1024 * 1024;
+
 const messageRole = z.enum([
   "user",
   "assistant",
@@ -42,16 +53,24 @@ const supportedImageMimeType = z.enum([
   "image/webp",
 ]);
 
+const supportedTextDocumentMimeType =
+  z.enum([
+    "text/plain",
+    "text/markdown",
+    "text/csv",
+    "application/json",
+  ]);
+
 const attachmentId = z
   .string()
   .trim()
   .min(1, {
     message:
-      "Each image requires an identifier.",
+      "Each attachment requires an identifier.",
   })
   .max(128, {
     message:
-      "An image identifier is too long.",
+      "An attachment identifier is too long.",
   });
 
 const attachmentName = z
@@ -59,11 +78,11 @@ const attachmentName = z
   .trim()
   .min(1, {
     message:
-      "Each image requires a filename.",
+      "Each attachment requires a filename.",
   })
   .max(255, {
     message:
-      "An image filename is too long.",
+      "An attachment filename is too long.",
   });
 
 const imageAttachment = z
@@ -223,6 +242,61 @@ const imageAttachment = z
     },
   );
 
+const textDocumentAttachment =
+  z.strictObject({
+    kind:
+      z.literal(
+        "document",
+      ),
+
+    id:
+      attachmentId,
+
+    name:
+      attachmentName,
+
+    mimeType:
+      supportedTextDocumentMimeType,
+
+    sizeBytes:
+      z.number()
+        .int()
+        .positive({
+          message:
+            "The selected document is empty.",
+        })
+        .max(
+          MAX_CHAT_DOCUMENT_BYTES,
+          {
+            message:
+              "Each text document must be 2 MB or smaller.",
+          },
+        ),
+
+    textContent:
+      z.string()
+        .min(
+          1,
+          {
+            message:
+              "The selected document has no readable text.",
+          },
+        )
+        .max(
+          MAX_CHAT_DOCUMENT_TEXT_CHARS,
+          {
+            message:
+              "The selected document contains too much text.",
+          },
+        ),
+  });
+
+const chatAttachment =
+  z.union([
+    imageAttachment,
+    textDocumentAttachment,
+  ]);
+
 const incomingMessage = z
   .strictObject({
     id: z
@@ -250,12 +324,14 @@ const incomingMessage = z
       .optional(),
 
     attachments: z
-      .array(imageAttachment)
+      .array(
+        chatAttachment,
+      )
       .max(
-        MAX_CHAT_IMAGE_ATTACHMENTS,
+        MAX_CHAT_ATTACHMENTS,
         {
           message:
-            `You can attach up to ${MAX_CHAT_IMAGE_ATTACHMENTS} images to one message.`,
+            `You can attach up to ${MAX_CHAT_ATTACHMENTS} files to one message.`,
         },
       )
       .optional(),
@@ -274,6 +350,33 @@ const incomingMessage = z
           path: ["attachments"],
           message:
             "Assistant messages cannot include user attachments.",
+        });
+      }
+
+      const imageCount =
+        message.attachments
+          ?.filter(
+            (
+              attachment,
+            ) =>
+              "dataUrl" in
+              attachment,
+          )
+          .length ??
+        0;
+
+      if (
+        imageCount >
+        MAX_CHAT_IMAGE_ATTACHMENTS
+      ) {
+        ctx.addIssue({
+          code:
+            "custom",
+          path: [
+            "attachments",
+          ],
+          message:
+            `You can attach up to ${MAX_CHAT_IMAGE_ATTACHMENTS} images to one message.`,
         });
       }
     },
@@ -341,19 +444,19 @@ export const chatRequestSchema = z
         last.content.trim()
           .length > 0;
 
-      const hasImages =
+      const hasAttachments =
         (last.attachments?.length ??
           0) > 0;
 
       if (
         !hasText &&
-        !hasImages
+        !hasAttachments
       ) {
         ctx.addIssue({
           code: "custom",
           path: ["messages"],
           message:
-            "A message cannot be empty unless an image is attached.",
+            "A message cannot be empty unless a file is attached.",
         });
       }
     },
