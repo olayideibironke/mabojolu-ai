@@ -1612,7 +1612,7 @@ export function updateFragmentProvenanceAfterMaintenance(
   };
 }
 
-export function localizeAndMaintainCompositeFragment(
+export function runControlledLocalizedCompositeMaintenance(
   lineage: RevisionLineage,
   actualProgram:
     HierarchicalCausalProgram,
