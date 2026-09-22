@@ -592,10 +592,15 @@ describe(
 
           progress:
             1,
-
-          exposure:
-            0.15,
         });
+
+        expect(
+          controller
+            .state
+            .exposure,
+        ).toBeCloseTo(
+          0.15,
+        );
 
         const finalDecision =
           chooseRecedingHorizonVectorControl(
