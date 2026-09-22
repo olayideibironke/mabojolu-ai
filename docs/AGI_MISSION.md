@@ -213,7 +213,12 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - receding-horizon multidimensional dual control with combined
   repair/prerequisite world hypotheses, vector state and terminal constraints,
   real action observations, posterior updates, one-control-at-a-time execution,
-  and full replanning after every observation.
+  and full replanning after every observation;
+- online belief-model coevolution where repeated live prediction mismatch can
+  quarantine a damaged fragment, trigger bounded topology repair on episode
+  evidence, require disjoint protected installation, relearn action
+  prerequisites, replace the live hypothesis, revise stale goal branches, and
+  immediately feed the revised model back into receding-horizon control.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -222,167 +227,148 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: receding-horizon multidimensional dual control
+### Current milestone: online belief-model coevolution
 
-Mabojolu G now executes dual-control decisions as a repeated closed loop rather
-than as a one-shot two-step policy.
+Mabojolu G can now revise its live causal model inside an ongoing
+receding-horizon episode when real action outcomes repeatedly contradict the
+active hypothesis.
 
-The v1.22 controller carries:
+The update does not occur after one surprising observation.
 
-- a multidimensional task state;
-- terminal minimum and maximum constraints;
-- posterior probability over combined causal hypotheses;
-- each hypothesis's repair identity;
-- each hypothesis's prerequisite identity;
-- state-dependent action prerequisites;
-- safe reversible task actions;
-- safe reversible pure experiments;
-- complete execution history.
+v1.23 adds an online prediction-mismatch tracker. Every real comparison records:
 
-A control cycle now performs:
+- predicted effect;
+- observed effect;
+- absolute residual;
+- whether that residual exceeds the configured mismatch threshold;
+- consecutive mismatch count.
 
-current vector state
-+ current posterior
--> compare open-loop and information-conditioned controls
--> select exactly one next control
--> execute that control
--> observe its real effect
--> update the posterior
--> update the vector state
--> recompute the next control from scratch.
+An isolated mismatch is retained as evidence but does not authorize repair.
+A later recovery observation resets the consecutive mismatch count.
 
-The benchmark uses two combined causal hypotheses.
+The controlled benchmark requires three consecutive live mismatches before the
+damaged fragment is eligible for quarantine.
 
-The slow combination contains:
+Persistent mismatch is converted into bounded fragment-reliability evidence.
+With three blame observations, the benchmark fragment's Beta-style posterior
+reliability falls to 0.20 and the fragment enters quarantine.
 
-- one repair identity;
-- readiness prerequisite about 0.40;
-- prepare-diagnostic raises readiness by 0.50;
-- finish-slow is effective;
-- finish-fast is weak.
+Quarantine still does not authorize model modification.
 
-The fast combination contains:
+The live episode then uses a repair-fitting evidence partition to generate
+bounded structural alternatives. The controlled incumbent contains the wrong
+linear-y fragment. The repair search recovers the pairwise interaction:
 
-- a different repair identity;
-- readiness prerequisite about 0.70;
-- prepare-diagnostic raises readiness by 0.80;
-- finish-fast is effective;
-- finish-slow is weak.
+interaction(y,z), coefficient about 0.50
 
-The terminal vector goal requires:
+Repair-fitting observation ids are kept disjoint from the protected installation
+reserve. The interaction repair must independently beat the incumbent and
+rollback on that protected reserve before the live hypothesis can change.
 
-progress >= 0.90
-and
-exposure <= 0.30
+Once protected validation succeeds, v1.23 projects the repaired hierarchical
+causal program back into the active receding-control hypothesis. For the
+controlled finish action, the repaired task effect changes from the stale
+prediction of about 0.90 to the protected repaired prediction of about 0.70.
 
-From an unprepared uncertain state, Mabojolu selects prepare-diagnostic.
+The same live episode also relearns the action prerequisite from action-effect
+observations.
 
-That action is useful in three ways simultaneously:
+The stale branch was built around:
 
-- it raises readiness;
-- it contributes task progress;
-- its observed readiness effect discriminates the two combined
-  repair/prerequisite hypotheses.
+readiness >= about 0.35 before finish
 
-Under the fast-world execution branch, the observed readiness increase is 0.80.
-The posterior concentrates on the fast combination and the real vector state
-becomes approximately:
+New evidence supports:
 
-readiness 0.80
-progress 0.10
-exposure 0.05
+readiness >= about 0.70 before finish
 
-Mabojolu then replans from that observed state and chooses finish-fast.
+The repaired live hypothesis therefore changes three linked pieces together:
 
-Under the slow-world branch, the same first action instead produces readiness
-0.50, concentrates posterior belief on the slow combination, and the next
-receding-horizon decision becomes finish-slow.
+- repair identity;
+- finish task effect;
+- finish readiness prerequisite.
 
-The controller therefore does not commit to either finish action before the
-first real observation.
+The old hypothesis id is removed from the active hypothesis catalog. Its belief
+mass is transferred to the protected revised hypothesis, preserving the live
+belief normalization rather than leaving both stale and revised versions active.
 
-After the fast branch executes finish-fast, the state reaches:
+The task planner is then rerun from the same current vector state.
 
-readiness 0.80
-progress 1.00
-exposure 0.15
+Before coevolution:
 
-The next controller cycle detects that every terminal constraint is satisfied
-and returns stop.
+prep-light
+-> finish
 
-The execution history contains only the controls actually executed:
+After protected model/prerequisite revision:
 
-prepare-diagnostic
--> finish-fast
+prep-strong
+-> finish
 
-rather than the unexecuted branches of the earlier lookahead.
+The goal hierarchy is revised through the existing branch-replacement machinery.
+The stale prerequisite-aware child goals are blocked and abandoned, replacement
+children are inserted, and the root terminal goal contract remains unchanged.
 
-v1.22 also keeps pure experiments inside the same controller.
+Finally, the updated hypothesis catalog is passed directly back into the v1.22
+receding-horizon controller.
 
-A second benchmark starts with readiness already satisfied. Route actions are
-made expensive enough that probing through an ordinary task action has lower
-expected value than first purchasing a cleaner pure route experiment.
+The next real control changes to:
 
-The controller therefore chooses probe-route, updates the same causal posterior,
-and can then replan toward the correct finish route.
+prep-strong
 
-This crossover is economic rather than artificial: task outcomes remain
-observable, but their higher cost makes a dedicated experiment preferable.
+rather than continuing the stale prep-light branch.
 
-A cheap constraint-shortcut is included in the controls. Although it reaches
-the progress target quickly, it raises exposure to 0.80 and therefore receives
-zero terminal vector utility. It is rejected despite its low direct cost.
+The resulting live loop is now:
 
-Unsafe zero-cost controls remain filtered before value comparison.
-
-The v1.22 loop therefore combines:
-
-joint repair/prerequisite uncertainty
-+ multidimensional state
-+ learned prerequisites
-+ informative task actions
-+ pure experiments
-+ hard vector constraints
--> select one control
--> execute
+execute
 -> observe
--> update belief and state
--> replan
--> stop only when the terminal vector contract is satisfied.
+-> compare prediction with reality
+-> accumulate repeated mismatch
+-> quarantine damaged fragment
+-> synthesize bounded repair
+-> protected validation
+-> relearn prerequisite
+-> replace live hypothesis
+-> revise goal branch
+-> receding-horizon replan
+-> execute the next control.
 
-This remains bounded receding-horizon control. The combined hypothesis catalog,
-dimension effects, prerequisite thresholds, action and experiment catalogs,
-scalar observation per control, Gaussian observation model, two-control
-lookahead used for valuation, task utility, cost and delay weights, terminal
-constraints, and hard safety ceilings remain human-specified.
+This milestone therefore closes the separation between model repair and control:
+a real action outcome can eventually change the model that selects the next real
+action, but only through repeated evidence and protected installation.
+
+The system remains bounded. The repair grammar, repair variables, evidence
+partitioning, mismatch threshold, required consecutive mismatches, protected
+reserve, prerequisite candidate dimensions, control-to-repair intervention
+bindings, action catalog, vector goal, observation model, and safety ceilings
+remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. direct use of the full joint repair/prerequisite posterior from v1.19 rather
-   than a separately enumerated combined-world catalog;
-2. online structural-repair and prerequisite updates inside the same receding
-   control episode;
-3. multidimensional noisy observations where only part of the vector state is
-   observed after an action;
-4. delayed effects and latent state across several control cycles;
-5. longer action/experiment lookahead while still executing only one next
-   control;
-6. deadlines and opportunity costs that make waiting for information dangerous;
-7. changing terminal constraints and newly discovered safety boundaries during
-   an episode;
-8. automatic goal-hierarchy updates from every receding-horizon control
-   decision;
-9. transfer of a learned receding-control strategy across renamed domains;
-10. whether repeated dual-control replanning preserves protected repair
-    installation, learned prerequisites, terminal intent, hard risk ceilings,
-    abstention, auditability, and zero unsafe irreversible execution.
+1. automatically deriving repair-fitting interventions directly from live
+   receding-controller executions rather than supplying a separate mapping;
+2. protected validation reserves that are refreshed without contaminating them
+   with repair-fitting observations;
+3. several simultaneous damaged fragments rather than one quarantined fragment;
+4. competing online repair candidates that remain probabilistic until enough
+   live evidence accumulates;
+5. prerequisite revision from noisy and drifting thresholds instead of one
+   clean step change;
+6. repeated model revisions within one long episode;
+7. rollback when a newly installed online repair later regresses;
+8. automatic synchronization between every receding-control decision and the
+   goal hierarchy, including completed and partially executed branches;
+9. transfer of an online-repaired model to a structurally similar renamed
+   domain;
+10. whether online model coevolution preserves protected installation,
+    terminal intent, hard risk ceilings, abstention, auditability, and zero
+    unsafe irreversible execution.
 
-The next central milestone is online belief-model coevolution: Mabojolu should
-allow real receding-horizon action outcomes to update not only probability over
-existing causal hypotheses but also trigger bounded structural repair,
-prerequisite revision, and goal-hierarchy changes inside the same live episode.
+The next central milestone is autonomous evidence partitioning and online
+rollback: Mabojolu should decide which live observations can be used for repair
+fitting, which must remain protected for validation, and when a previously
+installed online revision has degraded enough to roll back or reopen model
+search.
 
 ## Safety and audit principle
 
