@@ -29,7 +29,7 @@ import {
 } from "@/lib/ai/browser-mode-policy";
 import { useChat } from "@/hooks/use-chat";
 import { useConversations } from "@/hooks/use-conversations";
-import type { ChatImageAttachment } from "@/types/chat";
+import type { ChatAttachment } from "@/types/chat";
 
 import { Composer } from "./composer";
 import { HandoverPrompt } from "./handover-prompt";
@@ -700,7 +700,7 @@ export function ChatShell({
       (
         content: string,
         attachments:
-          ChatImageAttachment[] =
+          ChatAttachment[] =
             [],
       ) => {
         send(
