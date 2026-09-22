@@ -321,19 +321,20 @@ conditional on each possible first observation.
 
 The controlled policy chooses:
 
-fault-probe:z
+fault-probe:y
 
-first because it provides high information at lower configured risk and cost.
+first because its value under the contingent two-step objective is higher even
+though the z probe has lower configured risk and cost.
 
-After the z observation the two-fragment explanation rises to roughly 0.74
+After the y observation the two-fragment explanation rises to roughly 0.68
 confidence but remains below the repair threshold.
 
 The controller then replans and chooses:
 
-fault-probe:y
+fault-probe:z
 
-After that second observation, the bounded two-fragment explanation rises above
-0.95 confidence.
+After that second observation, the bounded two-fragment explanation rises to
+roughly 0.977 confidence.
 
 The controlled benchmark therefore resolves the fault only after two
 diagnostic steps.
@@ -366,7 +367,7 @@ Fault-posterior confidence is still not repair authority.
 The two passive half-strength observations each provide one deterministic blame
 episode for the corresponding damaged fragment.
 
-The active z and y diagnostics provide the second blame episodes.
+The active y and z diagnostics provide the second blame episodes.
 
 Only after the posterior resolves the multi-fragment explanation and both y and
 z independently satisfy the existing repeated-blame quarantine rule may repair
