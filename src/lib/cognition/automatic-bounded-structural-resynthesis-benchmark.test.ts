@@ -410,10 +410,9 @@ describe(
         );
 
         expect(
-          progressEffects
-            ?.[
-              "boost-finish"
-            ],
+          progressEffects?.[
+            "boost-finish"
+          ],
         ).toBeCloseTo(
           1.05,
         );
