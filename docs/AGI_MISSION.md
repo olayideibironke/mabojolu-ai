@@ -480,7 +480,7 @@ boost-finish -> about 0.59
 
 The terminal task requires:
 
-progress >= 0.50
+progress >= 0.55
 
 so the live plan changes:
 
