@@ -140,7 +140,7 @@ const GOAL:
   RecedingVectorGoal = {
   minimums: {
     progress:
-      1,
+      0.9,
   },
 
   maximums: {
