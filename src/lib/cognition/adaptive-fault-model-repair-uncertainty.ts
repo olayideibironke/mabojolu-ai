@@ -217,11 +217,16 @@ function uniqueSorted(
         value,
       );
 
-    seen.set(
+    const key =
       bounded.toFixed(
         6,
+      );
+
+    seen.set(
+      key,
+      Number(
+        key,
       ),
-      bounded,
     );
   }
 
@@ -1306,10 +1311,16 @@ function toLocalRepairCandidate(
 
     replacementFragmentIds,
 
-    retiredFragmentIds: [
-      ...candidate
-        .retiredFragmentIds,
-    ],
+    retiredFragmentIds:
+      Array.from(
+        new Set([
+          ...Object.keys(
+            replacementFragmentIds,
+          ),
+          ...candidate
+            .retiredFragmentIds,
+        ]),
+      ).sort(),
 
     discoveryMeanSquaredError,
 
