@@ -205,7 +205,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - autonomous bounded experiment synthesis from competing repair/prerequisite
   hypotheses, depth-two contingent epistemic lookahead, and decision-aware
   stopping when residual causal uncertainty no longer changes the safest
-  cost-minimizing vector plan.
+  cost-minimizing vector plan;
+- value-of-information dual control where ordinary task actions can also serve
+  as observations, pure experiments compete against informative actions on the
+  same task horizon, and information is purchased only when its downstream task
+  value exceeds explicit cost and delay penalties.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -214,128 +218,153 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: autonomous experiment synthesis and multi-step epistemic planning
+### Current milestone: value-of-information dual control with mixed action-experiment policies
 
-Mabojolu G can now generate a bounded active-discovery experiment catalog from
-its current competing hypotheses instead of requiring every diagnostic probe to
-be named in advance.
+Mabojolu G can now treat an ordinary goal-directed action as both a task action
+and an information source.
 
-The v1.20 experiment synthesizer operates over two hypothesis families.
+Earlier milestones separated pure experiments from task actions. v1.21 evaluates
+both under one bounded two-step decision problem.
 
-For competing structural-repair candidates, Mabojolu collects the variables that
-appear in the candidate causal terms and generates bounded binary interventions
-over single variables and small variable combinations.
+The controller begins with a posterior over competing causal mechanisms. Every
+safe reversible task action has:
 
-For competing prerequisite thresholds, Mabojolu groups hypotheses by action,
-target dimension, and candidate prerequisite dimension. It then places candidate
-probe states at midpoints between adjacent surviving thresholds.
+- interventions;
+- task effect predicted by each mechanism;
+- risk;
+- direct cost;
+- delay.
 
-The controlled benchmark therefore synthesizes its own repair probes over y and
-z and its own readiness probes between the competing prerequisite thresholds. No
-named repair or readiness probe is supplied to the active planner.
+Every safe reversible pure experiment has the same cost, delay, and risk
+accounting but does not directly advance the task state.
 
-Synthesized experiments are not self-authorizing. They still carry explicit
-risk, cost, reversibility, and observation-noise metadata. The epistemic planner
-applies an external maximum-risk ceiling and refuses every synthesized
-experiment when all candidates exceed that ceiling.
+When Mabojolu executes a task action, its observed task effect is also used as a
+causal observation. The mechanism posterior is updated from that observed effect
+using the same Gaussian likelihood family used elsewhere in the cognitive
+kernel.
 
-v1.20 adds bounded multi-step epistemic lookahead.
+The second action is then chosen conditionally from the updated posterior and
+the observed task state.
 
-The scientific-identification planner supports horizons one and two. For each
-candidate first experiment it evaluates representative observations under every
-currently possible joint repair/prerequisite truth. At horizon two, the second
-experiment is selected conditionally from the posterior produced by the first
-observation.
+v1.21 compares this mixed policy against a same-horizon open-loop action
+baseline. Both policies receive at most two control steps. This prevents an
+informative action from appearing better merely because it was given an
+additional opportunity to make task progress.
 
-The controlled benchmark shows lower expected terminal joint entropy under the
-two-step policy than under the best one-step probe. At least one contingent
-branch therefore uses a second diagnostic experiment, while all selected probes
-remain inside the hard risk limit.
+The open-loop baseline chooses the best one- or two-action sequence without
+conditioning the second action on the observed first outcome.
 
-v1.20 also separates scientific identification from decision sufficiency.
+A mixed policy receives information value only when the first observation
+actually changes the follow-up decision across posterior branches.
 
-A scientific objective may justify continuing experiments until repair and
-prerequisite uncertainty are both sharply reduced. A task objective should not
-necessarily spend more cost merely to identify a causal detail that cannot
-change the current safe plan.
+The controlled benchmark contains two environments:
 
-Mabojolu therefore aggregates joint posterior mass by the safe vector-plan
-signature implied by each prerequisite hypothesis.
+slow-world:
+diagnostic progress is small;
+finish-slow is effective;
+finish-fast is weak.
 
-Before experimentation, the controlled benchmark has two competing action plans:
+fast-world:
+diagnostic progress is larger;
+finish-fast is effective;
+finish-slow is weak.
 
-- prep-light -> finish;
-- prep-strong -> finish.
+Under equal prior belief, an informative action named diagnostic-progress both
+moves the task forward and sharply distinguishes the worlds.
 
-The posterior does not yet put enough mass on either plan to act without more
-information.
+Its contingent policy is:
 
-For decision-aware discovery, Mabojolu first filters the synthesized experiment
-catalog by expected reduction in plan entropy. A repair-only probe is excluded
-at this stage because repair identity does not affect the current action
-sequence. A synthesized prerequisite probe remains decision-relevant and is
-selected.
+diagnostic-progress
+-> if slow-world: finish-slow
+-> if fast-world: finish-fast
 
-Under the benchmark's hidden high-readiness-threshold environment, that one
-probe shifts more than the configured stopping probability onto:
+The mixed policy reaches full task utility in both branches while using less
+cost and delay than the best same-horizon open-loop sequence. Its value of
+information is therefore positive after all task costs are included.
 
-prep-strong -> finish
+v1.21 also tests the opposite economic regime.
 
-Repair identity deliberately remains unresolved at approximately 50/50, so the
-complete joint posterior is not yet sufficiently certain for scientific
-identification.
+When task actions are made substantially more expensive and slower to use as
+probes, a cheap pure diagnostic experiment wins instead:
 
-Nevertheless, every posterior-supported prerequisite hypothesis with material
-mass now implies the same safe action sequence. Mabojolu therefore stops
-experimenting in decision mode.
+pure-probe
+-> update mechanism posterior
+-> choose the matching finish action
 
-This produces an explicit distinction:
+The controller therefore does not prefer informative actions merely because
+they combine learning and progress. It compares their downstream task value
+against a pure experiment under the same explicit cost and delay objective.
 
-scientific identification mode
--> continue bounded epistemic probing when additional information is valuable
+A third benchmark removes decision-relevant uncertainty entirely. Both causal
+mechanisms imply the same universal finish action. A pure probe can still reveal
+which mechanism is true, but that knowledge cannot improve the task plan.
 
-decision mode
--> stop when remaining uncertainty cannot change the safest high-value plan
+The resulting value of information is zero and Mabojolu acts immediately rather
+than buying unnecessary information.
 
-The benchmark thus avoids two opposite failure modes: acting too early while
-decision-relevant uncertainty remains, and experimenting indefinitely after the
-decision is already invariant.
+The scoring rule is:
 
-This remains bounded experiment synthesis and bounded epistemic planning.
-Repair-variable combinations are binary and arity-limited; prerequisite probes
-are threshold midpoints; observation-noise scales, experiment risk/cost
-defaults, planning horizon, information-gain objective, plan-invariance
-probability, causal hypothesis grammar, action catalog, vector goal, and hard
-safety ceilings remain human-specified.
+expected terminal task utility
+- cost weight * expected monetary/control cost
+- delay weight * expected delay
+
+Value of information is measured relative to the best same-horizon open-loop
+action plan.
+
+Unsafe zero-cost actions and experiments are present in the unit controls but
+remain excluded by the hard maximum-risk and reversibility filters before policy
+comparison.
+
+The v1.21 decision modes are therefore:
+
+informative action
+-> when task progress plus information creates the highest downstream value
+
+pure experiment
+-> when cleaner information is worth its cost and delay
+
+direct task action
+-> when additional information cannot improve the safest plan
+
+stop
+-> when the task goal is already reached
+
+abstain
+-> when no safe task plan remains
+
+This remains bounded dual control. The causal mechanism catalog, action and
+experiment catalogs, scalar task state, task utility function, two-step horizon,
+Gaussian observation model, cost weight, delay weight, minimum value-of-
+information threshold, and hard safety ceilings remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. continuous-valued intervention synthesis rather than binary repair probes;
-2. adaptive experiment synthesis where candidate interventions are generated
-   from posterior disagreement gradients rather than fixed combinatorial rules;
-3. deeper contingent experiment trees beyond horizon two;
-4. noisy repeated probes where one observation cannot sharply separate the
-   hypotheses;
-5. explicit value-of-information measured in downstream task utility rather than
-   entropy or plan identity alone;
-6. mixed experiment/action policies where a task action can simultaneously make
-   progress and reveal causal information;
-7. experiment reuse and transfer when a structurally equivalent uncertainty
-   appears in a renamed domain;
-8. learned experiment cost and reliability models from past outcomes;
-9. stopping rules that compare expected information value directly with delay,
-   task opportunity cost, and safety margin;
-10. whether autonomous experiment synthesis preserves protected model
-    installation, hard risk ceilings, reversibility, abstention, auditability,
-    and zero unsafe irreversible execution.
+1. mixed action-experiment policies over horizons longer than two;
+2. multidimensional task utility and constraints instead of one scalar task
+   state;
+3. task actions whose observations are noisy, delayed, or only partially
+   observable;
+4. actions that trade immediate progress for substantially greater future
+   information value;
+5. explicit expected value of perfect and partial information benchmarks;
+6. opportunity-cost models where delaying action can lose future reward or
+   violate a deadline;
+7. online learning of action cost, delay, and observation reliability from
+   experience;
+8. mixed policies integrated directly with the probabilistic repair and
+   prerequisite posterior rather than a separate finite mechanism benchmark;
+9. receding-horizon execution where every real action observation triggers a
+   fresh value-of-information calculation;
+10. whether value-of-information dual control preserves hard risk ceilings,
+    reversibility, protected model installation, abstention, auditability, and
+    zero unsafe irreversible execution.
 
-The next central milestone is value-of-information dual control with mixed
-action-experiment policies: Mabojolu should reason about task actions that both
-advance the goal and teach it about the world, compare pure experiments against
-informative actions, and choose information gathering only when its expected
-downstream task value exceeds its cost and delay.
+The next central milestone is receding-horizon multidimensional dual control:
+Mabojolu should combine its repair/prerequisite uncertainty, vector goals,
+learned constraints, and informative task actions in one repeated control loop,
+recomputing the value of additional information after every real observation.
 
 ## Safety and audit principle
 
