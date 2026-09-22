@@ -364,6 +364,25 @@ function termFeature(
       ] ??
         0;
 
+    case "saturating": {
+      const magnitude =
+        interventions[
+          term.variables[
+            0
+          ]!
+        ] ??
+        0;
+
+      return magnitude <=
+        0
+        ? 0
+        : magnitude /
+          (
+            0.5 +
+            magnitude
+          );
+    }
+
     case "interaction":
       return term.variables.reduce(
         (
