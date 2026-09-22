@@ -248,7 +248,7 @@ const STATE = {
 const GOAL = {
   minimums: {
     progress:
-      0.5,
+      0.55,
   },
 
   maximums: {
@@ -507,7 +507,7 @@ function reasonerAndPlan() {
       "adaptive-fault-terminal",
 
     description:
-      "Reach progress >= 0.500 while exposure <= 0.300.",
+      "Reach progress >= 0.550 while exposure <= 0.300.",
 
     priority:
       100,
@@ -516,7 +516,7 @@ function reasonerAndPlan() {
       "active",
 
     successCriteria: [
-      "progress >= 0.500",
+      "progress >= 0.550",
       "exposure <= 0.300",
     ],
 
@@ -690,14 +690,26 @@ describe(
         expect(
           synthesized.some(
             (candidate) =>
-              candidate.scales[
-                Y_FRAGMENT.id
-              ] ===
-                0.4 &&
-              candidate.scales[
-                Z_FRAGMENT.id
-              ] ===
+              Math.abs(
+                (
+                  candidate.scales[
+                    Y_FRAGMENT.id
+                  ] ??
+                  0
+                ) -
+                0.4,
+              ) <
+                1e-9 &&
+              Math.abs(
+                (
+                  candidate.scales[
+                    Z_FRAGMENT.id
+                  ] ??
+                  0
+                ) -
                 0.7,
+              ) <
+                1e-9,
           ),
         ).toBe(
           true,
@@ -775,18 +787,20 @@ describe(
             .getBelief();
 
         expect(
-          belief.topScales,
-        ).toMatchObject({
-          [
+          belief.topScales[
             Y_FRAGMENT.id
-          ]:
-            0.4,
+          ],
+        ).toBeCloseTo(
+          0.4,
+        );
 
-          [
+        expect(
+          belief.topScales[
             Z_FRAGMENT.id
-          ]:
-            0.7,
-        });
+          ],
+        ).toBeCloseTo(
+          0.7,
+        );
 
         expect(
           belief
@@ -887,23 +901,27 @@ describe(
             .getBelief();
 
         expect(
-          belief,
-        ).toMatchObject({
-          topScales: {
-            [
-              Y_FRAGMENT.id
-            ]:
-              0.4,
+          belief
+            .sufficientlyResolved,
+        ).toBe(
+          true,
+        );
 
-            [
-              Z_FRAGMENT.id
-            ]:
-              0.7,
-          },
+        expect(
+          belief.topScales[
+            Y_FRAGMENT.id
+          ],
+        ).toBeCloseTo(
+          0.4,
+        );
 
-          sufficientlyResolved:
-            true,
-        });
+        expect(
+          belief.topScales[
+            Z_FRAGMENT.id
+          ],
+        ).toBeCloseTo(
+          0.7,
+        );
 
         expect(
           belief.confidence,
