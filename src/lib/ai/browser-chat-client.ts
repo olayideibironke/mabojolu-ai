@@ -30,9 +30,10 @@ import type {
   StreamCallbacks,
 } from "./client-stream";
 
-import type {
-  ChatErrorPayload,
-  ChatMessage,
+import {
+  isChatImageAttachment,
+  type ChatErrorPayload,
+  type ChatMessage,
 } from "@/types/chat";
 
 const BROWSER_FAILURE_STORAGE_KEY =
@@ -561,20 +562,22 @@ function latestImagePrompt(
           (
             message
               .attachments
-              ?.length ??
-            0
-          ) >
-            0,
+              ?.some(
+                isChatImageAttachment,
+              ) ??
+            false
+          ),
       );
 
   if (
     !latestUser ||
     !latestUser
       .attachments ||
-    latestUser
+    !latestUser
       .attachments
-      .length ===
-      0
+      .some(
+        isChatImageAttachment,
+      )
   ) {
     return null;
   }
@@ -603,6 +606,9 @@ function latestImagePrompt(
     const attachment of
       latestUser
         .attachments
+        .filter(
+          isChatImageAttachment,
+        )
   ) {
     content.push({
       type:
@@ -658,10 +664,11 @@ export async function streamBrowserChat(
         (
           message
             .attachments
-            ?.length ??
-          0
-        ) >
-        0,
+            ?.some(
+              isChatImageAttachment,
+            ) ??
+          false
+        ),
     );
 
   const chromeContext =
