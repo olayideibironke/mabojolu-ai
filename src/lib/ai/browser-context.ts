@@ -1,4 +1,8 @@
 import {
+  contentWithAttachmentContext,
+} from "./attachment-context";
+
+import {
   estimateTokens,
 } from "./models";
 
@@ -65,6 +69,7 @@ export function buildBrowserContext(input: {
         ChatMessage,
         | "role"
         | "content"
+        | "attachments"
       >
     >;
 
@@ -85,7 +90,9 @@ export function buildBrowserContext(input: {
     input.messages
       .filter(
         (message) =>
-          message.content
+          contentWithAttachmentContext(
+            message,
+          )
             .trim()
             .length >
           0,
@@ -96,7 +103,9 @@ export function buildBrowserContext(input: {
             message.role,
 
           content:
-            message.content,
+            contentWithAttachmentContext(
+              message,
+            ),
         }),
       );
 
