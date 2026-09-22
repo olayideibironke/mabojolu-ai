@@ -287,7 +287,13 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   candidates, can reject the selected revision before the full installation
   reserve when another retained structure dominates, reopens bounded search
   when every retained candidate is inadequate, and still delegates installation
-  authority to the existing adaptive protected validator.
+  authority to the existing adaptive protected validator;
+- adaptive joint-candidate pruning and deeper receding structural diagnosis,
+  where a larger bounded joint hypothesis set is updated one observation at a
+  time, strongly contradicted candidates leave the active planning set through
+  reversible audit events, the next structural experiment is replanned after
+  every observation, and inadequacy of the retained set reopens structural
+  synthesis instead of forcing selection from a collapsed model family.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -296,179 +302,225 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: active protected-validation planning and receding structural revision
+### Current milestone: adaptive joint-candidate pruning and deeper receding structural diagnosis
 
-Mabojolu G can now choose the protected evidence it still needs instead of
-receiving one fixed validation batch.
+Mabojolu G can now shrink its active structural hypothesis set during an
+extended diagnostic episode instead of carrying every bounded candidate through
+every later experiment.
 
-v1.34 starts only after a bounded structural search has already selected a
-candidate revision.
+v1.35 begins with already bounded local structural alternatives.
 
-That selected candidate does not receive installation authority from the active
-planner.
+The controlled benchmark contains three independent local uncertainties:
 
-The new active protected loop sits in front of the existing protected
-validator.
+y:
+linear-refit, coefficient about 0.90
+versus
+saturating, coefficient about 0.90
 
-Its job is only to decide:
+z:
+incumbent linear, coefficient about 0.50
+versus
+interaction(z,w), coefficient about 0.50
 
-- which safe protected falsification probe to run next;
-- whether enough evidence already exists to reject the selected revision;
-- whether every retained structural candidate has become inadequate;
-- or whether the full adaptive protected reserve is ready to be handed to the
-  existing installation validator.
+q:
+linear-refit, coefficient about 0.60
+versus
+saturating, coefficient about 0.60.
 
-The retained structural candidates are carried in a separate log-space
-protected posterior.
+Those three binary local uncertainties form exactly:
 
-The default protected prior is uniform across retained candidates.
+8 bounded joint structural candidates.
 
-That deliberately avoids importing the diagnostic posterior as protected
-evidence.
+The discovery interventions are deliberately ambiguous.
 
-The protected posterior therefore starts as an independent test of the selected
-revision.
+For y at 0.50:
 
-The probe generator extracts variables from all retained candidate programs and
-builds bounded interventions using:
+linear-refit y predicts about 0.45
 
-- levels 0.25, 0.50, and 1.00;
-- maximum intervention arity 2;
-- explicit risk, cost, reversibility, and observation-noise values.
+and:
 
-A synthesized probe is retained only if at least one retained candidate predicts
-a nonzero causal response under that intervention.
+saturating y predicts about 0.45.
 
-This prevents causally irrelevant zero-response probes from satisfying protected
-coverage merely because their intervention signature is different.
+For z at 1.00 with w at 1.00:
 
-The active probe score combines:
+incumbent linear z predicts about 0.50
 
-expected posterior information gain
-+
-adaptive coverage bonus
--
-cost penalty
--
-risk penalty.
+and:
 
-When unique intervention coverage is still missing, new signatures receive the
-largest coverage bonus.
+interaction(z,w) predicts about 0.50.
 
-When the reserve only needs additional observations, new relevant signatures
-remain preferred over repeating an old signature.
+For q at 0.50:
 
-The selected revision can reach four terminal states:
+linear-refit q predicts about 0.30
 
-validated
+and:
 
-falsified
+saturating q predicts about 0.30.
 
-reopen-search
+The combined ambiguous discovery observation therefore does not collapse the
+eight-candidate joint set.
 
-or:
+v1.35 executes only one diagnostic probe at a time.
 
-abstained.
+After each real observation it:
 
-Validation is intentionally the strictest terminal state.
+- updates active candidate probabilities in log likelihood space;
+- checks whether the retained set is still absolutely adequate;
+- identifies strongly contradicted non-top candidates;
+- prunes only candidates below both absolute and relative posterior thresholds;
+- preserves a configurable minimum retained set;
+- records every pruning event;
+- renormalizes the surviving posterior;
+- rebuilds the structural planner over only active candidates;
+- replans the next experiment.
 
-To validate, the active loop must first accumulate enough protected observations
-and intervention diversity to satisfy the existing complexity-and-uncertainty
-adaptive evidence requirement.
+The controlled probe catalog contains:
 
-The complete evidence set is then passed to:
+y = 1.00
 
-validateProbabilisticLocalRepairSearch(...)
+q = 1.00
 
-which remains the installation authority.
+and:
 
-The selected candidate must still:
+z = 1.00 with w = 0.50.
 
-- remain the best protected candidate;
-- materially improve over the incumbent;
-- satisfy adaptive protected count;
-- satisfy protected intervention coverage;
-- avoid all discovery evidence;
-- avoid all active diagnostic evidence;
-- avoid historical lineage installation evidence.
+All three probes are informative initially.
 
-The active planner cannot override any of those checks.
+Because their information value is initially comparable, the externally bounded
+cost and risk terms make the y probe the first choice.
 
-For the controlled two-fragment candidate with complexity about 2 and install
-uncertainty about 0.20, the protected requirement remains:
-
-minimum protected observations: 4
-
-minimum unique intervention signatures: 2.
-
-The successful controlled benchmark begins with no protected evidence.
-
-Mabojolu chooses the first high-information protected intervention from the
-bounded catalog.
-
-The protected posterior rapidly concentrates on the selected:
+The controlled true environment contains:
 
 saturating y
 +
-interaction z,w
-
-candidate.
-
-Posterior confidence alone is not enough to install it.
-
-The planner continues acquiring relevant protected evidence until the adaptive
-reserve is complete.
-
-Only then does the existing protected validator return:
-
-protected-local-repair-selected.
-
-The active loop reports:
-
-protected-structural-revision-validated.
-
-v1.34 also makes rejection cheaper than installation.
-
-If at least a minimum number of independent protected observations has been
-collected and another retained structural candidate becomes sufficiently
-dominant while the selected candidate's protected probability falls below the
-rejection ceiling, the active loop stops immediately.
-
-It does not waste additional protected experiments merely to fill the
-installation reserve for a revision that has already been independently
-falsified.
-
-The controlled falsification world uses another retained candidate:
-
-saturating y
+interaction(z,w)
 +
-linear z.
+saturating q.
 
-The original selected:
+The y = 1.00 observation is about:
 
-saturating y
-+
-interaction z,w
+0.60.
 
-revision is rejected after the protected posterior independently favors the
-retained alternative.
+The competing linear-refit y candidates predict about:
 
-The loop reports:
+0.90.
 
-selected-structural-revision-falsified.
+With observation standard deviation about 0.03, that difference produces a
+likelihood penalty on the wrong y half of roughly:
 
-No installation decision is produced.
+exp(-50).
 
-A third controlled environment lies outside every retained joint structural
-candidate.
+Those four contradicted joint candidates fall below the pruning thresholds.
 
-After the minimum protected falsification count is reached, Mabojolu compares
-the absolute mean-squared error of every retained candidate.
+The active set therefore contracts:
 
-If even the best retained candidate exceeds the externally specified acceptable
-error ceiling, the system does not activate the least-bad candidate.
+8
+-> 4.
 
-It reports:
+Mabojolu does not continue a precomputed three-step tree.
+
+It rebuilds the posterior and replans from those four survivors.
+
+The next best remaining diagnostic is:
+
+q = 1.00.
+
+The true saturating q mechanism predicts about:
+
+0.40.
+
+The linear-refit q alternatives predict about:
+
+0.60.
+
+That difference again makes the wrong q branch negligibly probable.
+
+The active set contracts:
+
+4
+-> 2.
+
+Mabojolu replans again.
+
+The final remaining uncertainty is the z structure.
+
+The next diagnostic is:
+
+z = 1.00
+w = 0.50.
+
+The interaction model predicts about:
+
+0.25.
+
+The incumbent linear z model predicts about:
+
+0.50.
+
+The wrong branch is pruned.
+
+The active set contracts:
+
+2
+-> 1.
+
+The controlled deeper receding path is therefore:
+
+8 candidates
+-> observe y
+-> prune 4
+-> replan
+-> observe q
+-> prune 2
+-> replan
+-> observe z,w
+-> prune 1
+-> resolve one structural candidate.
+
+Candidate pruning is explicitly reversible.
+
+Each pruning event records:
+
+- sequence number;
+- candidate id;
+- every evidence id available at pruning time;
+- candidate probability at pruning;
+- top probability at pruning;
+- reversible = true;
+- reason.
+
+Restoring a candidate does not delete its pruning event.
+
+Instead Mabojolu appends a new:
+
+restored
+
+audit event.
+
+The history therefore remains:
+
+pruned
+-> restored
+
+rather than rewriting history as though the candidate had never been removed.
+
+v1.35 also protects a minimum retained-candidate count.
+
+The current top candidate can never be pruned by the contradiction rule.
+
+The system therefore cannot accidentally erase every active candidate merely
+because probabilities become numerically extreme.
+
+A separate absolute adequacy test handles model-family collapse.
+
+In the controlled regime-change benchmark, the environment changes to a program
+outside all eight retained structures.
+
+After enough observations have accumulated, Mabojolu evaluates the best
+mean-squared error among the currently active candidates.
+
+If even that best retained candidate exceeds the externally specified adequacy
+ceiling, the system reports:
 
 all-retained-structural-candidates-inadequate
 
@@ -476,126 +528,115 @@ and returns:
 
 reopen-search.
 
-This preserves the v1.25 principle that a bounded candidate set must be allowed
-to fail completely.
+It does not continue pruning until one arbitrary least-bad candidate remains.
 
-The protected planner is fail-closed under risk as well.
+The resolved winner still does not receive installation authority from v1.35.
 
-If every synthesized protected probe exceeds the external risk ceiling, it
-returns:
+The selected three-fragment structure is converted into the existing protected
+structural search surface and passed into the v1.34 active protected-validation
+loop.
 
-no-safe-protected-structural-probe.
+All receding diagnostic observation ids remain excluded from protected
+validation.
 
-A deliberately short protected budget also cannot self-authorize.
+The v1.34 planner then actively acquires a fresh adaptive protected reserve.
 
-If the budget ends before validation, falsification, or reopen-search becomes
-justified, the loop returns:
+Only after that independent reserve is complete and the existing protected
+validator authorizes the same candidate can installation proceed.
 
-protected-structural-budget-exhausted.
+The controlled live planning benchmark begins with:
 
-Evidence-role separation is enforced before the first active protected probe.
+finish -> about 1.30
+boost-finish -> about 1.60
 
-The protected reserve cannot reuse ids from:
+and terminal requirement:
 
-- structural discovery evidence;
-- active diagnostic evidence;
-- historical lineage installation evidence.
+progress >= 1.20.
 
-Any overlap fails closed through the existing adaptive protected evidence
-contract.
-
-The controlled successful revision is still projected into live planning only
-after active validation succeeds.
-
-Before revision:
-
-finish -> about 0.80
-boost-finish -> about 1.10
-
-with terminal requirement:
-
-progress >= 0.79.
-
-The incumbent plan selects:
+The incumbent model therefore chooses:
 
 finish.
 
-After the actively protected joint structural revision:
+After the protected three-fragment revision, the live causal effects become:
 
-finish -> about 0.70
-boost-finish -> about 0.85.
+finish -> about 1.00
+boost-finish -> about 1.25.
 
-The live plan becomes:
+The previous finish action is no longer sufficient.
+
+The revised plan becomes:
 
 boost-finish.
 
-Both changed fragments advance provenance only after the protected installation
-decision.
+The receding-horizon controller also prefers boost-finish after cost and delay
+penalties.
+
+Fragment provenance advances only after protected installation.
 
 The terminal goal contract remains unchanged.
 
-The v1.34 loop is therefore:
+The v1.35 loop is therefore:
 
-resolved bounded structural search
--> initialize independent protected candidate posterior
--> analyze adaptive protected coverage gap
--> synthesize causally relevant protected probes
--> score information value, coverage, cost, and risk
--> choose one protected probe
--> observe the real effect
--> update protected posterior
--> re-evaluate terminal state
--> if another retained candidate dominates, falsify selected revision early
+bounded joint structural candidate set
+-> initialize active posterior
+-> execute one safe diagnostic
+-> update candidate probabilities
+-> test retained-set adequacy
+-> prune strongly contradicted candidates with reversible audit history
+-> renormalize surviving candidates
+-> rebuild the planner
+-> choose the next diagnostic from the new active set
+-> repeat until one candidate remains
 or
--> if every retained candidate is inadequate, reopen bounded search
+-> reopen structural synthesis if every survivor is inadequate
 or
--> if installation reserve is incomplete, choose the next protected probe
-or
--> if reserve is complete, call the existing protected validator
--> install only if that validator independently authorizes the same candidate
--> advance fragment provenance
--> revise stale live child goals
+-> abstain if no safe informative probe remains
+-> pass the resolved winner into independent active protected validation
+-> install only after the existing protected validator authorizes it
+-> advance provenance
+-> revise stale child goals
 -> continue receding-horizon control.
 
-This remains bounded protected-validation planning rather than autonomous
-self-authorization. The candidate set is already bounded before v1.34 begins,
-probe values and arity are bounded, risk/cost/reversibility remain external,
-falsification thresholds and absolute adequacy ceilings remain human-specified,
-protected priors do not receive hidden truth, and the active planner has no code
-path that can bypass the existing installation validator.
+This remains bounded candidate management rather than destructive hypothesis
+deletion or unrestricted search. The starting candidate set is finite,
+posterior pruning requires minimum evidence plus absolute and relative
+probability thresholds, a configurable minimum retained set is preserved,
+pruning is auditable and reversible, active diagnostics remain risk bounded,
+absolute inadequacy reopens search instead of forcing a winner, and protected
+installation authority remains outside the pruning subsystem.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. deeper receding protected-validation horizons where only the next
-   falsification probe is executed and the remaining policy is replanned after
-   every protected outcome;
-2. adaptive protected candidate pruning so repeatedly contradicted structures
-   can be removed from the live validation set without losing audit history;
-3. active reopening of local structural synthesis immediately after an
-   all-candidates-inadequate result;
-4. joint continuous parameter and topology uncertainty during protected
-   validation rather than one fitted coefficient per retained structural form;
-5. protected probe synthesis that directly optimizes expected task-regret
-   reduction in addition to model information gain;
-6. sequential stopping rules with explicit false-accept and false-reject error
-   guarantees;
-7. protected validation under noisy and heteroscedastic observations;
-8. cross-domain transfer of protected experiment policies between structurally
-   equivalent renamed environments;
-9. long-running validation where evidence ages and protected confidence must be
-   refreshed before a previously accepted revision is reused;
-10. whether active protected planning preserves bounded search, independent
-    validation roles, terminal intent, hard risk ceilings, abstention,
-    auditability, and zero unsafe irreversible execution.
+1. candidate resurrection driven automatically by later contradictory evidence
+   rather than explicit audit restoration;
+2. pruning thresholds calibrated from sequential false-prune guarantees instead
+   of fixed posterior cutoffs;
+3. richer candidate-family compression that merges structurally equivalent
+   hypotheses before active diagnosis;
+4. continuous parameter uncertainty inside each surviving topology rather than
+   one point coefficient per candidate;
+5. receding diagnosis over more than three structural factors with bounded beam
+   search instead of full Cartesian composition;
+6. automatic local candidate synthesis immediately after retained-set
+   inadequacy, closing the current reopen-search handoff;
+7. environment change-point detection that distinguishes stale evidence from a
+   genuinely falsified structural hypothesis;
+8. evidence aging so old diagnostic support decays without deleting historical
+   audit records;
+9. transfer of pruning and experiment policies across renamed structurally
+   equivalent domains;
+10. whether dynamic candidate management preserves protected independence,
+    terminal intent, hard risk ceilings, abstention, auditability, reversible
+    pruning, and zero unsafe irreversible execution.
 
-The next central milestone is adaptive joint-candidate pruning and deeper
-receding structural diagnosis: Mabojolu should carry a bounded but changing set
-of structural hypotheses over longer horizons, remove repeatedly contradicted
-candidates with reversible audit history, replan diagnostic and protected
-experiments after every observation, and reopen local synthesis automatically
-when the retained set collapses.
+The next central milestone is automatic bounded structural re-synthesis after
+candidate-set collapse: when the retained family becomes inadequate, Mabojolu
+should diagnose which local fragments need a new grammar search, generate a
+fresh bounded candidate family from the accumulated non-protected evidence,
+link the new candidates to the failed family through provenance, and restart
+receding diagnosis without human selection of the replacement hypothesis set.
 
 ## Safety and audit principle
 
