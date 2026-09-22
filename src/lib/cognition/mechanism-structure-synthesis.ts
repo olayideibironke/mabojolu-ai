@@ -8,6 +8,7 @@ import {
 
 export type StructuralTermKind =
   | "linear"
+  | "saturating"
   | "interaction"
   | "latent-bias";
 
@@ -263,6 +264,38 @@ function interactionFeature(
   );
 }
 
+function saturatingFeature(
+  variable:
+    string,
+
+  interventions:
+    Readonly<
+      Record<
+        string,
+        number
+      >
+    >,
+): number {
+  const magnitude =
+    interventions[
+      variable
+    ] ??
+    0;
+
+  if (
+    magnitude <=
+      0
+  ) {
+    return 0;
+  }
+
+  return magnitude /
+    (
+      0.5 +
+      magnitude
+    );
+}
+
 export function predictStructuredMechanismEffect(
   mechanism:
     StructuredCausalMechanism,
@@ -335,6 +368,28 @@ export function predictStructuredMechanismEffect(
               ]!
             ] ??
             0
+          );
+
+        break;
+      }
+
+      case "saturating": {
+        if (
+          term.variables.length !==
+            1
+        ) {
+          throw new Error(
+            "Saturating structural terms require exactly one variable.",
+          );
+        }
+
+        effect +=
+          term.coefficient *
+          saturatingFeature(
+            term.variables[
+              0
+            ]!,
+            interventions,
           );
 
         break;
@@ -440,6 +495,16 @@ function residualFeature(
         ] ??
         0;
 
+    case "saturating":
+      return saturatingFeature(
+        term.variables[
+          0
+        ]!,
+        observation
+          .experiment
+          .interventions,
+      );
+
     case "interaction":
       return interactionFeature(
         term.variables,
@@ -536,6 +601,7 @@ export function synthesizeBoundedStructuralChallengers(
   options?: {
     maximumChallengers?: number;
     complexityPenaltyPerVariable?: number;
+    includeSaturating?: boolean;
     includeLatentBias?: boolean;
   },
 ): StructuralChallenger[] {
@@ -632,6 +698,45 @@ export function synthesizeBoundedStructuralChallengers(
       candidates.push(
         term,
       );
+    }
+  }
+
+  if (
+    options
+      ?.includeSaturating ===
+      true
+  ) {
+    for (
+      const variable of
+        distinctVariables
+    ) {
+      const term:
+        StructuralMechanismTerm = {
+        id:
+          `saturating(${variable})`,
+
+        kind:
+          "saturating",
+
+        variables: [
+          variable,
+        ],
+
+        coefficient:
+          0,
+      };
+
+      if (
+        !existing.has(
+          termSignature(
+            term,
+          ),
+        )
+      ) {
+        candidates.push(
+          term,
+        );
+      }
     }
   }
 
