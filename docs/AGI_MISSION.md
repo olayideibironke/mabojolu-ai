@@ -252,7 +252,14 @@ The current Mabojolu G research branch contains controlled demonstrations of:
   gain under explicit risk/cost penalties, posterior resolution that cannot
   bypass repeated-blame quarantine, and fragment-specific provenance that
   preserves origin, active replacement, protected evidence, generation, and
-  local rollback history across maintained composite revisions.
+  local rollback history across maintained composite revisions;
+- multi-step bounded fault diagnosis and probabilistic local repair search,
+  where no-fault, single-fragment, and bounded multi-fragment explanations
+  compete in one posterior, short contingent diagnostic policies reduce
+  expected terminal uncertainty, repair search opens only after every implicated
+  fragment is both probabilistically resolved and independently quarantined,
+  and a combinatorial local repair winner must remain best on a fresh adaptive
+  protected reserve before installation.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -261,265 +268,274 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: active causal fault localization and fragment-specific provenance
+### Current milestone: multi-step fault diagnosis and probabilistic local repair search
 
-Mabojolu G can now choose bounded diagnostic interventions specifically to
-localize which inherited composite fragment is failing before launching local
-maintenance.
+Mabojolu G can now diagnose bounded composite failures without assuming either
+that a fault definitely exists or that exactly one inherited fragment failed.
 
-The controlled composite again contains:
+For the controlled two-fragment composite the fault hypothesis space is:
+
+no fault
+y fragment fault
+z fragment fault
+y + z multi-fragment fault
+
+Each fault explanation is represented by a bounded counterfactual program.
+
+In this milestone a fault scales the implicated fragment contribution by a
+human-specified bounded factor rather than deleting it completely.
+
+The controlled benchmark uses a fault scale of about 0.25.
+
+The installed composite begins with:
 
 linear(y), coefficient about 0.60
 +
 linear(z), coefficient about 0.50
 
-The hidden benchmark environment changes only z:
+The hidden controlled environment changes both fragments to:
 
-linear(y) remains about 0.60
-linear(z) becomes about 0.20
+linear(y), coefficient about 0.15
++
+linear(z), coefficient about 0.125
 
-v1.29 starts with competing fault hypotheses rather than assuming which
-component failed.
+Two passive half-strength observations are supplied first.
 
-For a two-fragment composite the controlled posterior begins over:
+Those observations favor the two-fragment fault, but the posterior remains
+unresolved at only about 0.52 confidence.
 
-fault:y
-fault:z
+No repair search is allowed at that point.
 
-Each fault hypothesis is represented by a counterfactual program with that
-fragment removed.
+v1.30 evaluates both one-step and two-step diagnostic policies.
 
-These counterfactuals are localization models, not automatic repair programs.
+The one-step policy can reduce uncertainty, but with four competing
+explanations one unary intervention cannot fully distinguish:
 
-A passive z-half observation is first incorporated.
+no fault
+single y fault
+single z fault
+double fault
 
-It makes z-failure more plausible but does not cross the configured confidence
-and margin threshold.
+The depth-two planner evaluates the information value of a second diagnostic
+conditional on each possible first observation.
 
-The controlled initial posterior is therefore informative but unresolved.
+The controlled policy chooses:
 
-Mabojulu then synthesizes safe unary diagnostic probes from variables used by
-the active composite.
+fault-probe:z
 
-The benchmark generates:
+first because it provides high information at lower configured risk and cost.
+
+After the z observation the two-fragment explanation rises to roughly 0.74
+confidence but remains below the repair threshold.
+
+The controller then replans and chooses:
 
 fault-probe:y
-fault-probe:z
 
-Both interventions remain inside the causal unit interval.
+After that second observation, the bounded two-fragment explanation rises above
+0.95 confidence.
 
-Each probe carries explicit:
+The controlled benchmark therefore resolves the fault only after two
+diagnostic steps.
 
-- risk;
-- cost;
-- reversibility;
-- observation noise.
+The diagnostic probes remain:
 
-Probe selection maximizes bounded expected information gain while subtracting
-cost and risk penalties.
+- reversible;
+- unit-bounded;
+- under the external risk ceiling;
+- costed explicitly.
 
-The benchmark assigns lower external risk and cost to the z probe.
+If every available diagnostic exceeds the risk ceiling, diagnosis abstains.
 
-Given the current posterior, Mabojolu selects:
+v1.30 also includes an explicit no-fault explanation.
 
-fault-probe:z
+When observations match the incumbent composite strongly enough, the posterior
+can resolve:
 
-The controlled benchmark simulator then supplies the observed effect from the
-hidden degraded program.
+no fault
 
-That hidden program is used only by functions explicitly named as controlled
-benchmark helpers.
+and the local repair search returns:
 
-The runtime-facing localizer does not receive the true failed-fragment label or
-the hidden degraded program.
+retain-no-fault
 
-It receives:
+No repair candidate is evaluated merely because a diagnostic process was
+started.
 
-- the current composite;
-- current fault belief;
-- safe candidate probes;
-- externally observed effects.
+Fault-posterior confidence is still not repair authority.
 
-After the z diagnostic outcome, the posterior crosses the configured confidence
-and margin thresholds and resolves:
+The two passive half-strength observations each provide one deterministic blame
+episode for the corresponding damaged fragment.
 
-rev-z:program-z-fragment
+The active z and y diagnostics provide the second blame episodes.
 
-as the most probable failing component.
+Only after the posterior resolves the multi-fragment explanation and both y and
+z independently satisfy the existing repeated-blame quarantine rule may repair
+search begin.
 
-Posterior resolution does not authorize repair by itself.
+If even one probabilistically implicated fragment is not quarantined, the repair
+search abstains.
 
-The same diagnostic observation is also passed into the existing v1.28
-fragment reliability monitor.
+The local repair search then constructs bounded combinations for every
+implicated fragment.
 
-Together with the earlier passive z-specific mismatch, it becomes the second
-independent blame episode required to quarantine z.
+For each failed fragment the choices are:
 
-A dedicated safety test gives Mabojolu an observation that makes z-failure
-nearly certain while supplying no repeated z blame.
+- fragment-only rollback;
+- validated same-topology local repair candidates.
+
+The controlled repair catalog contains:
+
+y -> 0.15
+y alternative -> 0.30
+z -> 0.125
+z alternative -> 0.25
+
+Because both y and z are implicated, Mabojolu evaluates combinations of these
+choices rather than choosing each repair independently.
+
+The discovery reserve selects the exact pair:
+
+linear(y), coefficient about 0.15
++
+linear(z), coefficient about 0.125
+
+with discovery MSE approximately zero.
+
+Discovery evidence cannot authorize installation.
+
+Repair-search evidence, passive/active diagnostic evidence, previous lineage
+installation evidence, and the final protected reserve are kept disjoint.
+
+The selected repair combination must remain the best candidate on the fresh
+protected reserve.
+
+A dedicated falsification test makes the discovery-selected pair lose to an
+alternative coefficient pair on protected evidence.
 
 Expected result:
 
-fault posterior resolved
-but
-fragment not quarantined
-therefore
-no maintenance
+repair-search-selection-not-protected
 
-This preserves the distinction between probabilistic localization and earned
-repair authority.
+and no installation.
 
-Once both gates are satisfied:
+When the discovery winner also wins protected validation, it must still satisfy
+the adaptive protected-evidence requirement derived from the repaired program's
+complexity and posterior uncertainty.
 
-fault posterior resolved
-and
-repeated-blame quarantine satisfied
+In the controlled benchmark the repaired two-fragment program requires four
+fresh protected observations.
 
-the existing selective-maintenance pipeline runs unchanged.
+A three-observation reserve is rejected.
 
-Fresh protected evidence remains disjoint from:
+The four-observation reserve passes and selects the exact repair pair with
+protected MSE approximately zero.
 
-- lineage installation reserves;
-- passive monitoring observations;
-- active fault-localization observations.
+The protected multi-fragment repair is appended as a new bounded lineage
+revision.
 
-The controlled local replacement is again:
+Fragment provenance advances independently for both damaged mechanisms.
 
-linear(z), coefficient about 0.20
+The y logical fragment keeps its historical origin in rev-y but changes active
+fragment to:
 
-The healthy y fragment remains structurally unchanged.
+repair-y-0.15
 
-v1.29 also introduces explicit fragment-specific provenance.
+The z logical fragment keeps its historical origin in rev-z but changes active
+fragment to:
 
-Each inherited logical fragment records:
+repair-z-0.125
 
-- original source revision;
-- original source fragment;
-- current active fragment id;
-- current revision id;
-- generation;
-- active or retired status;
-- auditable history events.
+Both provenance records advance one generation and retain the protected
+evidence ids that authorized the repair.
 
-The initial provenance ledger records:
+The protected repaired causal program is then projected into the live
+receding-control hypothesis.
 
-y logical fragment
--> origin rev-y
--> source program-y-fragment
--> active inherited y fragment
-
-z logical fragment
--> origin rev-z
--> source program-z-fragment
--> active inherited z fragment
-
-After protected local repair, y advances into the new revision as a preserved
-component without changing its origin or active fragment id.
-
-z keeps its historical origin in rev-z, but its active fragment becomes:
-
-repair-z-0.2
-
-Its history records:
-
-repaired
-from rev-z:program-z-fragment
-to repair-z-0.2
-under the new composite revision
-with the exact protected maintenance evidence ids that authorized installation.
-
-If later protected evidence removes the z mechanism entirely, fragment-only
-rollback marks the z logical component retired while preserving its origin and
-rollback history.
-
-The maintained causal program is projected back into the live hypothesis.
-
-Before local degradation:
+Before the multi-fragment repair:
 
 finish -> about 0.80
 boost-finish -> about 1.10
 
-After the protected z repair:
+After repair:
 
-finish -> about 0.50
-boost-finish -> about 0.80
+finish -> about 0.20
+boost-finish -> about 0.275
 
-The terminal task still requires:
+The terminal goal requires:
 
-progress >= 0.75
+progress >= 0.25
 
-so the plan changes:
+so the live plan changes:
 
 finish
 -> boost-finish
 
-The stale child goal is replaced while the terminal goal contract remains
-unchanged.
+Only the stale child goal branch is replaced.
 
-The actively localized maintained hypothesis is then passed directly into
-receding-horizon control.
+The terminal goal contract remains unchanged.
 
-The next real controller decision becomes:
+The protected multi-fragment repair then feeds directly into receding-horizon
+control, whose next decision becomes:
 
 boost-finish
 
-The v1.29 loop is therefore:
+The v1.30 loop is therefore:
 
-passive composite mismatch
--> probabilistic belief over fragment-failure hypotheses
--> synthesize safe diagnostic interventions
--> choose probe by expected information gain minus risk/cost
--> execute one externally bounded diagnostic
--> observe real effect
--> update fault posterior
+passive mismatch evidence
+-> posterior over no-fault, single-fault, and bounded multi-fault explanations
+-> evaluate one-step versus contingent two-step diagnostics
+-> execute one safe diagnostic
+-> update posterior
+-> replan the remaining diagnostic horizon
 -> require posterior confidence and margin
--> also require repeated fragment-specific blame
--> preserve healthy fragments
--> run local repair or fragment-only rollback on fresh protected evidence
--> advance fragment-specific provenance
+-> require repeated-blame quarantine for every implicated fragment
+-> open bounded combinatorial repair search
+-> select repair combination on discovery evidence
+-> require the same selection to win on disjoint protected evidence
+-> enforce adaptive protected count and intervention coverage
+-> install repaired child revision
+-> advance per-fragment provenance
 -> update live hypothesis and goal branch
 -> continue receding-horizon control.
 
-This remains bounded fault diagnosis rather than unrestricted experimentation.
-Fault candidates come only from fragments already present in the active
-composite, synthesized probes are unary and unit-bounded in this milestone,
-external risk/reversibility ceilings remain fixed, posterior thresholds remain
-human-specified, repeated-blame quarantine remains mandatory, protected
-maintenance evidence remains independent, and the repair catalog and terminal
-goal contract remain externally bounded.
+This remains bounded diagnostic and repair search rather than unrestricted
+self-modification. Maximum fault cardinality, fault scale, diagnostic horizon,
+probe set, risk ceiling, observation noise, posterior thresholds, quarantine
+thresholds, repair catalog, candidate count, topology matching, complexity
+penalty, protected improvement threshold, adaptive evidence formula, action
+catalog, and terminal goal contract remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. multi-step causal fault-localization policies where the first diagnostic is
-   chosen for the value of the best possible second diagnostic;
-2. explicit no-fault and multi-fragment-fault hypotheses rather than only
-   exactly-one-fragment failure;
-3. probabilistic same-fragment repair candidates after localization rather than
-   one supplied protected replacement;
-4. interaction and latent-bias fault localization where one diagnostic can
-   affect several fragments simultaneously;
-5. fragment provenance as a true multi-parent DAG rather than per-fragment
-   history attached to a single-parent revision lineage;
-6. fragment-specific rollback to older historical coefficients rather than only
-   local removal;
-7. gradual drift where the fault posterior and reliability posterior evolve on
-   different time scales;
-8. diagnostic value-of-information that includes downstream task delay;
-9. transfer of fragment-fault priors and provenance across structurally
-   equivalent renamed domains;
-10. whether active localization preserves protected evidence independence,
-    repeated-blame authority, healthy-fragment invariants, terminal intent, hard
-    risk ceilings, abstention, auditability, and zero unsafe irreversible
+1. fault-model structure learning rather than using one human-specified fault
+   scale for every fragment;
+2. diagnostic horizons longer than two while executing only the next probe and
+   replanning after every observation;
+3. probe synthesis that can use safe joint interventions when unary diagnostics
+   leave interaction-fragment faults unresolved;
+4. posterior mass over several repair combinations instead of deterministic
+   discovery selection;
+5. repair-search value-of-information that decides whether another diagnostic
+   is worth more than immediately validating the current repair candidates;
+6. interaction and latent-bias multi-fragment faults;
+7. provenance-aware repair priors that favor previously successful local
+   coefficients without bypassing protected validation;
+8. gradual faults where no discrete explanation dominates immediately;
+9. transfer of bounded multi-fault diagnosis and repair priors across
+   structurally equivalent renamed domains;
+10. whether multi-step diagnosis and repair search preserve evidence
+    independence, no-fault retention, repeated-blame authority, terminal intent,
+    hard risk ceilings, abstention, auditability, and zero unsafe irreversible
     execution.
 
-The next central milestone is multi-step fault diagnosis and probabilistic local
-repair search: Mabojolu should maintain uncertainty over no-fault,
-single-fragment, and bounded multi-fragment explanations, choose short
-contingent diagnostic policies rather than one isolated probe, and search among
-several local repair candidates only after the causal fault posterior justifies
-that search.
+The next central milestone is adaptive fault-model synthesis and repair
+uncertainty: Mabojolu should infer bounded fault magnitudes and local structural
+changes from evidence instead of relying on a fixed fault scale, maintain a
+posterior over several protected repair candidates, and decide whether to
+diagnose further, validate a candidate, or defer repair based on expected
+decision value.
 
 ## Safety and audit principle
 
