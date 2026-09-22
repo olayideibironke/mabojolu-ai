@@ -732,7 +732,7 @@ describe(
 
           firstProbe: {
             id:
-              "fault-probe:z",
+              "fault-probe:y",
           },
 
           reason:
@@ -754,7 +754,7 @@ describe(
               (branch) =>
                 branch
                   .secondProbeId ===
-                "fault-probe:y",
+                "fault-probe:z",
             ),
         ).toBe(
           true,
