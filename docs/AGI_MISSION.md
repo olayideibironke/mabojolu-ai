@@ -209,7 +209,11 @@ The current Mabojolu G research branch contains controlled demonstrations of:
 - value-of-information dual control where ordinary task actions can also serve
   as observations, pure experiments compete against informative actions on the
   same task horizon, and information is purchased only when its downstream task
-  value exceeds explicit cost and delay penalties.
+  value exceeds explicit cost and delay penalties;
+- receding-horizon multidimensional dual control with combined
+  repair/prerequisite world hypotheses, vector state and terminal constraints,
+  real action observations, posterior updates, one-control-at-a-time execution,
+  and full replanning after every observation.
 
 These are research building blocks. They do not by themselves establish AGI.
 
@@ -218,153 +222,167 @@ These are research building blocks. They do not by themselves establish AGI.
 Infrastructure work should periodically return to the cognitive frontier rather
 than becoming the project itself.
 
-### Current milestone: value-of-information dual control with mixed action-experiment policies
+### Current milestone: receding-horizon multidimensional dual control
 
-Mabojolu G can now treat an ordinary goal-directed action as both a task action
-and an information source.
+Mabojolu G now executes dual-control decisions as a repeated closed loop rather
+than as a one-shot two-step policy.
 
-Earlier milestones separated pure experiments from task actions. v1.21 evaluates
-both under one bounded two-step decision problem.
+The v1.22 controller carries:
 
-The controller begins with a posterior over competing causal mechanisms. Every
-safe reversible task action has:
+- a multidimensional task state;
+- terminal minimum and maximum constraints;
+- posterior probability over combined causal hypotheses;
+- each hypothesis's repair identity;
+- each hypothesis's prerequisite identity;
+- state-dependent action prerequisites;
+- safe reversible task actions;
+- safe reversible pure experiments;
+- complete execution history.
 
-- interventions;
-- task effect predicted by each mechanism;
-- risk;
-- direct cost;
-- delay.
+A control cycle now performs:
 
-Every safe reversible pure experiment has the same cost, delay, and risk
-accounting but does not directly advance the task state.
+current vector state
++ current posterior
+-> compare open-loop and information-conditioned controls
+-> select exactly one next control
+-> execute that control
+-> observe its real effect
+-> update the posterior
+-> update the vector state
+-> recompute the next control from scratch.
 
-When Mabojolu executes a task action, its observed task effect is also used as a
-causal observation. The mechanism posterior is updated from that observed effect
-using the same Gaussian likelihood family used elsewhere in the cognitive
-kernel.
+The benchmark uses two combined causal hypotheses.
 
-The second action is then chosen conditionally from the updated posterior and
-the observed task state.
+The slow combination contains:
 
-v1.21 compares this mixed policy against a same-horizon open-loop action
-baseline. Both policies receive at most two control steps. This prevents an
-informative action from appearing better merely because it was given an
-additional opportunity to make task progress.
+- one repair identity;
+- readiness prerequisite about 0.40;
+- prepare-diagnostic raises readiness by 0.50;
+- finish-slow is effective;
+- finish-fast is weak.
 
-The open-loop baseline chooses the best one- or two-action sequence without
-conditioning the second action on the observed first outcome.
+The fast combination contains:
 
-A mixed policy receives information value only when the first observation
-actually changes the follow-up decision across posterior branches.
+- a different repair identity;
+- readiness prerequisite about 0.70;
+- prepare-diagnostic raises readiness by 0.80;
+- finish-fast is effective;
+- finish-slow is weak.
 
-The controlled benchmark contains two environments:
+The terminal vector goal requires:
 
-slow-world:
-diagnostic progress is small;
-finish-slow is effective;
-finish-fast is weak.
+progress >= 0.90
+and
+exposure <= 0.30
 
-fast-world:
-diagnostic progress is larger;
-finish-fast is effective;
-finish-slow is weak.
+From an unprepared uncertain state, Mabojolu selects prepare-diagnostic.
 
-Under equal prior belief, an informative action named diagnostic-progress both
-moves the task forward and sharply distinguishes the worlds.
+That action is useful in three ways simultaneously:
 
-Its contingent policy is:
+- it raises readiness;
+- it contributes task progress;
+- its observed readiness effect discriminates the two combined
+  repair/prerequisite hypotheses.
 
-diagnostic-progress
--> if slow-world: finish-slow
--> if fast-world: finish-fast
+Under the fast-world execution branch, the observed readiness increase is 0.80.
+The posterior concentrates on the fast combination and the real vector state
+becomes approximately:
 
-The mixed policy reaches full task utility in both branches while using less
-cost and delay than the best same-horizon open-loop sequence. Its value of
-information is therefore positive after all task costs are included.
+readiness 0.80
+progress 0.10
+exposure 0.05
 
-v1.21 also tests the opposite economic regime.
+Mabojolu then replans from that observed state and chooses finish-fast.
 
-When task actions are made substantially more expensive and slower to use as
-probes, a cheap pure diagnostic experiment wins instead:
+Under the slow-world branch, the same first action instead produces readiness
+0.50, concentrates posterior belief on the slow combination, and the next
+receding-horizon decision becomes finish-slow.
 
-pure-probe
--> update mechanism posterior
--> choose the matching finish action
+The controller therefore does not commit to either finish action before the
+first real observation.
 
-The controller therefore does not prefer informative actions merely because
-they combine learning and progress. It compares their downstream task value
-against a pure experiment under the same explicit cost and delay objective.
+After the fast branch executes finish-fast, the state reaches:
 
-A third benchmark removes decision-relevant uncertainty entirely. Both causal
-mechanisms imply the same universal finish action. A pure probe can still reveal
-which mechanism is true, but that knowledge cannot improve the task plan.
+readiness 0.80
+progress 1.00
+exposure 0.15
 
-The resulting value of information is zero and Mabojolu acts immediately rather
-than buying unnecessary information.
+The next controller cycle detects that every terminal constraint is satisfied
+and returns stop.
 
-The scoring rule is:
+The execution history contains only the controls actually executed:
 
-expected terminal task utility
-- cost weight * expected monetary/control cost
-- delay weight * expected delay
+prepare-diagnostic
+-> finish-fast
 
-Value of information is measured relative to the best same-horizon open-loop
-action plan.
+rather than the unexecuted branches of the earlier lookahead.
 
-Unsafe zero-cost actions and experiments are present in the unit controls but
-remain excluded by the hard maximum-risk and reversibility filters before policy
-comparison.
+v1.22 also keeps pure experiments inside the same controller.
 
-The v1.21 decision modes are therefore:
+A second benchmark starts with readiness already satisfied. Route actions are
+made expensive enough that probing through an ordinary task action has lower
+expected value than first purchasing a cleaner pure route experiment.
 
-informative action
--> when task progress plus information creates the highest downstream value
+The controller therefore chooses probe-route, updates the same causal posterior,
+and can then replan toward the correct finish route.
 
-pure experiment
--> when cleaner information is worth its cost and delay
+This crossover is economic rather than artificial: task outcomes remain
+observable, but their higher cost makes a dedicated experiment preferable.
 
-direct task action
--> when additional information cannot improve the safest plan
+A cheap constraint-shortcut is included in the controls. Although it reaches
+the progress target quickly, it raises exposure to 0.80 and therefore receives
+zero terminal vector utility. It is rejected despite its low direct cost.
 
-stop
--> when the task goal is already reached
+Unsafe zero-cost controls remain filtered before value comparison.
 
-abstain
--> when no safe task plan remains
+The v1.22 loop therefore combines:
 
-This remains bounded dual control. The causal mechanism catalog, action and
-experiment catalogs, scalar task state, task utility function, two-step horizon,
-Gaussian observation model, cost weight, delay weight, minimum value-of-
-information threshold, and hard safety ceilings remain human-specified.
+joint repair/prerequisite uncertainty
++ multidimensional state
++ learned prerequisites
++ informative task actions
++ pure experiments
++ hard vector constraints
+-> select one control
+-> execute
+-> observe
+-> update belief and state
+-> replan
+-> stop only when the terminal vector contract is satisfied.
+
+This remains bounded receding-horizon control. The combined hypothesis catalog,
+dimension effects, prerequisite thresholds, action and experiment catalogs,
+scalar observation per control, Gaussian observation model, two-control
+lookahead used for valuation, task utility, cost and delay weights, terminal
+constraints, and hard safety ceilings remain human-specified.
 
 ### Next experiments
 
 The next experiments should measure:
 
-1. mixed action-experiment policies over horizons longer than two;
-2. multidimensional task utility and constraints instead of one scalar task
-   state;
-3. task actions whose observations are noisy, delayed, or only partially
-   observable;
-4. actions that trade immediate progress for substantially greater future
-   information value;
-5. explicit expected value of perfect and partial information benchmarks;
-6. opportunity-cost models where delaying action can lose future reward or
-   violate a deadline;
-7. online learning of action cost, delay, and observation reliability from
-   experience;
-8. mixed policies integrated directly with the probabilistic repair and
-   prerequisite posterior rather than a separate finite mechanism benchmark;
-9. receding-horizon execution where every real action observation triggers a
-   fresh value-of-information calculation;
-10. whether value-of-information dual control preserves hard risk ceilings,
-    reversibility, protected model installation, abstention, auditability, and
-    zero unsafe irreversible execution.
+1. direct use of the full joint repair/prerequisite posterior from v1.19 rather
+   than a separately enumerated combined-world catalog;
+2. online structural-repair and prerequisite updates inside the same receding
+   control episode;
+3. multidimensional noisy observations where only part of the vector state is
+   observed after an action;
+4. delayed effects and latent state across several control cycles;
+5. longer action/experiment lookahead while still executing only one next
+   control;
+6. deadlines and opportunity costs that make waiting for information dangerous;
+7. changing terminal constraints and newly discovered safety boundaries during
+   an episode;
+8. automatic goal-hierarchy updates from every receding-horizon control
+   decision;
+9. transfer of a learned receding-control strategy across renamed domains;
+10. whether repeated dual-control replanning preserves protected repair
+    installation, learned prerequisites, terminal intent, hard risk ceilings,
+    abstention, auditability, and zero unsafe irreversible execution.
 
-The next central milestone is receding-horizon multidimensional dual control:
-Mabojolu should combine its repair/prerequisite uncertainty, vector goals,
-learned constraints, and informative task actions in one repeated control loop,
-recomputing the value of additional information after every real observation.
+The next central milestone is online belief-model coevolution: Mabojolu should
+allow real receding-horizon action outcomes to update not only probability over
+existing causal hypotheses but also trigger bounded structural repair,
+prerequisite revision, and goal-hierarchy changes inside the same live episode.
 
 ## Safety and audit principle
 
