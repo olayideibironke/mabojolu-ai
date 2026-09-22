@@ -42,10 +42,10 @@ describe(
             ],
         ).toMatchObject({
           probeId:
-            "fault-probe:z",
+            "fault-probe:y",
 
           observedEffect:
-            0.125,
+            0.15,
         });
 
         expect(
@@ -56,10 +56,10 @@ describe(
             ],
         ).toMatchObject({
           probeId:
-            "fault-probe:y",
+            "fault-probe:z",
 
           observedEffect:
-            0.15,
+            0.125,
         });
 
         expect(
