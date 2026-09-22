@@ -2001,6 +2001,18 @@ export function validateAdaptiveRepairPosterior(
     selectedProtected
       .meanSquaredError;
 
+  const changedFragmentIds =
+    Array.from(
+      new Set([
+        ...Object.keys(
+          selected
+            .replacementFragmentIds,
+        ),
+        ...selected
+          .retiredFragmentIds,
+      ]),
+    ).sort();
+
   const search:
     ProbabilisticLocalRepairSearch = {
     decision:
@@ -2011,34 +2023,22 @@ export function validateAdaptiveRepairPosterior(
         "adaptive-fault-model",
 
       kind:
-        selected
-          .retiredFragmentIds
-          .length >
+        changedFragmentIds.length >
           1
           ? "multi-fragment"
           : "single-fragment",
 
-      fragmentIds:
-        Object.keys(
-          selected
-            .replacementFragmentIds,
-        ).concat(
-          selected
-            .retiredFragmentIds,
-        ),
+      fragmentIds: [
+        ...changedFragmentIds,
+      ],
     },
 
     faultConfidence:
       belief.confidence,
 
-    faultFragmentIds:
-      Object.keys(
-        selected
-          .replacementFragmentIds,
-      ).concat(
-        selected
-          .retiredFragmentIds,
-      ),
+    faultFragmentIds: [
+      ...changedFragmentIds,
+    ],
 
     repairEvidenceIds:
       discoveryEvidence.map(
