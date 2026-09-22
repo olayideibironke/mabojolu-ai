@@ -1232,6 +1232,189 @@ export function assessPlanInvariance(
   };
 }
 
+function planEntropyFromBelief(
+  belief:
+    JointRepairPrerequisiteBelief,
+
+  planSignatureByPrerequisiteHypothesisId:
+    Readonly<
+      Record<
+        string,
+        string
+      >
+    >,
+): number {
+  const probabilityByPlan =
+    new Map<
+      string,
+      number
+    >();
+
+  for (
+    const [
+      jointHypothesisId,
+      probability,
+    ] of
+      Object.entries(
+        belief.jointProbabilities,
+      )
+  ) {
+    const {
+      prerequisiteHypothesisId,
+    } =
+      parseJointHypothesisId(
+        jointHypothesisId,
+      );
+
+    const signature =
+      planSignatureByPrerequisiteHypothesisId[
+        prerequisiteHypothesisId
+      ];
+
+    if (
+      signature ===
+        undefined
+    ) {
+      throw new Error(
+        `Missing plan signature for prerequisite hypothesis ${prerequisiteHypothesisId}.`,
+      );
+    }
+
+    probabilityByPlan.set(
+      signature,
+      (
+        probabilityByPlan.get(
+          signature,
+        ) ??
+        0
+      ) +
+        probability,
+    );
+  }
+
+  let result =
+    0;
+
+  for (
+    const probability of
+      probabilityByPlan.values()
+  ) {
+    if (
+      probability >
+        0
+    ) {
+      result -=
+        probability *
+        Math.log(
+          probability,
+        );
+    }
+  }
+
+  return result;
+}
+
+function decisionRelevantExperiments(
+  incumbent:
+    HierarchicalCausalProgram,
+
+  repairCandidates:
+    readonly StructuralRepairTopologyCandidate[],
+
+  prerequisiteHypotheses:
+    readonly PrerequisiteHypothesis[],
+
+  posterior:
+    JointRepairPrerequisitePosterior,
+
+  experiments:
+    readonly JointDiscoveryExperiment[],
+
+  planSignatureByPrerequisiteHypothesisId:
+    Readonly<
+      Record<
+        string,
+        string
+      >
+    >,
+
+  maximumRisk:
+    number,
+): JointDiscoveryExperiment[] {
+  const priorBelief =
+    posterior.getBelief();
+
+  const priorPlanEntropy =
+    planEntropyFromBelief(
+      priorBelief,
+      planSignatureByPrerequisiteHypothesisId,
+    );
+
+  return safeExperiments(
+    experiments,
+    maximumRisk,
+  ).filter(
+    (experiment) => {
+      let expectedPlanEntropy =
+        0;
+
+      for (
+        const [
+          truthJointHypothesisId,
+          truthProbability,
+        ] of
+          Object.entries(
+            priorBelief
+              .jointProbabilities,
+          )
+      ) {
+        if (
+          truthProbability <=
+            0
+        ) {
+          continue;
+        }
+
+        const truth =
+          parseJointHypothesisId(
+            truthJointHypothesisId,
+          );
+
+        const observation =
+          posterior.simulateObservation(
+            truth.repairCandidateId,
+            truth.prerequisiteHypothesisId,
+            experiment,
+          );
+
+        const child =
+          clonePosterior(
+            incumbent,
+            repairCandidates,
+            prerequisiteHypotheses,
+            priorBelief,
+          );
+
+        child.recordObservation(
+          experiment,
+          observation,
+        );
+
+        expectedPlanEntropy +=
+          truthProbability *
+          planEntropyFromBelief(
+            child.getBelief(),
+            planSignatureByPrerequisiteHypothesisId,
+          );
+      }
+
+      return priorPlanEntropy -
+        expectedPlanEntropy >
+        1e-9;
+    },
+  );
+}
+
 export function chooseDecisionAwareEpistemicStep(
   incumbent:
     HierarchicalCausalProgram,
@@ -1288,23 +1471,36 @@ export function chooseDecisionAwareEpistemicStep(
     };
   }
 
+  const maximumRisk =
+    options
+      ?.maximumRisk ??
+    0.3;
+
+  const relevantExperiments =
+    decisionRelevantExperiments(
+      incumbent,
+      repairCandidates,
+      prerequisiteHypotheses,
+      posterior,
+      experiments,
+      planSignatureByPrerequisiteHypothesisId,
+      maximumRisk,
+    );
+
   const experimentPlan =
     planMultiStepEpistemicPolicy(
       incumbent,
       repairCandidates,
       prerequisiteHypotheses,
       posterior,
-      experiments,
+      relevantExperiments,
       {
         horizon:
           options
             ?.horizon ??
           2,
 
-        maximumRisk:
-          options
-            ?.maximumRisk ??
-          0.3,
+        maximumRisk,
 
         minimumInformationGain:
           options
