@@ -1,5 +1,6 @@
 import {
   appendInstalledRevision,
+  assessAdaptiveProtectedEvidence,
   deriveAdaptiveEvidenceRequirement,
   type AdaptiveEvidenceRequirement,
   type RevisionLineage,
@@ -13,9 +14,8 @@ import {
   type ValidatedCausalFragment,
 } from "./hierarchical-causal-program";
 
-import {
-  synthesizeProtectedValidationProbes,
-  type ProtectedValidationProbe,
+import type {
+  ProtectedValidationProbe,
 } from "./active-protected-evidence-probabilistic-lineage";
 
 import type {
@@ -57,6 +57,7 @@ export interface RevisionCompositionProposal {
   bestSingleMeanSquaredError?: number;
   candidate?: HierarchicalCausalProgram;
   candidateDiscoveryMeanSquaredError?: number;
+  compositionEvidenceIds?: string[];
   reason:
     | "multiple-regions-require-composition"
     | "single-revision-already-adequate"
@@ -134,7 +135,8 @@ export interface CompositeLineageInstallation {
   sourceRevisionIds: string[];
   reason:
     | "composite-revision-appended"
-    | "protected-composition-required";
+    | "protected-composition-required"
+    | "adaptive-protected-composition-reserve-insufficient";
 }
 
 function validateUnitInterval(
@@ -956,6 +958,14 @@ export function proposeRevisionComposition(
       bestCandidate
         .discoveryMeanSquaredError,
 
+    compositionEvidenceIds:
+      compositionEvidence.map(
+        (observation) =>
+          observation
+            .experiment
+            .id,
+      ),
+
     reason:
       "multiple-regions-require-composition",
   };
@@ -1656,17 +1666,75 @@ export function validateRevisionComposition(
     };
   }
 
+  const fittingIds =
+    new Set(
+      proposal
+        .compositionEvidenceIds ??
+      [],
+    );
+
+  const protectedIds =
+    protectedEvidence.map(
+      (observation) =>
+        observation
+          .experiment
+          .id,
+    );
+
+  if (
+    protectedIds.some(
+      (id) =>
+        fittingIds.has(id),
+    )
+  ) {
+    throw new Error(
+      "Composition fitting evidence must remain disjoint from protected validation evidence.",
+    );
+  }
+
+  const protectedSingleScores =
+    lineage.nodes
+      .map(
+        (node) => ({
+          revisionId:
+            node.revisionId,
+
+          meanSquaredError:
+            programMeanSquaredError(
+              node.program,
+              protectedEvidence,
+            ),
+        }),
+      )
+      .sort(
+        (left, right) =>
+          left.meanSquaredError -
+            right.meanSquaredError ||
+          left.revisionId.localeCompare(
+            right.revisionId,
+          ),
+      );
+
+  const protectedBestSingle =
+    protectedSingleScores[0];
+
+  if (!protectedBestSingle) {
+    throw new Error(
+      "Protected composition validation has no retained single revision.",
+    );
+  }
+
   const bestSingle =
     lineage.nodes.find(
       (node) =>
         node.revisionId ===
-        proposal
-          .bestSingleRevisionId,
+        protectedBestSingle
+          .revisionId,
     );
 
   if (!bestSingle) {
     throw new Error(
-      `Unknown best single revision ${proposal.bestSingleRevisionId}.`,
+      `Unknown protected best single revision ${protectedBestSingle.revisionId}.`,
     );
   }
 
@@ -2045,6 +2113,8 @@ export function installCompositeRevision(
   lineage: RevisionLineage,
   decision:
     ProtectedCompositionDecision,
+  protectedEvidence:
+    readonly StructuralMechanismObservation[],
   revisionId: string,
   controlInterventions:
     Readonly<Record<string, number>>,
@@ -2098,6 +2168,71 @@ export function installCompositeRevision(
       uncertaintyAtInstall,
     );
 
+  const suppliedProtectedIds =
+    protectedEvidence.map(
+      (observation) =>
+        observation
+          .experiment
+          .id,
+    );
+
+  const decisionProtectedIds = [
+    ...decision
+      .protectedEvidenceIds,
+  ].sort();
+
+  if (
+    suppliedProtectedIds
+      .slice()
+      .sort()
+      .join("|") !==
+    decisionProtectedIds
+      .join("|")
+  ) {
+    throw new Error(
+      "Composite installation protected evidence must match the validated protected reserve.",
+    );
+  }
+
+  const excludedInstallationIds =
+    Array.from(
+      new Set(
+        lineage.nodes.flatMap(
+          (node) =>
+            node
+              .installationProtectedEvidenceIds,
+        ),
+      ),
+    );
+
+  const coverage =
+    assessAdaptiveProtectedEvidence(
+      protectedEvidence,
+      requirement,
+      excludedInstallationIds,
+    );
+
+  if (
+    coverage.decision !==
+      "ready"
+  ) {
+    return {
+      decision:
+        "abstained",
+
+      requirement,
+
+      sourceRevisionIds: [
+        ...decision
+          .proposal
+          .sourceRevisionIds,
+      ],
+
+      reason:
+        "adaptive-protected-composition-reserve-insufficient",
+    };
+  }
+
   const revisedLineage =
     appendInstalledRevision(
       lineage,
@@ -2106,7 +2241,7 @@ export function installCompositeRevision(
         .compositeProgram,
       hypothesis,
       prerequisite,
-      decision
+      coverage
         .protectedEvidenceIds,
       uncertaintyAtInstall,
     );
