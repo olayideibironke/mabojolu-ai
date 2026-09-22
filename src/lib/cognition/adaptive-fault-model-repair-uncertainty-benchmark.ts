@@ -283,7 +283,7 @@ const STATE = {
 const GOAL = {
   minimums: {
     progress:
-      0.5,
+      0.55,
   },
 
   maximums: {
@@ -417,7 +417,7 @@ function createReasoner() {
       "v1.31-terminal",
 
     description:
-      "Reach progress >= 0.500 while exposure <= 0.300.",
+      "Reach progress >= 0.550 while exposure <= 0.300.",
 
     priority:
       100,
@@ -426,7 +426,7 @@ function createReasoner() {
       "active",
 
     successCriteria: [
-      "progress >= 0.500",
+      "progress >= 0.550",
       "exposure <= 0.300",
     ],
 
