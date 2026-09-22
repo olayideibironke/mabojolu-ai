@@ -321,6 +321,15 @@ versus:
 
 interaction(z,w), coefficient about 0.50.
 
+Local candidate fitting uses isolated intervention evidence for the
+corresponding target fragment.
+
+The combined y-plus-z discovery observation is deliberately withheld from the
+local coefficient fits and used only when scoring the completed joint programs.
+
+This prevents temporary model error in one still-incumbent fragment from being
+misattributed to another fragment during local fitting.
+
 Those two local uncertainties form exactly four bounded joint structural
 candidates.
 
