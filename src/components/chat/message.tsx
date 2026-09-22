@@ -17,11 +17,13 @@ import {
   AlertIcon,
   EditIcon,
 } from "@/components/ui/icons";
-import type {
-  ChatImageAttachment,
-  ChatMessage,
-  ChatSource,
-  FeedbackRating,
+import {
+  isChatImageAttachment,
+  isChatTextDocumentAttachment,
+  type ChatAttachment,
+  type ChatMessage,
+  type ChatSource,
+  type FeedbackRating,
 } from "@/types/chat";
 
 import { Markdown } from "./markdown";
@@ -103,58 +105,111 @@ export function Message({
 function UserAttachmentGallery({
   attachments,
 }: {
-  attachments: ChatImageAttachment[];
+  attachments:
+    ChatAttachment[];
 }) {
-  if (attachments.length === 0) {
+  if (
+    attachments.length ===
+      0
+  ) {
     return null;
   }
 
-  const isSingleImage =
-    attachments.length === 1;
+  const images =
+    attachments.filter(
+      isChatImageAttachment,
+    );
+
+  const documents =
+    attachments.filter(
+      isChatTextDocumentAttachment,
+    );
 
   return (
     <div
-      aria-label={`${attachments.length} attached ${
-        attachments.length === 1
-          ? "image"
-          : "images"
-      }`}
-      className={`grid max-w-full gap-2 ${
-        isSingleImage
-          ? "w-[300px] grid-cols-1"
-          : "w-[360px] grid-cols-2"
-      }`}
+      aria-label={`${attachments.length} attached file${attachments.length === 1 ? "" : "s"}`}
+      className="max-w-full space-y-2"
     >
-      {attachments.map(
-        (attachment) => (
-          <figure
-            key={attachment.id}
-            title={attachment.name}
-            className={`relative m-0 overflow-hidden rounded-2xl border border-border-subtle bg-surface-base ${
-              isSingleImage
-                ? "aspect-[4/3]"
-                : "aspect-square"
-            }`}
-          >
-            <Image
-              src={attachment.dataUrl}
-              alt={attachment.name}
-              fill
-              unoptimized
-              sizes={
-                isSingleImage
-                  ? "300px"
-                  : "180px"
-              }
-              className="object-cover"
-            />
+      {images.length > 0 ? (
+        <div
+          className={`grid max-w-full gap-2 ${
+            images.length === 1
+              ? "w-[300px] grid-cols-1"
+              : "w-[360px] grid-cols-2"
+          }`}
+        >
+          {images.map(
+            (
+              attachment,
+            ) => (
+              <figure
+                key={
+                  attachment.id
+                }
+                title={
+                  attachment.name
+                }
+                className={`relative m-0 overflow-hidden rounded-2xl border border-border-subtle bg-surface-base ${
+                  images.length === 1
+                    ? "aspect-[4/3]"
+                    : "aspect-square"
+                }`}
+              >
+                <Image
+                  src={
+                    attachment.dataUrl
+                  }
+                  alt={
+                    attachment.name
+                  }
+                  fill
+                  unoptimized
+                  sizes={
+                    images.length ===
+                      1
+                      ? "300px"
+                      : "180px"
+                  }
+                  className="object-cover"
+                />
 
-            <figcaption className="sr-only">
-              {attachment.name}
-            </figcaption>
-          </figure>
-        ),
-      )}
+                <figcaption className="sr-only">
+                  {attachment.name}
+                </figcaption>
+              </figure>
+            ),
+          )}
+        </div>
+      ) : null}
+
+      {documents.length >
+      0 ? (
+        <div className="flex max-w-[420px] flex-wrap gap-2">
+          {documents.map(
+            (
+              attachment,
+            ) => (
+              <div
+                key={
+                  attachment.id
+                }
+                title={
+                  attachment.name
+                }
+                className="max-w-full rounded-xl border border-border-subtle bg-surface-base px-3 py-2"
+              >
+                <p className="max-w-[320px] truncate text-xs font-semibold text-text-primary">
+                  {attachment.name}
+                </p>
+
+                <p className="mt-0.5 text-[11px] text-text-muted">
+                  {attachment.mimeType}
+                </p>
+              </div>
+            ),
+          )}
+        </div>
+      ) : null}
     </div>
   );
 }
@@ -265,7 +320,7 @@ function UserMessage({
               />
 
               <p className="mt-2 text-[11px] leading-4 text-text-muted">
-                Attached images will remain with the edited
+                Attached files will remain with the edited
                 message.
               </p>
             </div>
