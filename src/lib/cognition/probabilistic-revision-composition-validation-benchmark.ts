@@ -410,7 +410,7 @@ const COMPOSITION_FIT:
 
 function lineage():
   RevisionLineage {
-  let result =
+  const result =
     createRevisionLineage(
       "rev-z",
       PROGRAM_Z,
