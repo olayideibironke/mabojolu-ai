@@ -1,6 +1,10 @@
 "use client";
 
 import {
+  contentWithAttachmentContext,
+} from "./attachment-context";
+
+import {
   buildBrowserContext,
 } from "./browser-context";
 
@@ -591,14 +595,9 @@ function latestImagePrompt(
           "text",
 
         value:
-          latestUser
-            .content
-            .trim()
-            .length >
-            0
-            ? latestUser
-                .content
-            : "Describe and analyze the attached image.",
+          contentWithAttachmentContext(
+            latestUser,
+          ),
       },
   ];
 
