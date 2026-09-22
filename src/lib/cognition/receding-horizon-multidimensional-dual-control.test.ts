@@ -294,7 +294,7 @@ const READY_ACTIONS:
         0.1,
 
       cost:
-        0.12,
+        0.22,
 
       delay:
         0.1,
@@ -313,7 +313,7 @@ const READY_ACTIONS:
         0.1,
 
       cost:
-        0.12,
+        0.22,
 
       delay:
         0.1,
