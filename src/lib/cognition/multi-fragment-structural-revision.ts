@@ -4,10 +4,9 @@ import {
   type ValidatedCausalFragment,
 } from "./hierarchical-causal-program";
 
-import {
-  type JointParameterStructureBelief,
-  type LocalStructuralMutationCandidate,
-  type StructuralMutationProbe,
+import type {
+  LocalStructuralMutationCandidate,
+  StructuralMutationProbe,
 } from "./bounded-local-structural-mutation";
 
 import type {
