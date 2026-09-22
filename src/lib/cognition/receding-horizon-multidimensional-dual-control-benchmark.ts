@@ -342,7 +342,7 @@ export function runRecedingHorizonMultidimensionalBenchmark():
       EXPERIMENTS,
     );
 
-  let slow =
+  const slow =
     executeRecedingVectorControl(
       HYPOTHESES,
       initialController(),
