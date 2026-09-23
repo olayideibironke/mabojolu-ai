@@ -634,6 +634,223 @@ async function readTextDocument(
   return text;
 }
 
+async function generateImageOnServer(
+  prompt:
+    string,
+): Promise<ChatImageAttachment> {
+  const response =
+    await fetch(
+      "/api/media/image",
+      {
+        method:
+          "POST",
+
+        headers: {
+          "Content-Type":
+            "application/json",
+        },
+
+        body:
+          JSON.stringify({
+            prompt,
+          }),
+      },
+    );
+
+  let payload:
+    unknown;
+
+  try {
+    payload =
+      await response
+        .json();
+  } catch {
+    throw new Error(
+      "Mabojolu could not read the local image-generation response.",
+    );
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof payload ===
+          "object" &&
+        payload !==
+          null &&
+        "error" in
+          payload &&
+        typeof (
+          payload as {
+            error?:
+              unknown;
+          }
+        ).error ===
+          "object" &&
+        (
+          payload as {
+            error?: {
+              message?:
+                unknown;
+            };
+          }
+        ).error !==
+          null &&
+        typeof (
+          payload as {
+            error: {
+              message?:
+                unknown;
+            };
+          }
+        ).error
+          .message ===
+          "string"
+        ? (
+            payload as {
+              error: {
+                message:
+                  string;
+              };
+            }
+          ).error
+            .message
+        : "Mabojolu could not generate that image.";
+
+    throw new Error(
+      message,
+    );
+  }
+
+  if (
+    typeof payload !==
+      "object" ||
+    payload ===
+      null ||
+    !(
+      "image" in
+      payload
+    ) ||
+    typeof (
+      payload as {
+        image?:
+          unknown;
+      }
+    ).image !==
+      "object" ||
+    (
+      payload as {
+        image?:
+          unknown;
+      }
+    ).image ===
+      null
+  ) {
+    throw new Error(
+      "Mabojolu returned an invalid generated-image response.",
+    );
+  }
+
+  const image =
+    (
+      payload as {
+        image: {
+          filename?:
+            unknown;
+
+          mimeType?:
+            unknown;
+
+          dataUrl?:
+            unknown;
+        };
+      }
+    ).image;
+
+  if (
+    typeof image.filename !==
+      "string" ||
+    typeof image.mimeType !==
+      "string" ||
+    typeof image.dataUrl !==
+      "string" ||
+    !ACCEPTED_IMAGE_TYPES.has(
+      image.mimeType as
+        ChatImageAttachment[
+          "mimeType"
+        ],
+    ) ||
+    !image.dataUrl.startsWith(
+      `data:${image.mimeType};base64,`,
+    )
+  ) {
+    throw new Error(
+      "Mabojolu returned invalid generated-image data.",
+    );
+  }
+
+  const base64 =
+    image.dataUrl.slice(
+      image.dataUrl.indexOf(
+        ",",
+      ) +
+        1,
+    );
+
+  const padding =
+    base64.endsWith(
+      "==",
+    )
+      ? 2
+      : base64.endsWith(
+            "=",
+          )
+        ? 1
+        : 0;
+
+  const sizeBytes =
+    Math.max(
+      0,
+      Math.floor(
+        (
+          base64.length *
+          3
+        ) /
+          4 -
+          padding,
+      ),
+    );
+
+  if (
+    sizeBytes >
+      MAX_IMAGE_BYTES
+  ) {
+    throw new Error(
+      "The generated image is larger than Mabojolu's 10 MB chat-image limit.",
+    );
+  }
+
+  return {
+    kind:
+      "image",
+
+    id:
+      createAttachmentId(),
+
+    name:
+      image.filename,
+
+    mimeType:
+      image.mimeType as
+        ChatImageAttachment[
+          "mimeType"
+        ],
+
+    sizeBytes,
+
+    dataUrl:
+      image.dataUrl,
+  };
+}
+
 function removeTextareaChrome(
   textarea: HTMLTextAreaElement,
 ): void {
@@ -825,6 +1042,37 @@ function MicrophoneIcon() {
   );
 }
 
+function ImageGenerationIcon() {
+  return (
+    <svg
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      className="h-4 w-4"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.8"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <rect
+        x="3"
+        y="4"
+        width="18"
+        height="16"
+        rx="3"
+      />
+      <circle
+        cx="9"
+        cy="10"
+        r="1.5"
+      />
+      <path d="m5 18 4.5-4.5 3 3 2.5-2.5 4 4" />
+      <path d="M18 2v4" />
+      <path d="M16 4h4" />
+    </svg>
+  );
+}
+
 function ArrowUpIcon() {
   return (
     <svg
@@ -909,6 +1157,23 @@ export function Composer({
     setAttachmentError,
   ] = useState<string | null>(
     null,
+  );
+
+  const [
+    generatedImage,
+    setGeneratedImage,
+  ] = useState<
+    ChatImageAttachment |
+    null
+  >(
+    null,
+  );
+
+  const [
+    isGeneratingImage,
+    setIsGeneratingImage,
+  ] = useState(
+    false,
   );
 
   const [
@@ -1157,6 +1422,7 @@ export function Composer({
       setDraft("");
       setAttachments([]);
       setAttachmentError(null);
+      setGeneratedImage(null);
       setVoiceError(null);
 
       voiceBaseDraftRef.current =
@@ -1848,6 +2114,111 @@ export function Composer({
       isStreaming,
     ]);
 
+  const handleGenerateImage =
+    useCallback(async () => {
+      const prompt =
+        draft.trim();
+
+      if (
+        !prompt ||
+        disabled ||
+        isStreaming ||
+        isGeneratingImage
+      ) {
+        return;
+      }
+
+      setAttachmentError(null);
+      setIsGeneratingImage(
+        true,
+      );
+
+      try {
+        const image =
+          await generateImageOnServer(
+            prompt,
+          );
+
+        setGeneratedImage(
+          image,
+        );
+      } catch (
+        cause
+      ) {
+        setAttachmentError(
+          cause instanceof
+            Error
+            ? cause.message
+            : "Mabojolu could not generate that image.",
+        );
+      } finally {
+        setIsGeneratingImage(
+          false,
+        );
+      }
+    }, [
+      disabled,
+      draft,
+      isGeneratingImage,
+      isStreaming,
+    ]);
+
+  const useGeneratedImageInChat =
+    useCallback(() => {
+      if (
+        !generatedImage
+      ) {
+        return;
+      }
+
+      if (
+        attachments.length >=
+          MAX_ATTACHMENT_COUNT
+      ) {
+        setAttachmentError(
+          `You can attach up to ${MAX_ATTACHMENT_COUNT} files to one message.`,
+        );
+
+        return;
+      }
+
+      const imageCount =
+        attachments.filter(
+          isChatImageAttachment,
+        ).length;
+
+      if (
+        imageCount >=
+          MAX_IMAGE_COUNT
+      ) {
+        setAttachmentError(
+          `You can attach up to ${MAX_IMAGE_COUNT} images to one message.`,
+        );
+
+        return;
+      }
+
+      setAttachments(
+        (
+          current,
+        ) => [
+          ...current,
+          generatedImage,
+        ],
+      );
+
+      setGeneratedImage(
+        null,
+      );
+
+      setAttachmentError(
+        null,
+      );
+    }, [
+      attachments,
+      generatedImage,
+    ]);
+
   const handleToggleListening =
     useCallback(() => {
       if (
@@ -1878,6 +2249,7 @@ export function Composer({
   const canSend =
     !disabled &&
     !isStreaming &&
+    !isGeneratingImage &&
     (draft.trim().length > 0 ||
       attachments.length > 0);
 
@@ -2006,6 +2378,49 @@ export function Composer({
             </div>
           ) : null}
 
+          {generatedImage ? (
+            <div className="mb-3 rounded-2xl border border-border-subtle bg-surface-base p-3">
+              <div className="relative mx-auto aspect-square w-full max-w-[320px] overflow-hidden rounded-xl bg-surface-raised">
+                <Image
+                  src={
+                    generatedImage.dataUrl
+                  }
+                  alt={
+                    generatedImage.name
+                  }
+                  fill
+                  unoptimized
+                  sizes="320px"
+                  className="object-contain"
+                />
+              </div>
+
+              <div className="mt-3 flex items-center justify-center gap-2">
+                <button
+                  type="button"
+                  onClick={
+                    useGeneratedImageInChat
+                  }
+                  className="rounded-full border border-border-subtle bg-surface-raised px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-surface-base"
+                >
+                  Use in chat
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    setGeneratedImage(
+                      null,
+                    )
+                  }
+                  className="rounded-full px-3 py-1.5 text-xs font-medium text-text-muted transition-colors hover:bg-surface-raised hover:text-text-primary"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          ) : null}
+
           <label
             htmlFor="composer"
             className="sr-only"
@@ -2041,32 +2456,62 @@ export function Composer({
           />
 
           <div className="mt-3 flex items-center justify-between gap-3">
-            <button
-              type="button"
-              onClick={
-                openAttachmentPicker
-              }
-              disabled={
-                disabled ||
-                isStreaming ||
-                !attachmentsEnabled ||
-                attachments.length >=
-                  MAX_ATTACHMENT_COUNT
-              }
-              aria-label={
-                attachmentsEnabled
-                  ? "Attach files"
-                  : "File attachments are unavailable"
-              }
-              title={
-                attachmentsEnabled
-                  ? "Attach images or text documents"
-                  : "File attachments are unavailable"
-              }
-              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-base hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              <PaperclipIcon />
-            </button>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={
+                  openAttachmentPicker
+                }
+                disabled={
+                  disabled ||
+                  isStreaming ||
+                  isGeneratingImage ||
+                  !attachmentsEnabled ||
+                  attachments.length >=
+                    MAX_ATTACHMENT_COUNT
+                }
+                aria-label={
+                  attachmentsEnabled
+                    ? "Attach files"
+                    : "File attachments are unavailable"
+                }
+                title={
+                  attachmentsEnabled
+                    ? "Attach images, documents, audio, video, code, or data"
+                    : "File attachments are unavailable"
+                }
+                className="inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-base hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                <PaperclipIcon />
+              </button>
+
+              <button
+                type="button"
+                onClick={() =>
+                  void handleGenerateImage()
+                }
+                disabled={
+                  disabled ||
+                  isStreaming ||
+                  isGeneratingImage ||
+                  draft.trim().length ===
+                    0
+                }
+                aria-label="Generate image from current prompt"
+                title={
+                  isGeneratingImage
+                    ? "Generating image locally"
+                    : "Generate image from current prompt"
+                }
+                className={`inline-flex h-9 w-9 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-surface-base hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40 ${
+                  isGeneratingImage
+                    ? "animate-pulse"
+                    : ""
+                }`}
+              >
+                <ImageGenerationIcon />
+              </button>
+            </div>
 
             <div className="flex items-center gap-2">
               <div className="relative">
@@ -2225,8 +2670,10 @@ export function Composer({
         >
           Press Enter to send. Press Shift plus Enter
           for a new line. Use the microphone for voice
-          input. You may attach JPEG, PNG, WebP, TXT,
-          Markdown, CSV, or JSON files.
+          input. You may attach images, text, source code,
+          PDF, DOCX, XLSX, PPTX, audio, and video files.
+          Use the image button to generate an image locally
+          from the current prompt.
         </p>
       </div>
     </div>
