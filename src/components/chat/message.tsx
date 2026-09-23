@@ -686,6 +686,9 @@ function AssistantMessage({
   const generatedImages =
     message.generatedImages ?? [];
 
+  const generatedFiles =
+    message.generatedFiles ?? [];
+
   const sourcePanelId =
     `sources-${message.id}`;
 
@@ -714,8 +717,45 @@ function AssistantMessage({
           </div>
         ) : null}
 
+        {generatedFiles.length > 0 ? (
+          <div
+            className="mb-3 flex max-w-[640px] flex-wrap gap-2"
+            aria-label="Generated files"
+          >
+            {generatedFiles.map(
+              (file) => (
+                <a
+                  key={file.id}
+                  href={file.dataUrl}
+                  download={file.name}
+                  className="inline-flex max-w-full items-center gap-3 rounded-xl border border-border-subtle bg-surface-base px-3 py-2.5 text-sm text-text-primary shadow-sm transition hover:border-border-default hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                >
+                  <span
+                    aria-hidden="true"
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-bold text-text-muted"
+                  >
+                    TXT
+                  </span>
+
+                  <span className="min-w-0">
+                    <span className="block truncate font-semibold">
+                      {file.name}
+                    </span>
+
+                    <span className="block text-xs text-text-muted">
+                      Download text file
+                    </span>
+                  </span>
+                </a>
+              ),
+            )}
+          </div>
+        ) : null}
+
         {isThisMessageStreaming &&
-        !hasContent && generatedImages.length === 0 ? (
+        !hasContent &&
+        generatedImages.length === 0 &&
+        generatedFiles.length === 0 ? (
           <ReasoningStatus />
         ) : null}
 
@@ -754,7 +794,9 @@ function AssistantMessage({
         ) : null}
 
         {!isActive &&
-        (hasContent || generatedImages.length > 0) &&
+        (hasContent ||
+          generatedImages.length > 0 ||
+          generatedFiles.length > 0) &&
         message.status !== "failed" ? (
           <>
             <div className="mt-2 -ml-1.5 flex flex-wrap items-center gap-1">
