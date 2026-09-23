@@ -426,9 +426,18 @@ export function validateAttachment(input: ValidateInput): ValidationResult {
   if (!matchesMagicBytes(input.header, format)) {
     return {
       ok: false,
-      failure: format.magic.length === 0 ? "invalid_text_encoding" : "content_mismatch",
+      failure:
+        (
+          format.mimeType.startsWith("text/") ||
+          format.mimeType === "application/json"
+        )
+          ? "invalid_text_encoding"
+          : "content_mismatch",
       message:
-        format.magic.length === 0
+        (
+          format.mimeType.startsWith("text/") ||
+          format.mimeType === "application/json"
+        )
           ? "That file does not appear to be readable text."
           : `That file's contents do not match a ${format.label}.`,
     };
