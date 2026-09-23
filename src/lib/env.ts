@@ -328,6 +328,19 @@ const serverEnvSchema = z.object({
       .default(10_485_760),
 
   /**
+   * Larger bounded ceiling for uploaded audio and video.
+   *
+   * Media is processed from private storage and is never embedded directly into
+   * the ordinary chat request body.
+   */
+  MABOJOLU_MAX_MEDIA_ATTACHMENT_BYTES:
+    z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(104_857_600),
+
+  /**
    * Whether attachment uploads are enabled.
    *
    * Disabled by default until production storage controls are verified.
