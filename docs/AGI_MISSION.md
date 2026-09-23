@@ -58,6 +58,34 @@ Compute independence supports this mission by keeping model access cheap,
 replaceable, and under Mabojolu's control. It is infrastructure, not evidence of
 general intelligence by itself.
 
+
+### Universal multimodal substrate
+
+Mabojolu also maintains an ordinary-assistant multimodal substrate in parallel
+with the AGI research kernel.
+
+The product layer now has bounded local interfaces for:
+
+- image understanding;
+- text, code, CSV, and JSON analysis;
+- PDF and non-macro OOXML document extraction;
+- spreadsheet and presentation extraction;
+- local audio transcription and understanding through FFmpeg plus whisper.cpp;
+- video understanding through bounded frame sampling plus soundtrack
+  transcription;
+- local image generation through a loopback-only ComfyUI action surface.
+
+Multimodal specialist outputs are normalized into versioned evidence packages
+before they reach the reasoning layer.
+
+A local runtime capability probe distinguishes implemented adapters from engines
+that are actually installed and configured on the current machine.
+
+This substrate expands what Mabojolu can observe and produce, but it remains
+infrastructure rather than evidence of AGI. General-intelligence claims still
+depend on controlled transfer, learning, planning, revision, and adaptation
+benchmarks.
+
 ## Core capability targets
 
 1. Novel-task learning
