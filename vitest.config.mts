@@ -39,7 +39,10 @@ export default defineConfig({
           environment: "node",
           include: ["src/**/*.test.ts"],
           // Component tests live in .test.tsx and belong to the other project.
-          exclude: [\n            "src/**/*.test.tsx",\n            "src/lib/ai/chrome-prompt-client.test.ts",\n          ],
+          exclude: [
+            "src/**/*.test.tsx",
+            "src/lib/ai/chrome-prompt-client.test.ts",
+          ],
         },
       },
       {
@@ -47,7 +50,10 @@ export default defineConfig({
         test: {
           name: "browser",
           environment: "jsdom",
-          include: [\n            "src/**/*.test.tsx",\n            "src/lib/ai/chrome-prompt-client.test.ts",\n          ],
+          include: [
+            "src/**/*.test.tsx",
+            "src/lib/ai/chrome-prompt-client.test.ts",
+          ],
           setupFiles: ["./src/test/setup.ts"],
         },
       },
