@@ -673,6 +673,13 @@ function AssistantMessage({
     setAreSourcesOpen,
   ] = useState(false);
 
+  const [
+    viewingFileId,
+    setViewingFileId,
+  ] = useState<string | null>(
+    null,
+  );
+
   const isActive =
     message.status === "streaming" ||
     message.status === "pending";
@@ -724,29 +731,73 @@ function AssistantMessage({
           >
             {generatedFiles.map(
               (file) => (
-                <a
+                <div
                   key={file.id}
-                  href={file.dataUrl}
-                  download={file.name}
-                  className="inline-flex max-w-full items-center gap-3 rounded-xl border border-border-subtle bg-surface-base px-3 py-2.5 text-sm text-text-primary shadow-sm transition hover:border-border-default hover:bg-surface-raised focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                  className="max-w-full rounded-xl border border-border-subtle bg-surface-base px-3 py-2.5 text-sm text-text-primary shadow-sm"
                 >
-                  <span
-                    aria-hidden="true"
-                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-bold text-text-muted"
-                  >
-                    TXT
-                  </span>
-
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold">
-                      {file.name}
+                  <div className="flex max-w-full items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-bold text-text-muted"
+                    >
+                      TXT
                     </span>
 
-                    <span className="block text-xs text-text-muted">
-                      Download text file
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate font-semibold">
+                        {file.name}
+                      </span>
+
+                      <span className="block text-xs text-text-muted">
+                        Text file
+                      </span>
                     </span>
-                  </span>
-                </a>
+
+                    <button
+                      type="button"
+                      onClick={() =>
+                        setViewingFileId(
+                          (current) =>
+                            current ===
+                            file.id
+                              ? null
+                              : file.id,
+                        )
+                      }
+                      className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      {viewingFileId ===
+                      file.id
+                        ? "Hide"
+                        : "View"}
+                    </button>
+
+                    <a
+                      href={file.dataUrl}
+                      download={file.name}
+                      className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Download
+                    </a>
+                  </div>
+
+                  {viewingFileId ===
+                  file.id ? (
+                    <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-raised p-3 text-xs leading-5 text-text-primary">
+                      {decodeURIComponent(
+                        escape(
+                          atob(
+                            file.dataUrl.slice(
+                              file.dataUrl.indexOf(
+                                ",",
+                              ) + 1,
+                            ),
+                          ),
+                        ),
+                      )}
+                    </pre>
+                  ) : null}
+                </div>
               ),
             )}
           </div>
