@@ -200,7 +200,7 @@ describe(
         expect(
           documentOnly,
         ).toContain(
-          "Analyze the attached file using the extracted evidence below and respond with the useful result.",
+          "Use the extracted attachment evidence below to answer directly. Do not announce that you analyzed, processed, received, or were provided the attachment. Do not introduce yourself or mention your creator unless the user asks.",
         );
 
         expect(
