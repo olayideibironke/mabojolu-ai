@@ -27,7 +27,8 @@ MAX_CELLS_PER_ROW = 256
 
 
 def emit(payload: dict[str, Any]) -> None:
-    sys.stdout.write(json.dumps(payload, ensure_ascii=False))
+    serialized = json.dumps(payload, ensure_ascii=False)
+    sys.stdout.buffer.write(serialized.encode("utf-8"))
 
 
 def fail(code: str, message: str) -> None:
