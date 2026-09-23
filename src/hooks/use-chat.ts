@@ -83,6 +83,9 @@ const IMAGE_ANALYSIS_PATTERN = /\b(?:analy[sz]e|describe|explain|inspect|read|id
 const TEXT_FILE_REQUEST_PATTERN =
   /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,120}\b(?:\.txt|txt file|text file|plain text file)\b|\b(?:\.txt|txt file|text file|plain text file)\b[\s\S]{0,120}\b(?:create|make|generate|write|save|produce|download)\b/i;
 
+const EXACT_TEXT_FILE_PATTERN =
+  /(?:containing|with)\s+exactly\s+(?:these|the following)\s+\w*\s*lines?\s*:\s*([\s\S]*?)(?:\n\s*(?:give|provide|save|download|return)\b[\s\S]*|$)/i;
+
 function textFileRequest(
   content: string,
 ): boolean {
@@ -95,6 +98,28 @@ function textFileRequest(
       trimmed,
     )
   );
+}
+
+function requestedTextFileContent(
+  request: string,
+  modelOutput: string,
+): string {
+  const exact =
+    EXACT_TEXT_FILE_PATTERN.exec(
+      request,
+    )?.[1]
+      ?.trim();
+
+  if (exact) {
+    return exact;
+  }
+
+  return modelOutput
+    .replace(
+      /<ctrl\d+>/gi,
+      "",
+    )
+    .trim();
 }
 
 function generatedTextFile(
@@ -588,7 +613,11 @@ export function useChat(
                 ? {
                     generatedFiles: [
                       generatedTextFile(
-                        accumulated,
+                        requestedTextFileContent(
+                          latestUser?.content ??
+                            "",
+                          accumulated,
+                        ),
                       ),
                     ],
                   }
