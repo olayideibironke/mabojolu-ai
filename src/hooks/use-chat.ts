@@ -585,9 +585,7 @@ export function useChat(
         role: "user",
 
         content:
-          trimmed.length > 0
-            ? trimmed
-            : "Please describe the attached image.",
+          trimmed,
 
         status: "complete",
         createdAt: timestamp,
@@ -673,9 +671,7 @@ export function useChat(
         role: "user",
 
         content:
-          trimmed.length > 0
-            ? trimmed
-            : "Please describe the attached image.",
+          trimmed,
 
         status: "complete",
         createdAt:
