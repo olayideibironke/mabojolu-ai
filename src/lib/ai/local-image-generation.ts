@@ -116,6 +116,22 @@ function replaceWorkflowPlaceholders(
     typeof value ===
       "string"
   ) {
+    if (
+      value ===
+        "{{SEED}}"
+    ) {
+      const seed =
+        Number(
+          variables.SEED,
+        );
+
+      return Number.isFinite(
+        seed,
+      )
+        ? seed
+        : 1;
+    }
+
     let output =
       value;
 
