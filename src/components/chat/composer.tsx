@@ -258,9 +258,342 @@ function documentMimeType(
     case "json":
       return "application/json";
 
+    case "log":
+    case "py":
+    case "js":
+    case "jsx":
+    case "ts":
+    case "tsx":
+    case "css":
+    case "scss":
+    case "sql":
+    case "xml":
+    case "yaml":
+    case "yml":
+    case "toml":
+    case "ini":
+      return "text/plain";
+
     default:
       return null;
   }
+}
+
+const SERVER_ANALYZED_MIME_BY_EXTENSION:
+  Readonly<
+    Record<
+      string,
+      string
+    >
+  > = {
+  pdf:
+    "application/pdf",
+
+  docx:
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+
+  xlsx:
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+
+  pptx:
+    "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+
+  wav:
+    "audio/wav",
+
+  mp3:
+    "audio/mpeg",
+
+  flac:
+    "audio/flac",
+
+  ogg:
+    "audio/ogg",
+
+  oga:
+    "audio/ogg",
+
+  m4a:
+    "audio/mp4",
+
+  mp4:
+    "video/mp4",
+
+  m4v:
+    "video/mp4",
+
+  webm:
+    "video/webm",
+
+  mov:
+    "video/quicktime",
+};
+
+const MAX_SERVER_ANALYSIS_BYTES =
+  100 * 1024 * 1024;
+
+function serverAnalyzedMimeType(
+  file:
+    File,
+): string | null {
+  const normalizedType =
+    file.type
+      .split(
+        ";",
+      )[0]
+      .trim()
+      .toLowerCase();
+
+  if (
+    [
+      "application/pdf",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      "audio/wav",
+      "audio/mpeg",
+      "audio/flac",
+      "audio/ogg",
+      "audio/mp4",
+      "video/mp4",
+      "video/webm",
+      "video/quicktime",
+    ].includes(
+      normalizedType,
+    )
+  ) {
+    return normalizedType;
+  }
+
+  const extension =
+    file.name
+      .split(
+        ".",
+      )
+      .pop()
+      ?.toLowerCase();
+
+  return extension
+    ? (
+        SERVER_ANALYZED_MIME_BY_EXTENSION[
+          extension
+        ] ??
+        null
+      )
+    : null;
+}
+
+function isReturnedChatAttachment(
+  value:
+    unknown,
+): value is
+  ChatAttachment {
+  if (
+    typeof value !==
+      "object" ||
+    value ===
+      null
+  ) {
+    return false;
+  }
+
+  const candidate =
+    value as
+      Record<
+        string,
+        unknown
+      >;
+
+  if (
+    typeof candidate.id !==
+      "string" ||
+    typeof candidate.name !==
+      "string" ||
+    typeof candidate.mimeType !==
+      "string" ||
+    typeof candidate.sizeBytes !==
+      "number"
+  ) {
+    return false;
+  }
+
+  if (
+    candidate.kind ===
+      "document"
+  ) {
+    return (
+      typeof candidate.textContent ===
+        "string" &&
+      ACCEPTED_TEXT_DOCUMENT_TYPES.has(
+        candidate.mimeType as
+          ChatTextDocumentAttachment[
+            "mimeType"
+          ],
+      )
+    );
+  }
+
+  if (
+    candidate.kind ===
+      "image"
+  ) {
+    return (
+      typeof candidate.dataUrl ===
+        "string" &&
+      ACCEPTED_IMAGE_TYPES.has(
+        candidate.mimeType as
+          ChatImageAttachment[
+            "mimeType"
+          ],
+      )
+    );
+  }
+
+  return false;
+}
+
+async function analyzeFileOnServer(
+  file:
+    File,
+  mimeType:
+    string,
+): Promise<ChatAttachment[]> {
+  const normalizedFile =
+    file.type ===
+      mimeType
+      ? file
+      : new File(
+          [
+            file,
+          ],
+          file.name,
+          {
+            type:
+              mimeType,
+          },
+        );
+
+  const form =
+    new FormData();
+
+  form.append(
+    "file",
+    normalizedFile,
+  );
+
+  const response =
+    await fetch(
+      "/api/attachments/analyze",
+      {
+        method:
+          "POST",
+
+        body:
+          form,
+      },
+    );
+
+  let payload:
+    unknown;
+
+  try {
+    payload =
+      await response
+        .json();
+  } catch {
+    throw new Error(
+      "Mabojolu could not read the local file-analysis response.",
+    );
+  }
+
+  if (!response.ok) {
+    const message =
+      typeof payload ===
+          "object" &&
+        payload !==
+          null &&
+        "error" in
+          payload &&
+        typeof (
+          payload as {
+            error?:
+              unknown;
+          }
+        ).error ===
+          "object" &&
+        (
+          payload as {
+            error?: {
+              message?:
+                unknown;
+            };
+          }
+        ).error !==
+          null &&
+        typeof (
+          payload as {
+            error: {
+              message?:
+                unknown;
+            };
+          }
+        ).error
+          .message ===
+          "string"
+        ? (
+            payload as {
+              error: {
+                message:
+                  string;
+              };
+            }
+          ).error
+            .message
+        : "Mabojolu could not analyze that file.";
+
+    throw new Error(
+      message,
+    );
+  }
+
+  const attachments =
+    typeof payload ===
+        "object" &&
+      payload !==
+        null &&
+      "attachments" in
+        payload &&
+      Array.isArray(
+        (
+          payload as {
+            attachments?:
+              unknown;
+          }
+        ).attachments,
+      )
+      ? (
+          payload as {
+            attachments:
+              unknown[];
+          }
+        ).attachments
+      : [];
+
+  const normalized =
+    attachments.filter(
+      isReturnedChatAttachment,
+    );
+
+  if (
+    normalized.length ===
+      0
+  ) {
+    throw new Error(
+      "Mabojolu found no usable evidence in that file.",
+    );
+  }
+
+  return normalized;
 }
 
 async function readTextDocument(
@@ -1077,9 +1410,105 @@ export function Composer({
           if (
             !mimeType
           ) {
-            setAttachmentError(
-              `${file.name} is not supported yet. Use JPEG, PNG, WebP, TXT, Markdown, CSV, or JSON.`,
-            );
+            const serverMimeType =
+              serverAnalyzedMimeType(
+                file,
+              );
+
+            if (
+              !serverMimeType
+            ) {
+              setAttachmentError(
+                `${file.name} is not a supported Mabojolu analysis format.`,
+              );
+
+              continue;
+            }
+
+            if (
+              file.size >
+                MAX_SERVER_ANALYSIS_BYTES
+            ) {
+              setAttachmentError(
+                `${file.name} is ${formatMegabytes(file.size)}. Audio and video analysis is limited to 100 MB per file on this client.`,
+              );
+
+              continue;
+            }
+
+            try {
+              setAttachmentError(
+                `Analyzing ${file.name} locally...`,
+              );
+
+              const analyzed =
+                await analyzeFileOnServer(
+                  file,
+                  serverMimeType,
+                );
+
+              const remainingCapacity =
+                MAX_ATTACHMENT_COUNT -
+                attachments.length -
+                nextAttachments.length;
+
+              if (
+                remainingCapacity <=
+                  0
+              ) {
+                setAttachmentError(
+                  `There is no room to add the analyzed evidence for ${file.name}.`,
+                );
+
+                continue;
+              }
+
+              for (
+                const attachment of
+                  analyzed
+              ) {
+                if (
+                  nextAttachments.length +
+                    attachments.length >=
+                  MAX_ATTACHMENT_COUNT
+                ) {
+                  break;
+                }
+
+                if (
+                  isChatImageAttachment(
+                    attachment,
+                  )
+                ) {
+                  if (
+                    nextImageCount >=
+                      MAX_IMAGE_COUNT
+                  ) {
+                    continue;
+                  }
+
+                  nextImageCount +=
+                    1;
+                }
+
+                nextAttachments.push(
+                  attachment,
+                );
+              }
+
+              setAttachmentError(
+                null,
+              );
+            } catch (
+              cause
+            ) {
+              setAttachmentError(
+                cause instanceof
+                  Error
+                  ? `${file.name}: ${cause.message}`
+                  : `${file.name} could not be analyzed.`,
+              );
+            }
 
             continue;
           }
@@ -1482,7 +1911,7 @@ export function Composer({
           <input
             ref={fileInputRef}
             type="file"
-            accept="image/jpeg,image/png,image/webp,text/plain,text/markdown,text/csv,application/json,.txt,.text,.md,.markdown,.csv,.json"
+            accept="image/jpeg,image/png,image/webp,text/plain,text/markdown,text/csv,application/json,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.openxmlformats-officedocument.presentationml.presentation,audio/wav,audio/mpeg,audio/flac,audio/ogg,audio/mp4,video/mp4,video/webm,video/quicktime,.txt,.text,.md,.markdown,.csv,.json,.log,.py,.js,.jsx,.ts,.tsx,.css,.scss,.sql,.xml,.yaml,.yml,.toml,.ini,.pdf,.docx,.xlsx,.pptx,.wav,.mp3,.flac,.ogg,.oga,.m4a,.mp4,.m4v,.webm,.mov"
             multiple
             onChange={
               handleAttachmentSelection
