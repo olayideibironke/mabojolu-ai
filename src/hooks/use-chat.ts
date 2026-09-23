@@ -19,6 +19,7 @@ import {
 import type {
   ChatErrorPayload,
   ChatAttachment,
+  ChatGeneratedFile,
   ChatGeneratedImage,
   ChatMessage,
   ChatSource,
@@ -78,6 +79,65 @@ export interface UseChatOptions {
 
 const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b[\s\S]{0,80}\b(?:of|showing|depicting|with)\b/i;
 const IMAGE_ANALYSIS_PATTERN = /\b(?:analy[sz]e|describe|explain|inspect|read|identify|what|who|where|tell me|look at)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|attachment)\b/i;
+
+const TEXT_FILE_REQUEST_PATTERN =
+  /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,120}\b(?:\.txt|txt file|text file|plain text file)\b|\b(?:\.txt|txt file|text file|plain text file)\b[\s\S]{0,120}\b(?:create|make|generate|write|save|produce|download)\b/i;
+
+function textFileRequest(
+  content: string,
+): boolean {
+  const trimmed =
+    content.trim();
+
+  return (
+    trimmed.length > 0 &&
+    TEXT_FILE_REQUEST_PATTERN.test(
+      trimmed,
+    )
+  );
+}
+
+function generatedTextFile(
+  content: string,
+): ChatGeneratedFile {
+  const normalized =
+    content.trim();
+
+  const bytes =
+    new TextEncoder().encode(
+      normalized,
+    );
+
+  let binary = "";
+
+  for (
+    let offset = 0;
+    offset < bytes.length;
+    offset += 0x8000
+  ) {
+    binary +=
+      String.fromCharCode(
+        ...bytes.subarray(
+          offset,
+          offset +
+            0x8000,
+        ),
+      );
+  }
+
+  return {
+    id: createId(),
+    name:
+      "mabojolu-output.txt",
+    mimeType:
+      "text/plain",
+    sizeBytes:
+      bytes.length,
+    dataUrl:
+      "data:text/plain;charset=utf-8;base64," +
+      btoa(binary),
+  };
+}
 
 function imageGenerationPrompt(content: string): string | null {
   const trimmed = content.trim();
@@ -258,6 +318,16 @@ export function useChat(
       const imagePrompt = latestUser && (!latestUser.attachments || latestUser.attachments.length === 0)
         ? imageGenerationPrompt(latestUser.content)
         : null;
+
+      const wantsTextFile =
+        latestUser &&
+        (!latestUser.attachments ||
+          latestUser.attachments.length ===
+            0)
+          ? textFileRequest(
+              latestUser.content,
+            )
+          : false;
 
       if (imagePrompt) {
         setStatusLabel("Generating image...");
@@ -512,6 +582,17 @@ export function useChat(
             patchAssistant({
               content: accumulated,
               status: "complete",
+
+              ...(wantsTextFile &&
+              accumulated.trim().length > 0
+                ? {
+                    generatedFiles: [
+                      generatedTextFile(
+                        accumulated,
+                      ),
+                    ],
+                  }
+                : {}),
 
               ...(sources.length > 0
                 ? {
