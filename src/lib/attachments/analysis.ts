@@ -1,4 +1,7 @@
 import {
+  extractLocalDocument,
+} from "@/lib/attachments/local-document-processor";
+import {
   classifyMultimodalFormat,
   type MabojoluCapabilityId,
   type MabojoluModality,
@@ -601,4 +604,138 @@ export function decodeMultimodalEvidence(
   } catch {
     return undefined;
   }
+}
+
+
+export async function processAttachmentBytesWithLocalRuntime(
+  input:
+    AttachmentProcessingInput,
+): Promise<AttachmentProcessingResult> {
+  const direct =
+    processAttachmentBytes(
+      input,
+    );
+
+  if (
+    direct.ok ||
+    direct.reason !==
+      "processor-unavailable"
+  ) {
+    return direct;
+  }
+
+  const descriptor =
+    classifyMultimodalFormat(
+      input.mimeType,
+      input.filename,
+    );
+
+  if (!descriptor) {
+    return direct;
+  }
+
+  if (
+    descriptor.modality ===
+      "pdf" ||
+    descriptor.modality ===
+      "office-document" ||
+    descriptor.modality ===
+      "presentation" ||
+    (
+      descriptor.modality ===
+        "spreadsheet" &&
+      input.mimeType !==
+        "text/csv"
+    )
+  ) {
+    const extracted =
+      await extractLocalDocument(
+        {
+          filename:
+            input.filename,
+
+          mimeType:
+            input.mimeType,
+
+          bytes:
+            input.bytes,
+        },
+      );
+
+    if (!extracted.ok) {
+      return {
+        ok:
+          false,
+
+        reason:
+          extracted.code ===
+            "missing_dependency" ||
+          extracted.code ===
+            "worker_unavailable"
+            ? "processor-unavailable"
+            : "invalid-content",
+
+        message:
+          extracted.message,
+      };
+    }
+
+    return {
+      ok:
+        true,
+
+      evidence: {
+        schemaVersion:
+          MULTIMODAL_EVIDENCE_SCHEMA_VERSION,
+
+        attachmentId:
+          input.attachmentId,
+
+        filename:
+          input.filename,
+
+        mimeType:
+          input.mimeType,
+
+        modality:
+          descriptor.modality,
+
+        capabilityId:
+          descriptor
+            .capabilityId,
+
+        processor: {
+          id:
+            extracted.processor,
+
+          local:
+            true,
+        },
+
+        text:
+          extracted.text,
+
+        metadata: {
+          ...extracted
+            .metadata,
+
+          bytes:
+            input
+              .bytes
+              .byteLength,
+        },
+
+        warnings: [
+          ...extracted
+            .warnings,
+        ],
+
+        createdAt:
+          new Date()
+            .toISOString(),
+      },
+    };
+  }
+
+  return direct;
 }
