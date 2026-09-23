@@ -84,8 +84,7 @@ const beginSchema =
             .min(1),
 
         content:
-          z.string()
-            .min(1),
+          z.string(),
 
         createdAt:
           z.string()
@@ -395,7 +394,13 @@ export async function POST(
             title:
               generateConversationTitle(
                 userMessage
-                  .content,
+                  .content
+                  .trim()
+                  .length >
+                  0
+                  ? userMessage
+                      .content
+                  : "Attachment",
               ),
           });
 
