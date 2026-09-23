@@ -16,6 +16,7 @@ import json
 import re
 import sys
 import zipfile
+from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 from xml.etree import ElementTree as ET
@@ -124,10 +125,140 @@ def workbook_sheet_names(archive: zipfile.ZipFile) -> list[str]:
     ]
 
 
+BUILTIN_EXCEL_DATE_FORMAT_IDS = {
+    *range(14, 23),
+    *range(27, 37),
+    *range(45, 48),
+    *range(50, 59),
+}
+
+
+def workbook_uses_1904_dates(archive: zipfile.ZipFile) -> bool:
+    if "xl/workbook.xml" not in archive.namelist():
+        return False
+
+    root = xml_root(archive, "xl/workbook.xml")
+    ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+    properties = root.find("x:workbookPr", ns)
+    if properties is None:
+        return False
+
+    return properties.attrib.get("date1904", "").strip().lower() in {"1", "true"}
+
+
+def workbook_number_formats(
+    archive: zipfile.ZipFile,
+) -> tuple[list[int], dict[int, str]]:
+    if "xl/styles.xml" not in archive.namelist():
+        return [], {}
+
+    root = xml_root(archive, "xl/styles.xml")
+    ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
+
+    custom_formats: dict[int, str] = {}
+    for number_format in root.findall("x:numFmts/x:numFmt", ns):
+        raw_id = number_format.attrib.get("numFmtId", "")
+        try:
+            number_format_id = int(raw_id)
+        except ValueError:
+            continue
+        custom_formats[number_format_id] = number_format.attrib.get("formatCode", "")
+
+    style_number_format_ids: list[int] = []
+    for style in root.findall("x:cellXfs/x:xf", ns):
+        try:
+            style_number_format_ids.append(int(style.attrib.get("numFmtId", "0")))
+        except ValueError:
+            style_number_format_ids.append(0)
+
+    return style_number_format_ids, custom_formats
+
+
+def normalized_excel_format_code(format_code: str) -> str:
+    value = re.sub(r'"[^"]*"', "", format_code)
+    value = re.sub(r"\\.", "", value)
+    value = re.sub(r"\[[^\]]*\]", "", value)
+    value = value.replace("_", "").replace("*", "")
+    return value.lower()
+
+
+def is_excel_date_format(number_format_id: int, format_code: str | None) -> bool:
+    if number_format_id in BUILTIN_EXCEL_DATE_FORMAT_IDS:
+        return True
+    if not format_code:
+        return False
+
+    normalized = normalized_excel_format_code(format_code)
+    return bool(re.search(r"[ymdhis]", normalized))
+
+
+def excel_serial_to_text(raw: str, uses_1904_dates: bool) -> str | None:
+    try:
+        serial = float(raw)
+    except ValueError:
+        return None
+
+    if serial < 0:
+        return None
+
+    if uses_1904_dates:
+        converted = datetime(1904, 1, 1) + timedelta(days=serial)
+    else:
+        whole_days = int(serial)
+        fraction = serial - whole_days
+        if whole_days == 60:
+            if abs(fraction) < 1e-12:
+                return "1900-02-29"
+            seconds = round(fraction * 86_400)
+            hours, remainder = divmod(seconds, 3_600)
+            minutes, seconds = divmod(remainder, 60)
+            return f"1900-02-29T{hours:02d}:{minutes:02d}:{seconds:02d}"
+        base = datetime(1899, 12, 31)
+        adjusted_days = whole_days if whole_days < 60 else whole_days - 1
+        converted = base + timedelta(days=adjusted_days, seconds=fraction * 86_400)
+
+    if abs(serial - round(serial)) < 1e-12:
+        return converted.date().isoformat()
+
+    if converted.microsecond:
+        return converted.isoformat(timespec="microseconds")
+    return converted.isoformat(timespec="seconds")
+
+
+def formatted_excel_value(
+    raw: str,
+    cell: ET.Element,
+    style_number_format_ids: list[int],
+    custom_formats: dict[int, str],
+    uses_1904_dates: bool,
+) -> str:
+    raw_style_index = cell.attrib.get("s")
+    if raw_style_index is None:
+        return raw
+
+    try:
+        style_index = int(raw_style_index)
+    except ValueError:
+        return raw
+
+    if not 0 <= style_index < len(style_number_format_ids):
+        return raw
+
+    number_format_id = style_number_format_ids[style_index]
+    format_code = custom_formats.get(number_format_id)
+    if not is_excel_date_format(number_format_id, format_code):
+        return raw
+
+    return excel_serial_to_text(raw, uses_1904_dates) or raw
+
+
 def cell_value(
     cell: ET.Element,
     strings: list[str],
     ns: dict[str, str],
+    style_number_format_ids: list[int],
+    custom_formats: dict[int, str],
+    uses_1904_dates: bool,
 ) -> str:
     cell_type = cell.attrib.get("t", "")
     formula = cell.find("x:f", ns)
@@ -146,12 +277,20 @@ def cell_value(
         except ValueError:
             return raw
 
+    displayed = formatted_excel_value(
+        raw,
+        cell,
+        style_number_format_ids,
+        custom_formats,
+        uses_1904_dates,
+    )
+
     if formula is not None and formula.text:
-        if raw:
-            return f"={formula.text} -> {raw}"
+        if displayed:
+            return f"={formula.text} -> {displayed}"
         return f"={formula.text}"
 
-    return raw
+    return displayed
 
 
 def extract_xlsx(path: Path) -> dict[str, Any]:
@@ -170,6 +309,8 @@ def extract_xlsx(path: Path) -> dict[str, Any]:
 
         strings = shared_strings(archive)
         sheet_names = workbook_sheet_names(archive)
+        style_number_format_ids, custom_formats = workbook_number_formats(archive)
+        uses_1904_dates = workbook_uses_1904_dates(archive)
         ns = {"x": "http://schemas.openxmlformats.org/spreadsheetml/2006/main"}
 
         blocks: list[str] = []
