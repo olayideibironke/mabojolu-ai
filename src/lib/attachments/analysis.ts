@@ -45,6 +45,15 @@ export interface MultimodalEvidencePackage {
 
   transcript?: string;
 
+  images?: Array<{
+    name: string;
+    mimeType:
+      | "image/jpeg"
+      | "image/png"
+      | "image/webp";
+    base64Data: string;
+  }>;
+
   metadata:
     Record<
       string,
@@ -913,6 +922,20 @@ export async function processAttachmentBytesWithLocalRuntime(
 
         text:
           analyzed.transcript,
+
+        images:
+          analyzed.frames.map(
+            (frame) => ({
+              name:
+                frame.name,
+
+              mimeType:
+                frame.mimeType,
+
+              base64Data:
+                frame.base64Data,
+            }),
+          ),
 
         metadata: {
           bytes:
