@@ -90,7 +90,9 @@ export function contentWithAttachmentContext(
       0
   ) {
     return [
-      text,
+      text.length > 0
+        ? text
+        : "Analyze the attached file using the extracted evidence below and respond with the useful result.",
       ...blocks,
     ]
       .filter(
