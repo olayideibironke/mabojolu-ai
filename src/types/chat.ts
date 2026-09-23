@@ -144,6 +144,18 @@ export function isChatTextDocumentAttachment(
   );
 }
 
+export interface ChatGeneratedImage {
+  id: string;
+  name: string;
+  mimeType:
+    | "image/jpeg"
+    | "image/png"
+    | "image/webp";
+  sizeBytes: number;
+  dataUrl: string;
+  prompt?: string;
+}
+
 export interface ChatMessage {
   id: string;
 
@@ -168,6 +180,9 @@ export interface ChatMessage {
    * Assistant messages normally leave this undefined.
    */
   attachments?: ChatAttachment[];
+
+  /** Generated image artifacts produced by Mabojolu for an assistant turn. */
+  generatedImages?: ChatGeneratedImage[];
 
   /** Present on assistant messages after a provider starts responding. */
   model?: string;
