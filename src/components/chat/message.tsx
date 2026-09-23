@@ -102,6 +102,51 @@ export function Message({
   );
 }
 
+function attachmentDisplayType(
+  attachment: ChatAttachment,
+): string {
+  if (isChatImageAttachment(attachment)) {
+    return "Image";
+  }
+
+  const extension =
+    attachment.name
+      .split(".")
+      .pop()
+      ?.toLowerCase();
+
+  switch (extension) {
+    case "wav":
+    case "mp3":
+    case "flac":
+    case "ogg":
+    case "oga":
+    case "m4a":
+      return `Audio · ${extension.toUpperCase()}`;
+
+    case "mp4":
+    case "m4v":
+    case "webm":
+    case "mov":
+      return `Video · ${extension.toUpperCase()}`;
+
+    case "pdf":
+      return "PDF";
+
+    case "docx":
+      return "Word document";
+
+    case "xlsx":
+      return "Excel workbook";
+
+    case "pptx":
+      return "PowerPoint presentation";
+
+    default:
+      return attachment.mimeType;
+  }
+}
+
 function UserAttachmentGallery({
   attachments,
 }: {
@@ -203,7 +248,7 @@ function UserAttachmentGallery({
                 </p>
 
                 <p className="mt-0.5 text-[11px] text-text-muted">
-                  {attachment.mimeType}
+                  {attachmentDisplayType(attachment)}
                 </p>
               </div>
             ),
