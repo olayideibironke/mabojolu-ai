@@ -11,7 +11,7 @@ import {
   attachmentEvidenceSidecarPath,
   decodeMultimodalEvidence,
   encodeMultimodalEvidence,
-  processAttachmentBytes,
+  processAttachmentBytesWithLocalRuntime,
 } from "@/lib/attachments/analysis";
 import {
   getStorage,
@@ -443,7 +443,7 @@ export async function POST(
       );
 
     const processed =
-      processAttachmentBytes(
+      await processAttachmentBytesWithLocalRuntime(
         {
           attachmentId:
             record.id,
