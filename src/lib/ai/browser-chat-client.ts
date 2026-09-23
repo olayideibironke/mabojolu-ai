@@ -562,15 +562,7 @@ function latestImagePrompt(
       .find(
         (message) =>
           message.role ===
-          "user" &&
-          (
-            message
-              .attachments
-              ?.some(
-                isChatImageAttachment,
-              ) ??
-            false
-          ),
+          "user",
       );
 
   if (
@@ -655,20 +647,25 @@ export async function streamBrowserChat(
       body.messages,
     );
 
+  const latestUser =
+    [
+      ...body
+        .messages,
+    ]
+      .reverse()
+      .find(
+        (message) =>
+          message.role ===
+          "user",
+      );
+
   const hasImages =
-    body.messages.some(
-      (
-        message,
-      ) =>
-        (
-          message
-            .attachments
-            ?.some(
-              isChatImageAttachment,
-            ) ??
-          false
-        ),
-    );
+    latestUser
+      ?.attachments
+      ?.some(
+        isChatImageAttachment,
+      ) ??
+    false;
 
   const chromeContext =
     !identityResponse &&
