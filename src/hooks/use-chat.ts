@@ -19,6 +19,7 @@ import {
 import type {
   ChatErrorPayload,
   ChatAttachment,
+  ChatGeneratedImage,
   ChatMessage,
   ChatSource,
   FeedbackRating,
@@ -72,6 +73,34 @@ export interface UseChatOptions {
   ) => void;
 
   modelId?: string;
+}
+
+
+const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b[\s\S]{0,80}\b(?:of|showing|depicting|with)\b/i;
+
+function imageGenerationPrompt(content: string): string | null {
+  const trimmed = content.trim();
+  if (!trimmed || !IMAGE_REQUEST_PATTERN.test(trimmed)) return null;
+  return trimmed;
+}
+
+async function generateChatImage(prompt: string, signal: AbortSignal): Promise<ChatGeneratedImage> {
+  const response = await fetch("/api/media/image", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ prompt }),
+    signal,
+  });
+  const payload = await response.json().catch(() => null) as { image?: { filename?: unknown; mimeType?: unknown; dataUrl?: unknown }; error?: { message?: unknown } } | null;
+  if (!response.ok || !payload?.image) {
+    const message = typeof payload?.error?.message === "string" ? payload.error.message : "Mabojolu could not generate that image.";
+    throw new Error(message);
+  }
+  const { filename, mimeType, dataUrl } = payload.image;
+  if (typeof filename !== "string" || typeof mimeType !== "string" || typeof dataUrl !== "string" || !["image/jpeg","image/png","image/webp"].includes(mimeType)) throw new Error("Mabojolu returned invalid generated-image data.");
+  const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
+  const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
+  return { id: createId(), name: filename, mimeType: mimeType as ChatGeneratedImage["mimeType"], sizeBytes: Math.max(0, Math.floor(base64.length * 3 / 4 - padding)), dataUrl, prompt };
 }
 
 interface RequestMessage {
@@ -223,6 +252,50 @@ export function useChat(
           ),
         );
       };
+
+      const latestUser = [...history].reverse().find((message) => message.role === "user");
+      const imagePrompt = latestUser && (!latestUser.attachments || latestUser.attachments.length === 0)
+        ? imageGenerationPrompt(latestUser.content)
+        : null;
+
+      if (imagePrompt) {
+        setStatusLabel("Generating image...");
+        void generateChatImage(imagePrompt, controller.signal)
+          .then((image) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            patchAssistant({
+              content: "Here is the image you asked me to create.",
+              generatedImages: [image],
+              status: "complete",
+              model: "mabojolu-image",
+            });
+          })
+          .catch((cause) => {
+            if (!isCurrent()) return;
+            if (controller.signal.aborted) {
+              setIsStreaming(false);
+              setStatusLabel(null);
+              controllerRef.current = null;
+              patchAssistant({ status: "interrupted" });
+              return;
+            }
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            patchAssistant({
+              status: "failed",
+              error: {
+                code: "provider_unavailable",
+                message: cause instanceof Error ? cause.message : "Mabojolu could not generate that image.",
+                retryable: true,
+              },
+            });
+          });
+        return;
+      }
 
       const requestMessages =
         history
