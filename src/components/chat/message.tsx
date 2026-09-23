@@ -696,6 +696,22 @@ function AssistantMessage({
   const generatedFiles =
     message.generatedFiles ?? [];
 
+  const generatedFileLabel = (
+    mimeType: string,
+  ) =>
+    mimeType ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ? "DOCX"
+      : "TXT";
+
+  const generatedFileDescription = (
+    mimeType: string,
+  ) =>
+    mimeType ===
+    "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ? "Word document"
+      : "Text file";
+
   const sourcePanelId =
     `sources-${message.id}`;
 
@@ -740,7 +756,9 @@ function AssistantMessage({
                       aria-hidden="true"
                       className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-subtle bg-surface-raised text-xs font-bold text-text-muted"
                     >
-                      TXT
+                      {generatedFileLabel(
+                        file.mimeType,
+                      )}
                     </span>
 
                     <span className="min-w-0 flex-1">
@@ -749,7 +767,9 @@ function AssistantMessage({
                       </span>
 
                       <span className="block text-xs text-text-muted">
-                        Text file
+                        {generatedFileDescription(
+                          file.mimeType,
+                        )}
                       </span>
                     </span>
 
@@ -783,19 +803,26 @@ function AssistantMessage({
 
                   {viewingFileId ===
                   file.id ? (
-                    <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-raised p-3 text-xs leading-5 text-text-primary">
-                      {decodeURIComponent(
-                        escape(
-                          atob(
-                            file.dataUrl.slice(
-                              file.dataUrl.indexOf(
-                                ",",
-                              ) + 1,
+                    file.mimeType ===
+                    "text/plain" ? (
+                      <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-subtle bg-surface-raised p-3 text-xs leading-5 text-text-primary">
+                        {decodeURIComponent(
+                          escape(
+                            atob(
+                              file.dataUrl.slice(
+                                file.dataUrl.indexOf(
+                                  ",",
+                                ) + 1,
+                              ),
                             ),
                           ),
-                        ),
-                      )}
-                    </pre>
+                        )}
+                      </pre>
+                    ) : (
+                      <div className="mt-3 rounded-lg border border-border-subtle bg-surface-raised p-3 text-xs leading-5 text-text-secondary">
+                        Word document preview is available after download. The generated DOCX opens in Microsoft Word and compatible Office applications.
+                      </div>
+                    )
                   ) : null}
                 </div>
               ),
