@@ -184,7 +184,7 @@ describe(
             ],
           }),
         ).toBe(
-          "Please describe and analyze the attached image.",
+          "Answer directly from the attached image. Do not announce that you analyzed, processed, received, or were provided the image. Do not introduce yourself or mention your creator unless the user asks.",
         );
 
         const documentOnly =
