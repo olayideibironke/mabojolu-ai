@@ -156,6 +156,21 @@ export interface ChatGeneratedImage {
   prompt?: string;
 }
 
+/**
+ * Downloadable file artifact created by Mabojolu for an assistant turn.
+ *
+ * The first qualified output format is UTF-8 plain text. The union can be
+ * extended deliberately as DOCX, XLSX, PPTX, and PDF generation are proven
+ * end to end.
+ */
+export interface ChatGeneratedFile {
+  id: string;
+  name: string;
+  mimeType: "text/plain";
+  sizeBytes: number;
+  dataUrl: string;
+}
+
 export interface ChatMessage {
   id: string;
 
@@ -183,6 +198,9 @@ export interface ChatMessage {
 
   /** Generated image artifacts produced by Mabojolu for an assistant turn. */
   generatedImages?: ChatGeneratedImage[];
+
+  /** Downloadable file artifacts produced by Mabojolu for an assistant turn. */
+  generatedFiles?: ChatGeneratedFile[];
 
   /** Present on assistant messages after a provider starts responding. */
   model?: string;
