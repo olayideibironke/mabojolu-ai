@@ -175,6 +175,49 @@ const serverEnvSchema = z.object({
       .default(60_000),
 
   /**
+   * Local multimodal processing runtime.
+   *
+   * These are optional and never enable paid services. They locate free local
+   * tools when the operator has installed them.
+   */
+  MABOJOLU_PYTHON_PATH:
+    z.string()
+      .min(1)
+      .default("python"),
+
+  MABOJOLU_FFMPEG_PATH:
+    z.string()
+      .min(1)
+      .default("ffmpeg"),
+
+  MABOJOLU_FFPROBE_PATH:
+    z.string()
+      .min(1)
+      .default("ffprobe"),
+
+  MABOJOLU_WHISPER_CLI_PATH:
+    z.string()
+      .min(1)
+      .optional(),
+
+  MABOJOLU_WHISPER_MODEL_PATH:
+    z.string()
+      .min(1)
+      .optional(),
+
+  MABOJOLU_COMFYUI_BASE_URL:
+    z.string()
+      .url()
+      .default(
+        "http://127.0.0.1:8188",
+      ),
+
+  MABOJOLU_COMFYUI_WORKFLOW_PATH:
+    z.string()
+      .min(1)
+      .optional(),
+
+  /**
    * Where conversations are stored.
    *
    * local:
