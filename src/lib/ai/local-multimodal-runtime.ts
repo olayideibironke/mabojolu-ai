@@ -15,6 +15,7 @@ export type LocalMultimodalComponentId =
   | "python"
   | "ffmpeg"
   | "ffprobe"
+  | "pypdf"
   | "whisper"
   | "comfyui";
 
@@ -253,6 +254,16 @@ export async function inspectLocalMultimodalRuntime(
         },
         {
           id:
+            "pypdf",
+
+          available:
+            false,
+
+          detail:
+            "Server environment is invalid.",
+        },
+        {
+          id:
             "whisper",
 
           available:
@@ -309,7 +320,8 @@ export async function inspectLocalMultimodalRuntime(
     python,
     ffmpeg,
     ffprobe,
-    whisperCliExists,
+    pypdf,
+    whisperCli,
     whisperModelExists,
     comfyWorkflowExists,
     comfyui,
@@ -339,10 +351,27 @@ export async function inspectLocalMultimodalRuntime(
         ],
       ),
 
-      pathExists(
+      commandProbe(
         env
-          .MABOJOLU_WHISPER_CLI_PATH,
+          .MABOJOLU_PYTHON_PATH,
+        [
+          "-c",
+          "import pypdf",
+        ],
       ),
+
+      env
+        .MABOJOLU_WHISPER_CLI_PATH
+        ? commandProbe(
+            env
+              .MABOJOLU_WHISPER_CLI_PATH,
+            [
+              "--help",
+            ],
+          )
+        : Promise.resolve(
+            false,
+          ),
 
       pathExists(
         env
@@ -364,7 +393,7 @@ export async function inspectLocalMultimodalRuntime(
     ]);
 
   const whisper =
-    whisperCliExists &&
+    whisperCli &&
     whisperModelExists;
 
   const imageGeneration =
@@ -411,6 +440,18 @@ export async function inspectLocalMultimodalRuntime(
       },
       {
         id:
+          "pypdf",
+
+        available:
+          pypdf,
+
+        detail:
+          pypdf
+            ? "The free local pypdf package is available."
+            : "PDF text extraction requires the free local Python package pypdf.",
+      },
+      {
+        id:
           "whisper",
 
         available:
@@ -442,7 +483,8 @@ export async function inspectLocalMultimodalRuntime(
       // The Python worker can extract PDF text only when its optional PDF
       // backend is installed. Runtime processing performs that final check.
       pdfDocuments:
-        python,
+        python &&
+        pypdf,
 
       audioTranscription:
         whisper &&
