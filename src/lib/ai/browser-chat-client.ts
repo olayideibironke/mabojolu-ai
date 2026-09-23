@@ -891,32 +891,22 @@ export async function streamBrowserChat(
       !chromeSession ||
       !prompt
     ) {
+      callbacks.onStatus?.(
+        "On-device vision is unavailable. Falling back to Mabojolu's server vision...",
+      );
+
       await settlePersistence({
-        conversationId:
-          start.conversationId,
-
-        assistantMessageId:
-          start.messageId,
-
-        content:
-          "",
-
-        status:
-          "failed",
-
-        errorCode:
-          "browser_multimodal_unavailable",
+        conversationId: start.conversationId,
+        assistantMessageId: start.messageId,
+        content: "",
+        status: "interrupted",
+        errorCode: "browser_multimodal_fallback",
       });
 
       callbacks.onError({
-        code:
-          "provider_unavailable",
-
-        message:
-          "On-device image understanding is not available in this browser. Update Chrome and try again.",
-
-        retryable:
-          true,
+        code: "provider_unavailable",
+        message: "This browser cannot run on-device image understanding. Switch to a server-backed Mabojolu deployment or a browser with Chrome multimodal Prompt API support.",
+        retryable: true,
       });
 
       return;
