@@ -187,7 +187,7 @@ describe(
           "Please describe and analyze the attached image.",
         );
 
-        expect(
+        const documentOnly =
           contentWithAttachmentContext({
             content:
               "",
@@ -195,7 +195,16 @@ describe(
             attachments: [
               document,
             ],
-          }),
+          });
+
+        expect(
+          documentOnly,
+        ).toContain(
+          "Analyze the attached file using the extracted evidence below and respond with the useful result.",
+        );
+
+        expect(
+          documentOnly,
         ).toContain(
           "Mabojolu works.",
         );
