@@ -337,7 +337,14 @@ def extract_xlsx(path: Path) -> dict[str, Any]:
 
                 cells = row.findall("x:c", ns)[:MAX_CELLS_PER_ROW]
                 values = [
-                    cell_value(cell, strings, ns).replace("\t", " ").replace("\n", " ")
+                    cell_value(
+                        cell,
+                        strings,
+                        ns,
+                        style_number_format_ids,
+                        custom_formats,
+                        uses_1904_dates,
+                    ).replace("\t", " ").replace("\n", " ")
                     for cell in cells
                 ]
                 lines.append("\t".join(values))
