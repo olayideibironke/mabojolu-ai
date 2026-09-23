@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
 
 import { chatError, logChatError, normalizeError } from "@/lib/ai/errors";
+import { attachmentEvidenceSidecarPath } from "@/lib/attachments/analysis";
 import { errorResponse } from "@/lib/ai/stream";
 import {
   buildStoragePath,
@@ -70,14 +71,19 @@ export async function POST(request: NextRequest): Promise<Response> {
     // memory. Waiting until after the read would let a large upload consume
     // memory regardless.
     const declaredLength = request.headers.get("content-length");
+    const absoluteUploadLimit = Math.max(
+      env.MABOJOLU_MAX_ATTACHMENT_BYTES,
+      env.MABOJOLU_MAX_MEDIA_ATTACHMENT_BYTES,
+    );
+
     if (
       declaredLength &&
-      Number(declaredLength) > env.MABOJOLU_MAX_ATTACHMENT_BYTES + 8_192
+      Number(declaredLength) > absoluteUploadLimit + 16_384
     ) {
-      const limitMb = Math.floor(env.MABOJOLU_MAX_ATTACHMENT_BYTES / 1_048_576);
+      const limitMb = Math.floor(absoluteUploadLimit / 1_048_576);
       return errorResponse(
         chatError("message_too_long", {
-          message: `That file is larger than the ${limitMb} MB limit.`,
+          message: `That file is larger than the ${limitMb} MB maximum upload limit.`,
         }),
       );
     }
@@ -126,12 +132,18 @@ export async function POST(request: NextRequest): Promise<Response> {
     // Read enough bytes to check the signature. WebP needs 12.
     const bytes = new Uint8Array(await file.arrayBuffer());
 
+    const maxBytes =
+      file.type.startsWith("audio/") ||
+      file.type.startsWith("video/")
+        ? env.MABOJOLU_MAX_MEDIA_ATTACHMENT_BYTES
+        : env.MABOJOLU_MAX_ATTACHMENT_BYTES;
+
     const validation = validateAttachment({
       filename: file.name,
       declaredMimeType: file.type,
       sizeBytes: bytes.byteLength,
       header: bytes.subarray(0, 16),
-      maxBytes: env.MABOJOLU_MAX_ATTACHMENT_BYTES,
+      maxBytes,
     });
 
     if (!validation.ok || !validation.safeFilename || !validation.format) {
@@ -287,7 +299,18 @@ export async function DELETE(request: NextRequest): Promise<Response> {
       );
     }
 
-    const deleted = await getDatabase().deleteAttachment(
+    const database = getDatabase();
+
+    const record = await database.getAttachment(
+      attachmentId,
+      session.userId,
+    );
+
+    if (!record) {
+      return errorResponse(chatError("not_found"));
+    }
+
+    const deleted = await database.deleteAttachment(
       attachmentId,
       session.userId,
     );
@@ -295,6 +318,15 @@ export async function DELETE(request: NextRequest): Promise<Response> {
     if (!deleted) {
       return errorResponse(chatError("not_found"));
     }
+
+    await Promise.all([
+      getStorage().remove(record.storagePath),
+      getStorage().remove(
+        attachmentEvidenceSidecarPath(
+          record.storagePath,
+        ),
+      ),
+    ]);
 
     return Response.json({ ok: true });
   } catch (cause) {
