@@ -2,6 +2,10 @@ import {
   extractLocalDocument,
 } from "@/lib/attachments/local-document-processor";
 import {
+  analyzeLocalAudio,
+  analyzeLocalVideo,
+} from "@/lib/attachments/local-media-processor";
+import {
   classifyMultimodalFormat,
   type MabojoluCapabilityId,
   type MabojoluModality,
@@ -733,6 +737,221 @@ export async function processAttachmentBytesWithLocalRuntime(
         createdAt:
           new Date()
             .toISOString(),
+      },
+    };
+  }
+
+  if (
+    descriptor.modality ===
+      "audio-understanding"
+  ) {
+    const analyzed =
+      await analyzeLocalAudio(
+        {
+          filename:
+            input.filename,
+
+          bytes:
+            input.bytes,
+        },
+      );
+
+    if (!analyzed.ok) {
+      return {
+        ok:
+          false,
+
+        reason:
+          analyzed.code ===
+            "whisper_not_configured" ||
+          analyzed.code ===
+            "worker_unavailable"
+            ? "processor-unavailable"
+            : "invalid-content",
+
+        message:
+          analyzed.message,
+      };
+    }
+
+    return {
+      ok:
+        true,
+
+      evidence: {
+        schemaVersion:
+          MULTIMODAL_EVIDENCE_SCHEMA_VERSION,
+
+        attachmentId:
+          input.attachmentId,
+
+        filename:
+          input.filename,
+
+        mimeType:
+          input.mimeType,
+
+        modality:
+          descriptor.modality,
+
+        capabilityId:
+          descriptor.capabilityId,
+
+        processor: {
+          id:
+            analyzed.processor,
+
+          local:
+            true,
+        },
+
+        transcript:
+          analyzed.transcript,
+
+        text:
+          analyzed.transcript,
+
+        metadata: {
+          bytes:
+            input.bytes.byteLength,
+
+          ...(analyzed.language
+            ? {
+                language:
+                  analyzed.language,
+              }
+            : {}),
+
+          ...(analyzed.durationMs !==
+            undefined
+            ? {
+                durationMs:
+                  analyzed.durationMs,
+              }
+            : {}),
+
+          segmentCount:
+            analyzed.segments.length,
+        },
+
+        warnings: [
+          ...analyzed.warnings,
+        ],
+
+        createdAt:
+          new Date().toISOString(),
+      },
+    };
+  }
+
+  if (
+    descriptor.modality ===
+      "video-understanding"
+  ) {
+    const analyzed =
+      await analyzeLocalVideo(
+        {
+          filename:
+            input.filename,
+
+          bytes:
+            input.bytes,
+        },
+      );
+
+    if (!analyzed.ok) {
+      return {
+        ok:
+          false,
+
+        reason:
+          analyzed.code ===
+            "whisper_not_configured" ||
+          analyzed.code ===
+            "worker_unavailable"
+            ? "processor-unavailable"
+            : "invalid-content",
+
+        message:
+          analyzed.message,
+      };
+    }
+
+    return {
+      ok:
+        true,
+
+      evidence: {
+        schemaVersion:
+          MULTIMODAL_EVIDENCE_SCHEMA_VERSION,
+
+        attachmentId:
+          input.attachmentId,
+
+        filename:
+          input.filename,
+
+        mimeType:
+          input.mimeType,
+
+        modality:
+          descriptor.modality,
+
+        capabilityId:
+          descriptor.capabilityId,
+
+        processor: {
+          id:
+            analyzed.processor,
+
+          local:
+            true,
+        },
+
+        transcript:
+          analyzed.transcript,
+
+        text:
+          analyzed.transcript,
+
+        metadata: {
+          bytes:
+            input.bytes.byteLength,
+
+          ...(analyzed.language
+            ? {
+                language:
+                  analyzed.language,
+              }
+            : {}),
+
+          ...(analyzed.durationMs !==
+            undefined
+            ? {
+                durationMs:
+                  analyzed.durationMs,
+              }
+            : {}),
+
+          segmentCount:
+            analyzed.segments.length,
+
+          frameCount:
+            analyzed.frames.length,
+
+          frameNames:
+            analyzed.frames.map(
+              (frame) =>
+                frame.name,
+            ),
+        },
+
+        warnings: [
+          ...analyzed.warnings,
+        ],
+
+        createdAt:
+          new Date().toISOString(),
       },
     };
   }
