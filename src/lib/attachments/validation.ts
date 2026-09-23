@@ -16,8 +16,11 @@
  *
  * Deliberately excluded, and why:
  *   SVG        Can carry script, so serving one is a stored-XSS vector.
- *   Archives   Hide their real contents behind an outer MIME type.
- *   Office     Zip containers with macro surface; PDF and text cover the need.
+ *   Executables and arbitrary archives remain blocked. Mabojolu may inspect
+ *              supported document containers, but it never executes uploaded
+ *              content.
+ *   Legacy macro-enabled Office formats remain blocked. Only non-macro OOXML
+ *              containers are accepted.
  */
 
 export interface AllowedFormat {
@@ -44,15 +47,44 @@ export const ALLOWED_FORMATS: readonly AllowedFormat[] = [
   },
   {
     mimeType: "text/plain",
-    extensions: ["txt", "text"],
+    extensions: [
+      "txt",
+      "text",
+      "log",
+      "py",
+      "js",
+      "jsx",
+      "ts",
+      "tsx",
+      "css",
+      "scss",
+      "sql",
+      "xml",
+      "yaml",
+      "yml",
+      "toml",
+      "ini",
+    ],
     magic: [],
-    label: "Plain text",
+    label: "Plain text or source code",
   },
   {
     mimeType: "text/markdown",
     extensions: ["md", "markdown"],
     magic: [],
     label: "Markdown",
+  },
+  {
+    mimeType: "text/csv",
+    extensions: ["csv"],
+    magic: [],
+    label: "CSV",
+  },
+  {
+    mimeType: "application/json",
+    extensions: ["json", "jsonl"],
+    magic: [],
+    label: "JSON",
   },
   {
     mimeType: "image/png",
@@ -69,7 +101,6 @@ export const ALLOWED_FORMATS: readonly AllowedFormat[] = [
   {
     mimeType: "image/gif",
     extensions: ["gif"],
-    // "GIF87a" and "GIF89a"
     magic: [
       [0x47, 0x49, 0x46, 0x38, 0x37, 0x61],
       [0x47, 0x49, 0x46, 0x38, 0x39, 0x61],
@@ -78,11 +109,83 @@ export const ALLOWED_FORMATS: readonly AllowedFormat[] = [
   },
   {
     mimeType: "image/webp",
-    // RIFF container: bytes 0-3 "RIFF", 8-11 "WEBP". Checked specially below,
-    // because the signature is not contiguous from offset zero.
     extensions: ["webp"],
     magic: [[0x52, 0x49, 0x46, 0x46]],
     label: "WebP image",
+  },
+  {
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    extensions: ["docx"],
+    magic: [[0x50, 0x4b, 0x03, 0x04]],
+    label: "Word document",
+  },
+  {
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    extensions: ["xlsx"],
+    magic: [[0x50, 0x4b, 0x03, 0x04]],
+    label: "Excel workbook",
+  },
+  {
+    mimeType:
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+    extensions: ["pptx"],
+    magic: [[0x50, 0x4b, 0x03, 0x04]],
+    label: "PowerPoint presentation",
+  },
+  {
+    mimeType: "audio/wav",
+    extensions: ["wav"],
+    magic: [[0x52, 0x49, 0x46, 0x46]],
+    label: "WAV audio",
+  },
+  {
+    mimeType: "audio/mpeg",
+    extensions: ["mp3"],
+    magic: [
+      [0x49, 0x44, 0x33],
+      [0xff, 0xfb],
+      [0xff, 0xf3],
+      [0xff, 0xf2],
+    ],
+    label: "MP3 audio",
+  },
+  {
+    mimeType: "audio/flac",
+    extensions: ["flac"],
+    magic: [[0x66, 0x4c, 0x61, 0x43]],
+    label: "FLAC audio",
+  },
+  {
+    mimeType: "audio/ogg",
+    extensions: ["ogg", "oga"],
+    magic: [[0x4f, 0x67, 0x67, 0x53]],
+    label: "Ogg audio",
+  },
+  {
+    mimeType: "audio/mp4",
+    extensions: ["m4a"],
+    magic: [],
+    label: "M4A audio",
+  },
+  {
+    mimeType: "video/mp4",
+    extensions: ["mp4", "m4v"],
+    magic: [],
+    label: "MP4 video",
+  },
+  {
+    mimeType: "video/webm",
+    extensions: ["webm"],
+    magic: [[0x1a, 0x45, 0xdf, 0xa3]],
+    label: "WebM video",
+  },
+  {
+    mimeType: "video/quicktime",
+    extensions: ["mov"],
+    magic: [],
+    label: "QuickTime video",
   },
 ] as const;
 
@@ -165,9 +268,45 @@ export function matchesMagicBytes(
   bytes: Uint8Array,
   format: AllowedFormat,
 ): boolean {
-  // Text formats have no signature, so they are validated by decoding instead.
-  if (format.magic.length === 0) {
+  // Text formats have no binary signature, so they are validated by decoding.
+  if (
+    format.magic.length === 0 &&
+    (
+      format.mimeType.startsWith("text/") ||
+      format.mimeType === "application/json"
+    )
+  ) {
     return isProbablyUtf8Text(bytes);
+  }
+
+  // ISO Base Media formats identify their family with "ftyp" at byte 4.
+  if (
+    format.mimeType === "audio/mp4" ||
+    format.mimeType === "video/mp4" ||
+    format.mimeType === "video/quicktime"
+  ) {
+    return (
+      bytes.length >= 12 &&
+      bytes[4] === 0x66 &&
+      bytes[5] === 0x74 &&
+      bytes[6] === 0x79 &&
+      bytes[7] === 0x70
+    );
+  }
+
+  // WAV is a RIFF container with "WAVE" at byte 8.
+  if (format.mimeType === "audio/wav") {
+    return (
+      bytes.length >= 12 &&
+      bytes[0] === 0x52 &&
+      bytes[1] === 0x49 &&
+      bytes[2] === 0x46 &&
+      bytes[3] === 0x46 &&
+      bytes[8] === 0x57 &&
+      bytes[9] === 0x41 &&
+      bytes[10] === 0x56 &&
+      bytes[11] === 0x45
+    );
   }
 
   // WebP is a RIFF container: "RIFF" at 0, then "WEBP" at 8.
@@ -184,6 +323,10 @@ export function matchesMagicBytes(
     );
 
     return riff && webp;
+  }
+
+  if (format.magic.length === 0) {
+    return false;
   }
 
   return format.magic.some((signature) => {
