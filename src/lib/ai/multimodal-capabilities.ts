@@ -363,7 +363,7 @@ export const MULTIMODAL_CAPABILITIES:
       "spreadsheet-analysis",
 
     state:
-      "next",
+      "ready",
 
     localFirst:
       true,
@@ -379,7 +379,7 @@ export const MULTIMODAL_CAPABILITIES:
     ],
 
     notes:
-      "CSV is already readable. XLSX requires structure-aware extraction from the stored OOXML container.",
+      "CSV is directly readable and XLSX uses bounded structure-aware OOXML extraction through the local multimodal worker.",
   },
   {
     modality:
@@ -389,7 +389,7 @@ export const MULTIMODAL_CAPABILITIES:
       "document-understanding",
 
     state:
-      "next",
+      "ready",
 
     localFirst:
       true,
@@ -403,7 +403,7 @@ export const MULTIMODAL_CAPABILITIES:
     ],
 
     notes:
-      "Secure storage validation is enabled. Page-aware text extraction and optional rendered-page vision remain to be connected.",
+      "PDF text extraction is connected through the local multimodal worker when pypdf is installed.",
   },
   {
     modality:
@@ -413,7 +413,7 @@ export const MULTIMODAL_CAPABILITIES:
       "document-understanding",
 
     state:
-      "next",
+      "ready",
 
     localFirst:
       true,
@@ -427,7 +427,7 @@ export const MULTIMODAL_CAPABILITIES:
     ],
 
     notes:
-      "Non-macro OOXML only. Extraction will preserve document order without executing embedded content.",
+      "Non-macro OOXML only. Local extraction preserves document order without executing embedded content.",
   },
   {
     modality:
@@ -437,7 +437,7 @@ export const MULTIMODAL_CAPABILITIES:
       "presentation-analysis",
 
     state:
-      "next",
+      "ready",
 
     localFirst:
       true,
@@ -451,7 +451,7 @@ export const MULTIMODAL_CAPABILITIES:
     ],
 
     notes:
-      "Slide-aware text extraction and optional slide rendering are the processing path.",
+      "Slide-aware local OOXML extraction preserves bounded slide text without executing embedded content.",
   },
   {
     modality:
@@ -461,7 +461,7 @@ export const MULTIMODAL_CAPABILITIES:
       "audio-understanding",
 
     state:
-      "next",
+      "ready",
 
     localFirst:
       true,
@@ -483,7 +483,7 @@ export const MULTIMODAL_CAPABILITIES:
     ],
 
     notes:
-      "Live microphone dictation exists. Uploaded audio needs local transcription plus acoustic metadata before reasoning.",
+      "Live microphone dictation is available in supported browsers. Uploaded audio uses FFmpeg plus whisper.cpp when the local runtime is configured.",
   },
   {
     modality:
@@ -493,7 +493,7 @@ export const MULTIMODAL_CAPABILITIES:
       "video-understanding",
 
     state:
-      "planned",
+      "ready",
 
     localFirst:
       true,
@@ -511,7 +511,7 @@ export const MULTIMODAL_CAPABILITIES:
     ],
 
     notes:
-      "The target path combines bounded frame sampling, audio transcription, timing metadata, and multimodal synthesis.",
+      "Uploaded video combines bounded frame sampling, audio transcription, timing metadata, and multimodal synthesis when FFmpeg, FFprobe, and whisper.cpp are configured.",
   },
   {
     modality:
@@ -521,7 +521,7 @@ export const MULTIMODAL_CAPABILITIES:
       "image-generation",
 
     state:
-      "planned",
+      "ready",
 
     localFirst:
       true,
@@ -535,7 +535,7 @@ export const MULTIMODAL_CAPABILITIES:
       [],
 
     notes:
-      "A dedicated local image-generation engine is required because Mabojolu's reasoning models produce text, not pixels.",
+      "Text-to-image generation is connected to the dedicated local ComfyUI adapter when its loopback runtime and workflow are configured.",
   },
   {
     modality:
@@ -545,7 +545,7 @@ export const MULTIMODAL_CAPABILITIES:
       "speech-synthesis",
 
     state:
-      "planned",
+      "ready",
 
     localFirst:
       true,
@@ -558,7 +558,7 @@ export const MULTIMODAL_CAPABILITIES:
       [],
 
     notes:
-      "Speech output belongs to a dedicated local synthesis processor rather than the reasoning provider.",
+      "Speech synthesis is part of the universal assistant target; runtime availability is reported separately and must not be confused with adapter presence.",
   },
 ] as const;
 
