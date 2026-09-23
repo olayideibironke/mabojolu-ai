@@ -204,6 +204,18 @@ describe(
     );
 
     it(
+      "reports every connected multimodal adapter as ready",
+      () => {
+        const modalities = [
+          "image-understanding", "text-document", "structured-data", "source-code", "spreadsheet", "pdf", "office-document", "presentation", "audio-understanding", "video-understanding", "image-generation", "speech-synthesis",
+        ] as const;
+        for (const modality of modalities) {
+          expect(multimodalCapability(modality).state).toBe("ready");
+        }
+      },
+    );
+
+    it(
       "defines the complete ordinary-assistant target surface explicitly",
       () => {
         expect(
