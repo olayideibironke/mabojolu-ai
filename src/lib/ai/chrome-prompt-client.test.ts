@@ -82,7 +82,9 @@ describe(
       async () => {
         const create =
           vi.fn(
-            async () => ({
+            async (
+              _options: unknown,
+            ) => ({
               promptStreaming:
                 vi.fn(),
             }),
