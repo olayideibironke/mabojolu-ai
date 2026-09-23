@@ -166,7 +166,7 @@ export interface ChatGeneratedImage {
 export interface ChatGeneratedFile {
   id: string;
   name: string;
-  mimeType: "text/plain";
+  mimeType:\n    | "text/plain"\n    | "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
   sizeBytes: number;
   dataUrl: string;
 }
