@@ -122,6 +122,20 @@ function requestedTextFileContent(
     .trim();
 }
 
+function textFileAssistantMessage(
+  request: string,
+): string {
+  const exact =
+    EXACT_TEXT_FILE_PATTERN.exec(
+      request,
+    )?.[1]
+      ?.trim();
+
+  return exact
+    ? "Created the text file exactly as requested."
+    : "Created the requested text file.";
+}
+
 function generatedTextFile(
   content: string,
 ): ChatGeneratedFile {
@@ -604,8 +618,17 @@ export function useChat(
               return;
             }
 
+            const completedContent =
+              wantsTextFile
+                ? textFileAssistantMessage(
+                    latestUser?.content ??
+                      "",
+                  )
+                : accumulated;
+
             patchAssistant({
-              content: accumulated,
+              content:
+                completedContent,
               status: "complete",
 
               ...(wantsTextFile &&
