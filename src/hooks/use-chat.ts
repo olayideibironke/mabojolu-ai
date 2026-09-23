@@ -80,6 +80,9 @@ export interface UseChatOptions {
 const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b[\s\S]{0,80}\b(?:of|showing|depicting|with)\b/i;
 const IMAGE_ANALYSIS_PATTERN = /\b(?:analy[sz]e|describe|explain|inspect|read|identify|what|who|where|tell me|look at)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|attachment)\b/i;
 
+const XLSX_FILE_REQUEST_PATTERN =
+  /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,180}\b(?:\.xlsx|xlsx file|excel spreadsheet|excel file|spreadsheet)\b|\b(?:\.xlsx|xlsx file|excel spreadsheet|excel file|spreadsheet)\b[\s\S]{0,180}\b(?:create|make|generate|write|save|produce|download)\b/i;
+
 const DOCX_FILE_REQUEST_PATTERN =
   /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,160}\b(?:\.docx|docx file|word document|word file)\b|\b(?:\.docx|docx file|word document|word file)\b[\s\S]{0,160}\b(?:create|make|generate|write|save|produce|download)\b/i;
 
@@ -88,6 +91,60 @@ const TEXT_FILE_REQUEST_PATTERN =
 
 const EXACT_TEXT_FILE_PATTERN =
   /(?:containing|with)\s+exactly\s+(?:these|the following)\s+\w*\s*(?:lines?|paragraphs?)\s*:\s*([\s\S]*?)(?:\n\s*(?:give|provide|save|download|return)\b[\s\S]*|$)/i;
+
+function xlsxFileRequest(
+  content: string,
+): boolean {
+  const trimmed = content.trim();
+  return trimmed.length > 0 &&
+    XLSX_FILE_REQUEST_PATTERN.test(trimmed);
+}
+
+async function generatedXlsxFile(
+  content: string,
+  signal: AbortSignal,
+): Promise<ChatGeneratedFile> {
+  const response = await fetch("/api/files/xlsx", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: content.trim() }),
+    signal,
+  });
+
+  const payload = await response.json().catch(() => null) as {
+    file?: {
+      name?: unknown;
+      mimeType?: unknown;
+      sizeBytes?: unknown;
+      dataUrl?: unknown;
+    };
+    error?: { message?: unknown };
+  } | null;
+
+  if (
+    !response.ok ||
+    !payload?.file ||
+    typeof payload.file.name !== "string" ||
+    payload.file.mimeType !==
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" ||
+    typeof payload.file.sizeBytes !== "number" ||
+    typeof payload.file.dataUrl !== "string"
+  ) {
+    throw new Error(
+      typeof payload?.error?.message === "string"
+        ? payload.error.message
+        : "Mabojolu could not create that spreadsheet.",
+    );
+  }
+
+  return {
+    id: createId(),
+    name: payload.file.name,
+    mimeType: payload.file.mimeType,
+    sizeBytes: payload.file.sizeBytes,
+    dataUrl: payload.file.dataUrl,
+  };
+}
 
 function docxFileRequest(
   content: string,
@@ -468,6 +525,63 @@ export function useChat(
               latestUser.content,
             )
           : false;
+
+      const wantsXlsxFile =
+        latestUser &&
+        (!latestUser.attachments ||
+          latestUser.attachments.length === 0)
+          ? xlsxFileRequest(latestUser.content)
+          : false;
+
+      if (wantsXlsxFile && latestUser) {
+        setStatusLabel("Creating spreadsheet...");
+
+        const spreadsheetContent =
+          requestedTextFileContent(
+            latestUser.content,
+            latestUser.content,
+          );
+
+        void generatedXlsxFile(
+          spreadsheetContent,
+          controller.signal,
+        )
+          .then((file) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            patchAssistant({
+              content: "Created the spreadsheet as requested.",
+              generatedFiles: [file],
+              status: "complete",
+              model: "mabojolu-xlsx",
+            });
+          })
+          .catch((cause) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            if (controller.signal.aborted) {
+              patchAssistant({ status: "interrupted" });
+              return;
+            }
+            patchAssistant({
+              status: "failed",
+              error: {
+                code: "internal_error",
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Mabojolu could not create that spreadsheet.",
+                retryable: true,
+              },
+            });
+          });
+
+        return;
+      }
 
       if (
         wantsDocxFile &&
