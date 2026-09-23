@@ -92,7 +92,7 @@ export function contentWithAttachmentContext(
     return [
       text.length > 0
         ? text
-        : "Analyze the attached file using the extracted evidence below and respond with the useful result.",
+        : "Use the extracted attachment evidence below to answer directly. Do not announce that you analyzed, processed, received, or were provided the attachment. Do not introduce yourself or mention your creator unless the user asks.",
       ...blocks,
     ]
       .filter(
@@ -120,7 +120,7 @@ export function contentWithAttachmentContext(
     ).length >
       0
   ) {
-    return "Please describe and analyze the attached image.";
+    return "Answer directly from the attached image. Do not announce that you analyzed, processed, received, or were provided the image. Do not introduce yourself or mention your creator unless the user asks.";
   }
 
   return message.content;
