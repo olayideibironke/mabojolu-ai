@@ -251,13 +251,28 @@ async function runWorker(
             const parsed =
               JSON.parse(
                 stdout,
-              ) as
-                Partial<
-                  LocalDocumentExtraction
-                > &
-                Partial<
-                  LocalDocumentExtractionFailure
-                >;
+              ) as {
+                ok?:
+                  boolean;
+
+                processor?:
+                  unknown;
+
+                text?:
+                  unknown;
+
+                metadata?:
+                  unknown;
+
+                warnings?:
+                  unknown;
+
+                code?:
+                  unknown;
+
+                message?:
+                  unknown;
+              };
 
             if (
               parsed.ok ===
