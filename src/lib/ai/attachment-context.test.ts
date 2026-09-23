@@ -200,7 +200,7 @@ describe(
         expect(
           documentOnly,
         ).toContain(
-          "Use the extracted attachment evidence below to answer directly. Do not announce that you analyzed, processed, received, or were provided the attachment. Do not introduce yourself or mention your creator unless the user asks.",
+          "Summarize the attachment's key content directly from the extracted evidence below. For structured data, report the important rows, labels, values, dates, totals, statuses, and action items that are actually present. Do not announce that you analyzed, processed, received, or were provided the attachment. Do not introduce yourself or mention your creator unless the user asks.",
         );
 
         expect(
