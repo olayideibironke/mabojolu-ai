@@ -109,6 +109,43 @@ describe("useChat", () => {
     });
   });
 
+  it("keeps attachment-only synthetic instructions out of the visible user message", async () => {
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      result.current.send("", [
+        {
+          kind: "document",
+          id: "audio-evidence-1",
+          name: "jfk.wav",
+          mimeType: "text/plain",
+          sizeBytes: 64,
+          textContent: "Ask not what your country can do for you.",
+        },
+      ]);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isStreaming).toBe(false);
+    });
+
+    expect(result.current.messages[0]).toMatchObject({
+      role: "user",
+      content: "",
+    });
+
+    expect(result.current.messages[0].attachments?.[0]).toMatchObject({
+      name: "jfk.wav",
+    });
+
+    const call = chatCalls()[0] as [string, RequestInit];
+    const body = JSON.parse(String(call[1].body)) as {
+      messages: Array<{ content: string }>;
+    };
+
+    expect(body.messages[0].content).toBe("");
+  });
+
   it("adopts the server's conversation id exactly once", async () => {
     // Reported once per conversation, not once per double-invoked updater.
     const onConversationChanged = vi.fn();
