@@ -1,6 +1,15 @@
 import {
+  chatError,
+} from "@/lib/ai/errors";
+import {
   inspectLocalMultimodalRuntime,
 } from "@/lib/ai/local-multimodal-runtime";
+import {
+  errorResponse,
+} from "@/lib/ai/stream";
+import {
+  getSession,
+} from "@/lib/auth/session";
 
 export const runtime =
   "nodejs";
@@ -10,6 +19,17 @@ export const dynamic =
 
 export async function GET():
   Promise<Response> {
+  const session =
+    await getSession();
+
+  if (!session) {
+    return errorResponse(
+      chatError(
+        "unauthorized",
+      ),
+    );
+  }
+
   const status =
     await inspectLocalMultimodalRuntime();
 
@@ -37,7 +57,7 @@ export async function GET():
     {
       headers: {
         "Cache-Control":
-          "no-store",
+          "private, no-store",
       },
     },
   );
