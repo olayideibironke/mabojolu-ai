@@ -638,6 +638,9 @@ function AssistantMessage({
   const sources =
     message.sources ?? [];
 
+  const generatedImages =
+    message.generatedImages ?? [];
+
   const sourcePanelId =
     `sources-${message.id}`;
 
@@ -655,8 +658,19 @@ function AssistantMessage({
           />
         ) : null}
 
+        {generatedImages.length > 0 ? (
+          <div className="mb-3 grid max-w-[640px] gap-3 sm:grid-cols-2" aria-label="Generated images">
+            {generatedImages.map((image) => (
+              <figure key={image.id} className="relative m-0 aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-surface-base">
+                <Image src={image.dataUrl} alt={image.prompt ?? image.name} fill unoptimized sizes="(max-width: 640px) 100vw, 320px" className="object-contain" />
+                <figcaption className="sr-only">{image.prompt ?? image.name}</figcaption>
+              </figure>
+            ))}
+          </div>
+        ) : null}
+
         {isThisMessageStreaming &&
-        !hasContent ? (
+        !hasContent && generatedImages.length === 0 ? (
           <ReasoningStatus />
         ) : null}
 
@@ -695,7 +709,7 @@ function AssistantMessage({
         ) : null}
 
         {!isActive &&
-        hasContent &&
+        (hasContent || generatedImages.length > 0) &&
         message.status !== "failed" ? (
           <>
             <div className="mt-2 -ml-1.5 flex flex-wrap items-center gap-1">
