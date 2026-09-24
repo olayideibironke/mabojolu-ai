@@ -159,7 +159,14 @@ export function inferStructuralChangePoint(
     };
   }
 
-  const errors = sorted.map((entry) => squaredError(activeProgram, entry.observation));
+  const errors = sorted.map(
+    (entry) =>
+      squaredError(
+        activeProgram,
+        entry.observation,
+      ),
+  );
+
   const candidates: Array<{
     index: number;
     score: number;
@@ -169,73 +176,102 @@ export function inferStructuralChangePoint(
 
   for (
     let index = minimumSegmentSize;
-    index <= sorted.length - minimumSegmentSize;
+    index <=
+      sorted.length -
+        minimumSegmentSize;
     index += 1
   ) {
-    const beforeWindow = errors.slice(
-      index - minimumSegmentSize,
-      index,
-    );
-    const afterWindow = errors.slice(
-      index,
-      index + minimumSegmentSize,
-    );
-    const beforeMean = mean(beforeWindow);
-    const afterMean = mean(afterWindow);
-    const improvement = afterMean - beforeMean;
-    const persistence =
+    const beforeWindow =
+      errors.slice(
+        index -
+          minimumSegmentSize,
+        index,
+      );
+
+    const afterWindow =
+      errors.slice(
+        index,
+        index +
+          minimumSegmentSize,
+      );
+
+    const beforeMean =
+      mean(
+        beforeWindow,
+      );
+
+    const afterMean =
+      mean(
+        afterWindow,
+      );
+
+    const improvement =
+      afterMean -
+      beforeMean;
+
+    const elevatedAfter =
       afterWindow.filter(
         (value) =>
-          value >
+          value >=
           beforeMean +
-            minimumMseImprovement / 2,
-      ).length / afterWindow.length;
-    const score = improvement * (0.5 + 0.5 * persistence);
-    const posterior = sigmoid(
-      posteriorScale * (score - minimumMseImprovement),
-    );
+            minimumMseImprovement,
+      ).length;
 
-    candidates.push({ index, score, improvement, posterior });
+    const quietBefore =
+      beforeWindow.filter(
+        (value) =>
+          value <=
+          beforeMean +
+            minimumMseImprovement /
+              2,
+      ).length;
+
+    const persistence =
+      elevatedAfter /
+      afterWindow.length;
+
+    const boundaryPurity =
+      quietBefore /
+      beforeWindow.length;
+
+    const score =
+      improvement *
+      persistence *
+      boundaryPurity;
+
+    const posterior =
+      sigmoid(
+        posteriorScale *
+          (
+            score -
+            minimumMseImprovement
+          ),
+      );
+
+    candidates.push({
+      index,
+      score,
+      improvement,
+      posterior,
+    });
   }
 
   candidates.sort(
-    (left, right) =>
-      right.score - left.score ||
-      left.index - right.index,
+    (
+      left,
+      right,
+    ) =>
+      right.score -
+        left.score ||
+      left.index -
+        right.index,
   );
 
-  const maximumScore =
-    candidates[0]!
-      .score;
-
-  const nearBest =
-    candidates
-      .filter(
-        (candidate) =>
-          maximumScore -
-            candidate.score <=
-          Math.max(
-            minimumMseImprovement,
-            Math.abs(
-              maximumScore,
-            ) * 0.15,
-          ),
-      )
-      .sort(
-        (left, right) =>
-          left.index -
-          right.index,
-      );
-
   const best =
-    nearBest[0] ??
     candidates[0]!;
+
   const runnerUp =
-    candidates.find(
-      (candidate) =>
-        candidate.index !==
-        best.index,
-    );
+    candidates[1];
   const posteriorGap = runnerUp
     ? best.posterior - runnerUp.posterior
     : best.posterior;
