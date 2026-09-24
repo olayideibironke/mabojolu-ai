@@ -15,6 +15,7 @@ const EDITABLE_MIMES = new Set<string>([
   "text/markdown",
   "text/csv",
   "application/json",
+  "application/pdf",
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
   "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
   "application/vnd.openxmlformats-officedocument.presentationml.presentation",
@@ -58,9 +59,7 @@ export async function POST(request: Request): Promise<Response> {
 
     if (!EDITABLE_MIMES.has(record.mimeType)) {
       return NextResponse.json(
-        { error: { message: record.mimeType === "application/pdf"
-          ? "Preservation-safe PDF editing is not connected yet. Mabojolu will not rebuild the PDF and pretend its original structure was preserved."
-          : "That attachment format is not editable by the preservation-safe file editor yet." } },
+        { error: { message: "That attachment format is not editable by the preservation-safe file editor yet." } },
         { status: 422 },
       );
     }
@@ -91,7 +90,9 @@ export async function POST(request: Request): Promise<Response> {
       },
       edit: {
         replacements: edited.replacements,
-        preservationMode: "original-container",
+        preservationMode: record.mimeType === "application/pdf"
+          ? "byte-preserving-pdf"
+          : "original-container",
       },
     });
   } catch (cause) {
