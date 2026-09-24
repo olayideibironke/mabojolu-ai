@@ -455,6 +455,34 @@ function generatedTextFile(
   };
 }
 
+const FILE_EDIT_PATTERN = /\b(?:change|replace|edit|update)\b[\s\S]{0,240}\b(?:to|with)\b/i;
+
+function requestedFileEdit(content: string): { findText: string; replaceText: string } | null {
+  const quoted = /\b(?:change|replace|edit|update)\s+["“']([^"”']+)["”']\s+(?:to|with)\s+["“']([^"”']*)["”']/i.exec(content);
+  if (quoted) return { findText: quoted[1], replaceText: quoted[2] };
+  const plain = /\b(?:change|replace|edit|update)\s+(.+?)\s+(?:to|with)\s+(.+?)(?:[.!?]|$)/i.exec(content);
+  return plain ? { findText: plain[1].trim(), replaceText: plain[2].trim() } : null;
+}
+
+async function modifiedAttachmentFile(attachmentId: string, edit: { findText: string; replaceText: string }, signal: AbortSignal): Promise<ChatGeneratedFile> {
+  const response = await fetch("/api/files/edit", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ attachmentId, findText: edit.findText, replaceText: edit.replaceText }),
+    signal,
+  });
+  const payload = await response.json().catch(() => null) as { file?: { name?: unknown; mimeType?: unknown; sizeBytes?: unknown; dataUrl?: unknown }; error?: { message?: unknown } } | null;
+  if (!response.ok || !payload?.file || typeof payload.file.name !== "string" || typeof payload.file.mimeType !== "string" || typeof payload.file.sizeBytes !== "number" || typeof payload.file.dataUrl !== "string") {
+    throw new Error(typeof payload?.error?.message === "string" ? payload.error.message : "Mabojolu could not modify that file.");
+  }
+  return {
+    id: createId(),
+    name: payload.file.name,
+    mimeType: payload.file.mimeType as ChatGeneratedFile["mimeType"],
+    sizeBytes: payload.file.sizeBytes,
+    dataUrl: payload.file.dataUrl,
+  };
+}
 function imageGenerationPrompt(content: string): string | null {
   const trimmed = content.trim();
   if (!trimmed || !IMAGE_REQUEST_PATTERN.test(trimmed) || IMAGE_ANALYSIS_PATTERN.test(trimmed)) return null;
@@ -631,6 +659,50 @@ export function useChat(
       };
 
       const latestUser = [...history].reverse().find((message) => message.role === "user");
+      const editableAttachment = latestUser?.attachments?.find((attachment) =>
+        "textContent" in attachment &&
+        typeof attachment.sourceAttachmentId === "string" &&
+        attachment.sourceAttachmentId.length > 0,
+      );
+      const requestedEdit = latestUser && editableAttachment && FILE_EDIT_PATTERN.test(latestUser.content)
+        ? requestedFileEdit(latestUser.content)
+        : null;
+
+      if (editableAttachment && requestedEdit) {
+        setStatusLabel("Modifying file...");
+        void modifiedAttachmentFile(editableAttachment.sourceAttachmentId as string, requestedEdit, controller.signal)
+          .then((file) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            patchAssistant({
+              content: "Modified the attached file and preserved the original container structure.",
+              generatedFiles: [file],
+              status: "complete",
+              model: "mabojolu-file-editor",
+            });
+          })
+          .catch((cause) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            if (controller.signal.aborted) {
+              patchAssistant({ status: "interrupted" });
+              return;
+            }
+            patchAssistant({
+              status: "failed",
+              error: {
+                code: "internal_error",
+                message: cause instanceof Error ? cause.message : "Mabojolu could not modify that file.",
+                retryable: false,
+              },
+            });
+          });
+        return;
+      }
       const imagePrompt = latestUser && (!latestUser.attachments || latestUser.attachments.length === 0)
         ? imageGenerationPrompt(latestUser.content)
         : null;
