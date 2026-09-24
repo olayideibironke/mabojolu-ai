@@ -231,10 +231,16 @@ export function inferStructuralChangePoint(
       quietBefore /
       beforeWindow.length;
 
+    const boundaryContamination =
+      1 -
+      boundaryPurity;
+
     const score =
       improvement *
-      persistence *
-      boundaryPurity;
+      persistence -
+      boundaryContamination *
+        minimumMseImprovement *
+        2;
 
     const posterior =
       sigmoid(
