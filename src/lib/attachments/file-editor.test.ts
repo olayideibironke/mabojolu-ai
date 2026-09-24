@@ -161,6 +161,41 @@ describe("editFileBytes", () => {
     expect(result.replacements).toBe(1);
   });
 
+  it("edits the first XLSX inline string cell without changing formulas or later instructions", () => {
+    const worksheetXml =
+      '<worksheet><sheetData>' +
+      '<row r="4"><c r="C4" t="inlineStr"><is><t>Quarterly Target</t></is></c></row>' +
+      '<row r="11"><c r="B11"><f>SUM(C5:C8)</f><v>147500</v></c></row>' +
+      '<row r="13"><c r="B13" t="inlineStr"><is><t>Change &quot;Quarterly Target&quot; to &quot;Annual Target&quot;.</t></is></c></row>' +
+      '</sheetData></worksheet>';
+    const original = zipSync({
+      "xl/worksheets/sheet1.xml": strToU8(worksheetXml),
+      "xl/styles.xml": strToU8("<styleSheet/>"),
+    });
+
+    const result = editFileBytes({
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      bytes: original,
+      findText: "Quarterly Target",
+      replaceText: "Annual Target",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const archive = unzipSync(result.bytes);
+    const edited = strFromU8(archive["xl/worksheets/sheet1.xml"]);
+
+    expect(edited).toContain("<t>Annual Target</t>");
+    expect(edited).toContain("<f>SUM(C5:C8)</f><v>147500</v>");
+    expect(edited).toContain(
+      'Change &quot;Quarterly Target&quot; to &quot;Annual Target&quot;.',
+    );
+    expect(strFromU8(archive["xl/styles.xml"])).toBe("<styleSheet/>");
+    expect(result.replacements).toBe(1);
+  });
+
   it("leaves the Office package untouched when the requested visible text is absent", () => {
     const original = zipSync({
       "word/document.xml": strToU8(
