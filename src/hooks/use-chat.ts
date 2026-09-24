@@ -659,11 +659,21 @@ export function useChat(
       };
 
       const latestUser = [...history].reverse().find((message) => message.role === "user");
-      const editableAttachment = latestUser?.attachments?.find((attachment) =>
-        "textContent" in attachment &&
-        typeof attachment.sourceAttachmentId === "string" &&
-        attachment.sourceAttachmentId.length > 0,
-      );
+      const editableAttachment =
+        latestUser?.attachments?.find(
+          (
+            attachment,
+          ): attachment is ChatTextDocumentAttachment =>
+            attachment.kind ===
+              "document" &&
+            typeof attachment
+              .sourceAttachmentId ===
+              "string" &&
+            attachment
+              .sourceAttachmentId
+              .length >
+              0,
+        );
       const requestedEdit = latestUser && editableAttachment && FILE_EDIT_PATTERN.test(latestUser.content)
         ? requestedFileEdit(latestUser.content)
         : null;
