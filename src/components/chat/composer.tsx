@@ -26,6 +26,7 @@ import {
 
 interface ComposerProps {
   isStreaming: boolean;
+  conversationId?: string | null;
 
   onSend: (
     content: string,
@@ -1138,6 +1139,7 @@ function CloseIcon() {
 
 export function Composer({
   isStreaming,
+  conversationId = null,
   onSend,
   onStop,
   focusKey = 0,
@@ -1720,6 +1722,7 @@ export function Composer({
                 await analyzeFileOnServer(
                   file,
                   serverMimeType,
+                  conversationId,
                 );
 
               const remainingCapacity =
