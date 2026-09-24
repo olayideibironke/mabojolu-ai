@@ -11,8 +11,15 @@ import {
   processAttachmentBytesWithLocalRuntime,
 } from "@/lib/attachments/analysis";
 import {
+  buildStoragePath,
   validateAttachment,
 } from "@/lib/attachments/validation";
+import {
+  getStorage,
+} from "@/lib/attachments/storage";
+import {
+  getDatabase,
+} from "@/lib/database";
 import {
   errorResponse,
 } from "@/lib/ai/stream";
@@ -190,6 +197,11 @@ export async function POST(
         "file",
       );
 
+    const conversationId =
+      form.get(
+        "conversationId",
+      );
+
     if (
       !(
         file instanceof
@@ -259,8 +271,97 @@ export async function POST(
       );
     }
 
-    const attachmentId =
+    let attachmentId =
       crypto.randomUUID();
+
+    if (
+      typeof conversationId ===
+        "string" &&
+      conversationId.length > 0
+    ) {
+      const database =
+        getDatabase();
+
+      const conversation =
+        await database.getConversation(
+          conversationId,
+          session.userId,
+        );
+
+      if (!conversation) {
+        return errorResponse(
+          chatError(
+            "not_found",
+          ),
+        );
+      }
+
+      const record =
+        await database.createAttachment({
+          userId:
+            session.userId,
+
+          conversationId,
+
+          filename:
+            validation.safeFilename,
+
+          mimeType:
+            validation.format.mimeType,
+
+          sizeBytes:
+            bytes.byteLength,
+
+          storagePath:
+            `pending/${session.userId}/${crypto.randomUUID()}`,
+        });
+
+      const storagePath =
+        buildStoragePath({
+          userId:
+            session.userId,
+
+          conversationId,
+
+          attachmentId:
+            record.id,
+
+          safeFilename:
+            validation.safeFilename,
+        });
+
+      try {
+        await getStorage().put(
+          storagePath,
+          bytes,
+          validation.format.mimeType,
+        );
+
+        await database.updateAttachmentStatus(
+          record.id,
+          session.userId,
+          "ready",
+          {
+            storagePath,
+          },
+        );
+      } catch (cause) {
+        await database.updateAttachmentStatus(
+          record.id,
+          session.userId,
+          "failed",
+          {
+            failureReason:
+              "Upload to storage failed.",
+          },
+        );
+
+        throw cause;
+      }
+
+      attachmentId =
+        record.id;
+    }
 
     const processed =
       await processAttachmentBytesWithLocalRuntime(
@@ -347,6 +448,16 @@ export async function POST(
 
         textContent:
           text,
+
+        ...(typeof conversationId === "string" && conversationId.length > 0
+          ? {
+              sourceAttachmentId:
+                attachmentId,
+
+              sourceMimeType:
+                validation.format.mimeType,
+            }
+          : {}),
       });
     }
 
