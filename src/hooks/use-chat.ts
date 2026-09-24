@@ -82,7 +82,7 @@ export interface UseChatOptions {
 }
 
 
-const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b[\s\S]{0,80}\b(?:of|showing|depicting|with)\b/i;
+const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print|design)\b[\s\S]{0,120}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic|flyer|poster|banner|invitation|birthday card|greeting card)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic|flyer|poster|banner|invitation|birthday card|greeting card)\b[\s\S]{0,120}\b(?:of|for|showing|depicting|with)\b/i;
 const IMAGE_ANALYSIS_PATTERN = /\b(?:analy[sz]e|describe|explain|inspect|read|identify|what|who|where|tell me|look at)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|attachment)\b/i;
 
 const PDF_FILE_REQUEST_PATTERN =
