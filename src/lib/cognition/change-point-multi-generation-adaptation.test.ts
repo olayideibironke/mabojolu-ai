@@ -14,6 +14,7 @@ function program(id: string, coefficient: number): HierarchicalCausalProgram {
   return {
     id,
     baseEffects: {},
+    observationStdDev: 0.05,
     fragments: [
       {
         id: `${id}:x`,
