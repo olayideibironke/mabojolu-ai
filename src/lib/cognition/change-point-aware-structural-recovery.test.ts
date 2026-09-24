@@ -48,6 +48,7 @@ function program(
         sourceMechanismId: `${id}:source`,
         terms: [
           {
+            id: `${id}:x:linear`,
             kind: "linear",
             variables: ["x"],
             coefficient,
