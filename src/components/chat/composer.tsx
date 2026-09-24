@@ -28,6 +28,10 @@ interface ComposerProps {
   isStreaming: boolean;
   conversationId?: string | null;
 
+  onConversationPrepared?: (
+    conversationId: string,
+  ) => void;
+
   onSend: (
     content: string,
     attachments: ChatAttachment[],
@@ -460,7 +464,10 @@ async function analyzeFileOnServer(
     string,
   conversationId?:
     string | null,
-): Promise<ChatAttachment[]> {
+): Promise<{
+  attachments: ChatAttachment[];
+  conversationId: string | null;
+}> {
   const normalizedFile =
     file.type ===
       mimeType
@@ -603,7 +610,27 @@ async function analyzeFileOnServer(
     );
   }
 
-  return normalized;
+  const returnedConversationId =
+    typeof payload === "object" &&
+    payload !== null &&
+    "conversationId" in payload &&
+    typeof (
+      payload as {
+        conversationId?: unknown;
+      }
+    ).conversationId === "string"
+      ? (
+          payload as {
+            conversationId: string;
+          }
+        ).conversationId
+      : null;
+
+  return {
+    attachments: normalized,
+    conversationId:
+      returnedConversationId,
+  };
 }
 
 async function readTextDocument(
@@ -1140,6 +1167,7 @@ function CloseIcon() {
 export function Composer({
   isStreaming,
   conversationId = null,
+  onConversationPrepared,
   onSend,
   onStop,
   focusKey = 0,
@@ -1718,12 +1746,25 @@ export function Composer({
                 `Analyzing ${file.name} locally...`,
               );
 
-              const analyzed =
+              const analyzedResult =
                 await analyzeFileOnServer(
                   file,
                   serverMimeType,
                   conversationId,
                 );
+
+              if (
+                analyzedResult.conversationId &&
+                analyzedResult.conversationId !==
+                  conversationId
+              ) {
+                onConversationPrepared?.(
+                  analyzedResult.conversationId,
+                );
+              }
+
+              const analyzed =
+                analyzedResult.attachments;
 
               const remainingCapacity =
                 MAX_ATTACHMENT_COUNT -
@@ -1853,6 +1894,8 @@ export function Composer({
       },
       [
         attachments,
+        conversationId,
+        onConversationPrepared,
       ],
     );
 
