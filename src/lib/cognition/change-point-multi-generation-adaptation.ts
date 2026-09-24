@@ -160,7 +160,6 @@ export function inferStructuralChangePoint(
   }
 
   const errors = sorted.map((entry) => squaredError(activeProgram, entry.observation));
-  const globalMean = mean(errors);
   const candidates: Array<{
     index: number;
     score: number;
@@ -173,14 +172,24 @@ export function inferStructuralChangePoint(
     index <= sorted.length - minimumSegmentSize;
     index += 1
   ) {
-    const before = errors.slice(0, index);
-    const after = errors.slice(index);
-    const beforeMean = mean(before);
-    const afterMean = mean(after);
+    const beforeWindow = errors.slice(
+      index - minimumSegmentSize,
+      index,
+    );
+    const afterWindow = errors.slice(
+      index,
+      index + minimumSegmentSize,
+    );
+    const beforeMean = mean(beforeWindow);
+    const afterMean = mean(afterWindow);
     const improvement = afterMean - beforeMean;
     const persistence =
-      after.filter((value) => value > beforeMean + minimumMseImprovement / 2)
-        .length / after.length;
+      afterWindow.filter(
+        (value) =>
+          value >
+          beforeMean +
+            minimumMseImprovement / 2,
+      ).length / afterWindow.length;
     const score = improvement * (0.5 + 0.5 * persistence);
     const posterior = sigmoid(
       posteriorScale * (score - minimumMseImprovement),
