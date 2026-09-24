@@ -5,6 +5,7 @@ export type EditableMimeType =
   | "text/markdown"
   | "text/csv"
   | "application/json"
+  | "application/pdf"
   | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
   | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
   | "application/vnd.openxmlformats-officedocument.presentationml.presentation";
@@ -16,6 +17,8 @@ export type FileEditResult =
       code: "unsupported_format" | "text_not_found" | "invalid_archive";
       message: string;
     };
+
+const PDF_MIME: EditableMimeType = "application/pdf";
 
 const OOXML_MIMES = new Set<EditableMimeType>([
   "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -315,6 +318,57 @@ function replaceAcrossXmlTextRuns(
   };
 }
 
+function editPdfSameWidthLiteral(
+  bytes: Uint8Array,
+  findText: string,
+  replaceText: string,
+): FileEditResult {
+  const findBytes = new TextEncoder().encode(findText);
+  const replacementBytes = new TextEncoder().encode(replaceText);
+
+  if (findBytes.byteLength !== replacementBytes.byteLength) {
+    return {
+      ok: false,
+      code: "unsupported_format",
+      message:
+        "Safe PDF editing currently requires replacement text with the same UTF-8 byte length as the original text. Mabojolu left the PDF unchanged rather than rebuilding it.",
+    };
+  }
+
+  // This intentionally supports only direct, uncompressed PDF string operands.
+  // Replacing equal-width bytes keeps object lengths, xref offsets, page geometry,
+  // resources, metadata, and every unrelated byte unchanged.
+  const source = Buffer.from(bytes);
+  const needle = Buffer.from(findBytes);
+  const replacement = Buffer.from(replacementBytes);
+  const starts: number[] = [];
+
+  for (let offset = source.indexOf(needle); offset >= 0; offset = source.indexOf(needle, offset + needle.length)) {
+    const before = source[offset - 1];
+    const after = source[offset + needle.length];
+    const inLiteralString = before === 0x28 && after === 0x29;
+    if (inLiteralString) starts.push(offset);
+  }
+
+  if (starts.length === 0) {
+    return {
+      ok: false,
+      code: "text_not_found",
+      message:
+        "The requested text was not found as a safe direct PDF text operand. Mabojolu left the original PDF unchanged.",
+    };
+  }
+
+  const output = Buffer.from(source);
+  replacement.copy(output, starts[0]);
+
+  return {
+    ok: true,
+    bytes: new Uint8Array(output),
+    replacements: 1,
+  };
+}
+
 export function editFileBytes(input: {
   mimeType: EditableMimeType;
   bytes: Uint8Array;
@@ -327,6 +381,14 @@ export function editFileBytes(input: {
       code: "text_not_found",
       message: "The text to replace cannot be empty.",
     };
+  }
+
+  if (input.mimeType === PDF_MIME) {
+    return editPdfSameWidthLiteral(
+      input.bytes,
+      input.findText,
+      input.replaceText,
+    );
   }
 
   if (!OOXML_MIMES.has(input.mimeType)) {
