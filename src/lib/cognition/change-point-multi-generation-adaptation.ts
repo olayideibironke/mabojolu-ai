@@ -213,17 +213,14 @@ export function inferStructuralChangePoint(
       afterWindow.filter(
         (value) =>
           value >=
-          beforeMean +
-            minimumMseImprovement,
+          minimumMseImprovement,
       ).length;
 
     const quietBefore =
       beforeWindow.filter(
         (value) =>
-          value <=
-          beforeMean +
-            minimumMseImprovement /
-              2,
+          value <
+          minimumMseImprovement,
       ).length;
 
     const persistence =
