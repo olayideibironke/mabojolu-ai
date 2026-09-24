@@ -27,7 +27,13 @@ const XML_TEXT_PATTERN =
   /<(w:t|a:t|t)(\s[^>]*)?>([\s\S]*?)<\/\1>/g;
 
 const XLSX_INLINE_TEXT_PATTERN =
-  /<t(\s[^>]*)?>([\s\S]*?)<\/t>/g;
+  /<(?:[A-Za-z_][\\w.-]*:)?t(\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?t>/g;
+
+const XLSX_STRING_VALUE_PATTERN =
+  /<((?:[A-Za-z_][\\w.-]*:)?c)\\b([^>]*\\bt=["']str["'][^>]*)>([\\s\\S]*?)<\\/\\1>/g;
+
+const XLSX_VALUE_PATTERN =
+  /<((?:[A-Za-z_][\\w.-]*:)?v)(\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>/;
 
 interface XmlTextNode {
   start: number;
@@ -85,7 +91,7 @@ function xmlTextNodes(xml: string): XmlTextNode[] {
   return nodes;
 }
 
-function replaceFirstXlsxInlineString(
+function replaceFirstXlsxString(
   xml: string,
   findText: string,
   replaceText: string,
@@ -105,6 +111,35 @@ function replaceFirstXlsxInlineString(
     const escaped = xmlEscapeText(nextText);
     const rawOffset = match[0].indexOf(rawText);
     const textStart = match.index + rawOffset;
+    const textEnd = textStart + rawText.length;
+
+    return {
+      value: xml.slice(0, textStart) + escaped + xml.slice(textEnd),
+      count: 1,
+    };
+  }
+
+  for (const cell of xml.matchAll(XLSX_STRING_VALUE_PATTERN)) {
+    if (cell.index === undefined) continue;
+
+    const body = cell[3] ?? "";
+    const value = XLSX_VALUE_PATTERN.exec(body);
+    if (!value) continue;
+
+    const rawText = value[3] ?? "";
+    const decoded = xmlDecodeText(rawText);
+    const offset = decoded.indexOf(findText);
+    if (offset < 0) continue;
+
+    const nextText =
+      decoded.slice(0, offset) +
+      replaceText +
+      decoded.slice(offset + findText.length);
+    const escaped = xmlEscapeText(nextText);
+    const valueRawOffset = value[0].indexOf(rawText);
+    const bodyOffset = cell[0].indexOf(body);
+    const textStart =
+      cell.index + bodyOffset + (value.index ?? 0) + valueRawOffset;
     const textEnd = textStart + rawText.length;
 
     return {
@@ -414,7 +449,7 @@ export function editFileBytes(input: {
     const edited =
       input.mimeType ===
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        ? replaceFirstXlsxInlineString(
+        ? replaceFirstXlsxString(
             xml,
             input.findText,
             input.replaceText,
