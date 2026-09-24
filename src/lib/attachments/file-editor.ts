@@ -26,6 +26,9 @@ const OOXML_MIMES = new Set<EditableMimeType>([
 const XML_TEXT_PATTERN =
   /<(w:t|a:t|t)(\s[^>]*)?>([\s\S]*?)<\/\1>/g;
 
+const XLSX_INLINE_TEXT_PATTERN =
+  /<t(\s[^>]*)?>([\s\S]*?)<\/t>/g;
+
 interface XmlTextNode {
   start: number;
   end: number;
@@ -80,6 +83,37 @@ function xmlTextNodes(xml: string): XmlTextNode[] {
     });
   }
   return nodes;
+}
+
+function replaceFirstXlsxInlineString(
+  xml: string,
+  findText: string,
+  replaceText: string,
+): { value: string; count: number } {
+  for (const match of xml.matchAll(XLSX_INLINE_TEXT_PATTERN)) {
+    if (match.index === undefined) continue;
+
+    const rawText = match[2] ?? "";
+    const decoded = xmlDecodeText(rawText);
+    const offset = decoded.indexOf(findText);
+    if (offset < 0) continue;
+
+    const nextText =
+      decoded.slice(0, offset) +
+      replaceText +
+      decoded.slice(offset + findText.length);
+    const escaped = xmlEscapeText(nextText);
+    const rawOffset = match[0].indexOf(rawText);
+    const textStart = match.index + rawOffset;
+    const textEnd = textStart + rawText.length;
+
+    return {
+      value: xml.slice(0, textStart) + escaped + xml.slice(textEnd),
+      count: 1,
+    };
+  }
+
+  return { value: xml, count: 0 };
 }
 
 function replaceAcrossXmlTextRuns(
@@ -374,12 +408,22 @@ export function editFileBytes(input: {
     const bytes =
       archive[name];
 
+    const xml =
+      strFromU8(bytes);
+
     const edited =
-      replaceAcrossXmlTextRuns(
-        strFromU8(bytes),
-        input.findText,
-        input.replaceText,
-      );
+      input.mimeType ===
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        ? replaceFirstXlsxInlineString(
+            xml,
+            input.findText,
+            input.replaceText,
+          )
+        : replaceAcrossXmlTextRuns(
+            xml,
+            input.findText,
+            input.replaceText,
+          );
 
     if (edited.count > 0) {
       output[name] =
