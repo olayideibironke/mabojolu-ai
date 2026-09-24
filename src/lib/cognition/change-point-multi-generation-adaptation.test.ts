@@ -17,7 +17,8 @@ function program(id: string, coefficient: number): HierarchicalCausalProgram {
     fragments: [
       {
         id: `${id}:x`,
-        sourceMechanismId: `${id}:source`,
+        validationMeanSquaredError: 0,
+        sourceEvidenceCount: 4,
         terms: [
           {
             id: `${id}:x:linear`,
@@ -26,7 +27,6 @@ function program(id: string, coefficient: number): HierarchicalCausalProgram {
             coefficient,
           },
         ],
-        validationEvidenceIds: [`${id}:validated`],
       },
     ],
     depth: 2,
