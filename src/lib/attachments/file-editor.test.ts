@@ -196,6 +196,51 @@ describe("editFileBytes", () => {
     expect(result.replacements).toBe(1);
   });
 
+  it("edits namespaced XLSX t=str value cells used by exported workbooks", () => {
+    const worksheetXml =
+      '<?xml version="1.0" encoding="utf-8"?>' +
+      '<x:worksheet xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<x:sheetData><x:row r="4">' +
+      '<x:c r="C4" s="28" t="str"><x:v>Quarterly Target</x:v></x:c>' +
+      '</x:row><x:row r="11">' +
+      '<x:c r="B11" s="30" t="n"><x:f>SUM(C5:C8)</x:f><x:v>147500</x:v></x:c>' +
+      '</x:row><x:row r="13">' +
+      '<x:c r="B13" s="29" t="str"><x:v>Change &quot;Quarterly Target&quot; to &quot;Annual Target&quot; and return the modified workbook.</x:v></x:c>' +
+      '</x:row></x:sheetData></x:worksheet>';
+    const original = zipSync({
+      "xl/sharedStrings.xml": strToU8(
+        '<?xml version="1.0"?><x:sst xmlns:x="http://schemas.openxmlformats.org/spreadsheetml/2006/main" />',
+      ),
+      "xl/worksheets/sheet1.xml": strToU8(worksheetXml),
+      "xl/styles.xml": strToU8("<styleSheet/>"),
+    });
+
+    const result = editFileBytes({
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      bytes: original,
+      findText: "Quarterly Target",
+      replaceText: "Annual Target",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const archive = unzipSync(result.bytes);
+    const edited = strFromU8(archive["xl/worksheets/sheet1.xml"]);
+
+    expect(edited).toContain(
+      '<x:c r="C4" s="28" t="str"><x:v>Annual Target</x:v></x:c>',
+    );
+    expect(edited).toContain(
+      '<x:f>SUM(C5:C8)</x:f><x:v>147500</x:v>',
+    );
+    expect(edited).toContain(
+      'Change &quot;Quarterly Target&quot; to &quot;Annual Target&quot; and return the modified workbook.',
+    );
+    expect(result.replacements).toBe(1);
+  });
+
   it("leaves the Office package untouched when the requested visible text is absent", () => {
     const original = zipSync({
       "word/document.xml": strToU8(
