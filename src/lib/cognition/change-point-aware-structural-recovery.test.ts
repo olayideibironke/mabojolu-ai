@@ -45,7 +45,8 @@ function program(
     fragments: [
       {
         id: `${id}:x`,
-        sourceMechanismId: `${id}:source`,
+        validationMeanSquaredError: 0,
+        sourceEvidenceCount: 4,
         terms: [
           {
             id: `${id}:x:linear`,
@@ -54,7 +55,6 @@ function program(
             coefficient,
           },
         ],
-        validationEvidenceIds: [`${id}:validated`],
       },
     ],
     depth: 2,
