@@ -66,6 +66,10 @@ export interface UseChatResult {
     conversationId: string,
   ) => void;
 
+  adoptConversation: (
+    conversationId: string,
+  ) => void;
+
   canRetry: boolean;
 }
 
@@ -1763,6 +1767,17 @@ export function useChat(
     [messages],
   );
 
+  const adoptConversation =
+    useCallback(
+      (
+        conversationId: string,
+      ) => {
+        conversationIdRef.current =
+          conversationId;
+      },
+      [],
+    );
+
   const loadMessages = useCallback(
     (
       loaded: ChatMessage[],
@@ -1862,6 +1877,7 @@ export function useChat(
     setFeedback,
     reset,
     loadMessages,
+    adoptConversation,
     canRetry,
   };
 }
