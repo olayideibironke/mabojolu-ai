@@ -42,6 +42,7 @@ function program(
   return {
     id,
     baseEffects: {},
+    observationStdDev: 0.05,
     fragments: [
       {
         id: `${id}:x`,
