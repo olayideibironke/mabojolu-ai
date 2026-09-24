@@ -80,6 +80,49 @@ export interface UseChatOptions {
 const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b[\s\S]{0,80}\b(?:of|showing|depicting|with)\b/i;
 const IMAGE_ANALYSIS_PATTERN = /\b(?:analy[sz]e|describe|explain|inspect|read|identify|what|who|where|tell me|look at)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|attachment)\b/i;
 
+const PDF_FILE_REQUEST_PATTERN =
+  /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,180}\b(?:\.pdf|pdf file|pdf document)\b|\b(?:\.pdf|pdf file|pdf document)\b[\s\S]{0,180}\b(?:create|make|generate|write|save|produce|download)\b/i;
+
+function pdfFileRequest(content: string): boolean {
+  const trimmed = content.trim();
+  return trimmed.length > 0 &&
+    PDF_FILE_REQUEST_PATTERN.test(trimmed);
+}
+
+async function generatedPdfFile(
+  content: string,
+  signal: AbortSignal,
+): Promise<ChatGeneratedFile> {
+  const response = await fetch("/api/files/pdf", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: content.trim() }),
+    signal,
+  });
+  const payload = await response.json().catch(() => null) as {
+    file?: { name?: unknown; mimeType?: unknown; sizeBytes?: unknown; dataUrl?: unknown };
+    error?: { message?: unknown };
+  } | null;
+  if (!response.ok || !payload?.file ||
+      typeof payload.file.name !== "string" ||
+      payload.file.mimeType !== "application/pdf" ||
+      typeof payload.file.sizeBytes !== "number" ||
+      typeof payload.file.dataUrl !== "string") {
+    throw new Error(
+      typeof payload?.error?.message === "string"
+        ? payload.error.message
+        : "Mabojolu could not create that PDF.",
+    );
+  }
+  return {
+    id: createId(),
+    name: payload.file.name,
+    mimeType: payload.file.mimeType,
+    sizeBytes: payload.file.sizeBytes,
+    dataUrl: payload.file.dataUrl,
+  };
+}
+
 const PPTX_FILE_REQUEST_PATTERN =
   /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,180}\b(?:\.pptx|pptx file|powerpoint presentation|powerpoint file|presentation)\b|\b(?:\.pptx|pptx file|powerpoint presentation|powerpoint file|presentation)\b[\s\S]{0,180}\b(?:create|make|generate|write|save|produce|download)\b/i;
 
@@ -618,6 +661,57 @@ export function useChat(
           latestUser.attachments.length === 0)
           ? xlsxFileRequest(latestUser.content)
           : false;
+
+      const wantsPdfFile =
+        latestUser &&
+        (!latestUser.attachments ||
+          latestUser.attachments.length === 0)
+          ? pdfFileRequest(latestUser.content)
+          : false;
+
+      if (wantsPdfFile && latestUser) {
+        setStatusLabel("Creating PDF...");
+        const pdfContent =
+          requestedTextFileContent(
+            latestUser.content,
+            latestUser.content,
+          );
+
+        void generatedPdfFile(pdfContent, controller.signal)
+          .then((file) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            patchAssistant({
+              content: "Created the PDF as requested.",
+              generatedFiles: [file],
+              status: "complete",
+              model: "mabojolu-pdf",
+            });
+          })
+          .catch((cause) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            if (controller.signal.aborted) {
+              patchAssistant({ status: "interrupted" });
+              return;
+            }
+            patchAssistant({
+              status: "failed",
+              error: {
+                code: "internal_error",
+                message: cause instanceof Error
+                  ? cause.message
+                  : "Mabojolu could not create that PDF.",
+                retryable: true,
+              },
+            });
+          });
+        return;
+      }
 
       const wantsPptxFile =
         latestUser &&
