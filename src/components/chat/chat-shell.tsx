@@ -1134,6 +1134,9 @@ export function ChatShell({
           ) : null}
 
           <Composer
+            conversationId={
+              activeConversationId
+            }
             isStreaming={
               isStreaming
             }
