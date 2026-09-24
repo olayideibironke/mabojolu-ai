@@ -197,7 +197,7 @@ export async function POST(
         "file",
       );
 
-    const conversationId =
+    const requestedConversationId =
       form.get(
         "conversationId",
       );
@@ -271,20 +271,20 @@ export async function POST(
       );
     }
 
-    let attachmentId =
-      crypto.randomUUID();
+    const database =
+      getDatabase();
+
+    let conversationId:
+      string;
 
     if (
-      typeof conversationId ===
+      typeof requestedConversationId ===
         "string" &&
-      conversationId.length > 0
+      requestedConversationId.length > 0
     ) {
-      const database =
-        getDatabase();
-
       const conversation =
         await database.getConversation(
-          conversationId,
+          requestedConversationId,
           session.userId,
         );
 
@@ -296,72 +296,87 @@ export async function POST(
         );
       }
 
-      const record =
-        await database.createAttachment({
+      conversationId =
+        requestedConversationId;
+    } else {
+      const conversation =
+        await database.createConversation({
           userId:
             session.userId,
 
-          conversationId,
-
-          filename:
-            validation.safeFilename,
-
-          mimeType:
-            validation.format.mimeType,
-
-          sizeBytes:
-            bytes.byteLength,
-
-          storagePath:
-            `pending/${session.userId}/${crypto.randomUUID()}`,
+          title:
+            "File conversation",
         });
 
-      const storagePath =
-        buildStoragePath({
-          userId:
-            session.userId,
-
-          conversationId,
-
-          attachmentId:
-            record.id,
-
-          safeFilename:
-            validation.safeFilename,
-        });
-
-      try {
-        await getStorage().put(
-          storagePath,
-          bytes,
-          validation.format.mimeType,
-        );
-
-        await database.updateAttachmentStatus(
-          record.id,
-          session.userId,
-          "ready",
-          {
-            storagePath,
-          },
-        );
-      } catch (cause) {
-        await database.updateAttachmentStatus(
-          record.id,
-          session.userId,
-          "failed",
-          {
-            failureReason:
-              "Upload to storage failed.",
-          },
-        );
-
-        throw cause;
-      }
-
-      attachmentId =
-        record.id;
+      conversationId =
+        conversation.id;
     }
+
+    const record =
+      await database.createAttachment({
+        userId:
+          session.userId,
+
+        conversationId,
+
+        filename:
+          validation.safeFilename,
+
+        mimeType:
+          validation.format.mimeType,
+
+        sizeBytes:
+          bytes.byteLength,
+
+        storagePath:
+          `pending/${session.userId}/${crypto.randomUUID()}`,
+      });
+
+    const storagePath =
+      buildStoragePath({
+        userId:
+          session.userId,
+
+        conversationId,
+
+        attachmentId:
+          record.id,
+
+        safeFilename:
+          validation.safeFilename,
+      });
+
+    try {
+      await getStorage().put(
+        storagePath,
+        bytes,
+        validation.format.mimeType,
+      );
+
+      await database.updateAttachmentStatus(
+        record.id,
+        session.userId,
+        "ready",
+        {
+          storagePath,
+        },
+      );
+    } catch (cause) {
+      await database.updateAttachmentStatus(
+        record.id,
+        session.userId,
+        "failed",
+        {
+          failureReason:
+            "Upload to storage failed.",
+        },
+      );
+
+      throw cause;
+    }
+
+    const attachmentId =
+      record.id;
 
     const processed =
       await processAttachmentBytesWithLocalRuntime(
@@ -449,15 +464,11 @@ export async function POST(
         textContent:
           text,
 
-        ...(typeof conversationId === "string" && conversationId.length > 0
-          ? {
-              sourceAttachmentId:
-                attachmentId,
+        sourceAttachmentId:
+          attachmentId,
 
-              sourceMimeType:
-                validation.format.mimeType,
-            }
-          : {}),
+        sourceMimeType:
+          validation.format.mimeType,
       });
     }
 
@@ -522,6 +533,8 @@ export async function POST(
       {
         attachments:
           chatAttachments,
+
+        conversationId,
 
         analysis: {
           modality:
