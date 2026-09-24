@@ -457,6 +457,8 @@ async function analyzeFileOnServer(
     File,
   mimeType:
     string,
+  conversationId?:
+    string | null,
 ): Promise<ChatAttachment[]> {
   const normalizedFile =
     file.type ===
@@ -480,6 +482,13 @@ async function analyzeFileOnServer(
     "file",
     normalizedFile,
   );
+
+  if (conversationId) {
+    form.append(
+      "conversationId",
+      conversationId,
+    );
+  }
 
   const response =
     await fetch(
