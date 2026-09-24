@@ -153,18 +153,20 @@ export function inferStructuralChangePoint(
       decision: "stable",
       posteriorChangeProbability: 0,
       improvement: 0,
-      preChangeEvidenceIds: sorted.map((entry) => entry.observation.experiment.id),
+      preChangeEvidenceIds: sorted.map(
+        (entry) => entry.observation.experiment.id,
+      ),
       postChangeEvidenceIds: [],
       reason: "noise-or-insufficient-improvement",
     };
   }
 
-  const errors = sorted.map(
-    (entry) =>
-      squaredError(
-        activeProgram,
-        entry.observation,
-      ),
+  const errors = sorted.map((entry) =>
+    squaredError(activeProgram, entry.observation),
+  );
+
+  const elevated = errors.map(
+    (value) => value >= minimumMseImprovement,
   );
 
   const candidates: Array<{
@@ -176,80 +178,47 @@ export function inferStructuralChangePoint(
 
   for (
     let index = minimumSegmentSize;
-    index <=
-      sorted.length -
-        minimumSegmentSize;
+    index <= sorted.length - minimumSegmentSize;
     index += 1
   ) {
-    const beforeWindow =
-      errors.slice(
-        index -
-          minimumSegmentSize,
-        index,
-      );
+    const beforeWindow = errors.slice(
+      index - minimumSegmentSize,
+      index,
+    );
+    const afterWindow = errors.slice(
+      index,
+      index + minimumSegmentSize,
+    );
 
-    const afterWindow =
-      errors.slice(
-        index,
-        index +
-          minimumSegmentSize,
-      );
+    const beforeMean = mean(beforeWindow);
+    const afterMean = mean(afterWindow);
+    const improvement = afterMean - beforeMean;
 
-    const beforeMean =
-      mean(
-        beforeWindow,
-      );
+    const postPersistent =
+      elevated
+        .slice(
+          index,
+          index + minimumSegmentSize,
+        )
+        .every(Boolean);
 
-    const afterMean =
-      mean(
-        afterWindow,
-      );
+    const preQuiet =
+      elevated
+        .slice(
+          index - minimumSegmentSize,
+          index,
+        )
+        .every((value) => !value);
 
-    const improvement =
-      afterMean -
-      beforeMean;
+    if (!postPersistent || !preQuiet) {
+      continue;
+    }
 
-    const elevatedAfter =
-      afterWindow.filter(
-        (value) =>
-          value >=
-          minimumMseImprovement,
-      ).length;
-
-    const quietBefore =
-      beforeWindow.filter(
-        (value) =>
-          value <
-          minimumMseImprovement,
-      ).length;
-
-    const persistence =
-      elevatedAfter /
-      afterWindow.length;
-
-    const boundaryPurity =
-      quietBefore /
-      beforeWindow.length;
-
-    const boundaryContamination =
-      1 -
-      boundaryPurity;
-
-    const score =
-      improvement *
-      persistence -
-      boundaryContamination *
-        minimumMseImprovement *
-        2;
-
-    const posterior =
-      sigmoid(
-        posteriorScale *
-          (
-            score -
-            minimumMseImprovement
-          ),
-      );
+    const score = improvement;
+    const posterior = sigmoid(
+      posteriorScale *
+        (score - minimumMseImprovement),
+    );
 
     candidates.push({
       index,
@@ -259,22 +228,28 @@ export function inferStructuralChangePoint(
     });
   }
 
+  if (candidates.length === 0) {
+    return {
+      decision: "stable",
+      posteriorChangeProbability: 0,
+      improvement: 0,
+      preChangeEvidenceIds: sorted.map(
+        (entry) => entry.observation.experiment.id,
+      ),
+      postChangeEvidenceIds: [],
+      reason: "noise-or-insufficient-improvement",
+    };
+  }
+
   candidates.sort(
-    (
-      left,
-      right,
-    ) =>
-      right.score -
-        left.score ||
-      left.index -
-        right.index,
+    (left, right) =>
+      left.index - right.index ||
+      right.score - left.score,
   );
 
-  const best =
-    candidates[0]!;
+  const best = candidates[0]!;
+  const runnerUp = candidates[1];
 
-  const runnerUp =
-    candidates[1];
   const posteriorGap = runnerUp
     ? best.posterior - runnerUp.posterior
     : best.posterior;
@@ -290,19 +265,29 @@ export function inferStructuralChangePoint(
       decision: "stable",
       posteriorChangeProbability: best.posterior,
       improvement: best.improvement,
-      preChangeEvidenceIds: sorted.map((entry) => entry.observation.experiment.id),
+      preChangeEvidenceIds: sorted.map(
+        (entry) => entry.observation.experiment.id,
+      ),
       postChangeEvidenceIds: [],
       reason: "noise-or-insufficient-improvement",
     };
   }
 
-  if (runnerUp && posteriorGap < ambiguityMargin) {
+  if (
+    runnerUp &&
+    posteriorGap >= 0 &&
+    posteriorGap < ambiguityMargin
+  ) {
     return {
       decision: "abstained",
       posteriorChangeProbability: best.posterior,
       improvement: best.improvement,
-      preChangeEvidenceIds: before.map((entry) => entry.observation.experiment.id),
-      postChangeEvidenceIds: after.map((entry) => entry.observation.experiment.id),
+      preChangeEvidenceIds: before.map(
+        (entry) => entry.observation.experiment.id,
+      ),
+      postChangeEvidenceIds: after.map(
+        (entry) => entry.observation.experiment.id,
+      ),
       reason: "ambiguous-change-point",
     };
   }
@@ -312,8 +297,12 @@ export function inferStructuralChangePoint(
     changeSequence: sorted[best.index]!.sequence,
     posteriorChangeProbability: best.posterior,
     improvement: best.improvement,
-    preChangeEvidenceIds: before.map((entry) => entry.observation.experiment.id),
-    postChangeEvidenceIds: after.map((entry) => entry.observation.experiment.id),
+    preChangeEvidenceIds: before.map(
+      (entry) => entry.observation.experiment.id,
+    ),
+    postChangeEvidenceIds: after.map(
+      (entry) => entry.observation.experiment.id,
+    ),
     reason: "persistent-predictive-regime-change",
   };
 }
