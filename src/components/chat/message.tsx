@@ -705,7 +705,10 @@ function AssistantMessage({
       : mimeType ===
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ? "XLSX"
-        : "TXT";
+        : mimeType ===
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          ? "PPTX"
+          : "TXT";
 
   const generatedFileDescription = (
     mimeType: string,
@@ -716,7 +719,10 @@ function AssistantMessage({
       : mimeType ===
           "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         ? "Excel spreadsheet"
-        : "Text file";
+        : mimeType ===
+            "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+          ? "PowerPoint presentation"
+          : "Text file";
 
   const sourcePanelId =
     `sources-${message.id}`;
@@ -829,7 +835,10 @@ function AssistantMessage({
                         {file.mimeType ===
                         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                           ? "Spreadsheet preview is available after download. The generated XLSX opens in Microsoft Excel and compatible spreadsheet applications."
-                          : "Word document preview is available after download. The generated DOCX opens in Microsoft Word and compatible Office applications."}
+                          : file.mimeType ===
+                              "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                            ? "Presentation preview is available after download. The generated PPTX opens in Microsoft PowerPoint and compatible presentation applications."
+                            : "Word document preview is available after download. The generated DOCX opens in Microsoft Word and compatible Office applications."}
                       </div>
                     )
                   ) : null}
