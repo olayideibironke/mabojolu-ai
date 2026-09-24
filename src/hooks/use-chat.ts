@@ -80,6 +80,77 @@ export interface UseChatOptions {
 const IMAGE_REQUEST_PATTERN = /\b(?:generate|create|draw|make|render|produce|show|print)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b|\b(?:image|picture|photo|photograph|illustration|artwork|portrait|graphic)\b[\s\S]{0,80}\b(?:of|showing|depicting|with)\b/i;
 const IMAGE_ANALYSIS_PATTERN = /\b(?:analy[sz]e|describe|explain|inspect|read|identify|what|who|where|tell me|look at)\b[\s\S]{0,80}\b(?:image|picture|photo|photograph|attachment)\b/i;
 
+const PPTX_FILE_REQUEST_PATTERN =
+  /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,180}\b(?:\.pptx|pptx file|powerpoint presentation|powerpoint file|presentation)\b|\b(?:\.pptx|pptx file|powerpoint presentation|powerpoint file|presentation)\b[\s\S]{0,180}\b(?:create|make|generate|write|save|produce|download)\b/i;
+
+const EXACT_PRESENTATION_PATTERN =
+  /(?:containing|with)\s+exactly\s+(?:these|the following)\s+slides?\s*:\s*([\s\S]*?)(?:\n\s*(?:give|provide|save|download|return)\b[\s\S]*|$)/i;
+
+function requestedPresentationContent(
+  request: string,
+): string {
+  return (
+    EXACT_PRESENTATION_PATTERN.exec(
+      request,
+    )?.[1]?.trim() ??
+    request.trim()
+  );
+}
+
+function pptxFileRequest(
+  content: string,
+): boolean {
+  const trimmed = content.trim();
+  return trimmed.length > 0 &&
+    PPTX_FILE_REQUEST_PATTERN.test(trimmed);
+}
+
+async function generatedPptxFile(
+  content: string,
+  signal: AbortSignal,
+): Promise<ChatGeneratedFile> {
+  const response = await fetch("/api/files/pptx", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content: content.trim() }),
+    signal,
+  });
+
+  const payload = await response.json().catch(() => null) as {
+    file?: {
+      name?: unknown;
+      mimeType?: unknown;
+      sizeBytes?: unknown;
+      dataUrl?: unknown;
+    };
+    error?: { message?: unknown };
+  } | null;
+
+  if (
+    !response.ok ||
+    !payload?.file ||
+    typeof payload.file.name !== "string" ||
+    payload.file.mimeType !==
+      "application/vnd.openxmlformats-officedocument.presentationml.presentation" ||
+    typeof payload.file.sizeBytes !== "number" ||
+    typeof payload.file.dataUrl !== "string"
+  ) {
+    throw new Error(
+      typeof payload?.error?.message === "string"
+        ? payload.error.message
+        : "Mabojolu could not create that presentation.",
+    );
+  }
+
+  return {
+    id: createId(),
+    name: payload.file.name,
+    mimeType: payload.file.mimeType,
+    sizeBytes: payload.file.sizeBytes,
+    dataUrl: payload.file.dataUrl,
+  };
+}
+
 const XLSX_FILE_REQUEST_PATTERN =
   /\b(?:create|make|generate|write|save|produce|give me)\b[\s\S]{0,180}\b(?:\.xlsx|xlsx file|excel spreadsheet|excel file|spreadsheet)\b|\b(?:\.xlsx|xlsx file|excel spreadsheet|excel file|spreadsheet)\b[\s\S]{0,180}\b(?:create|make|generate|write|save|produce|download)\b/i;
 
@@ -547,6 +618,58 @@ export function useChat(
           latestUser.attachments.length === 0)
           ? xlsxFileRequest(latestUser.content)
           : false;
+
+      const wantsPptxFile =
+        latestUser &&
+        (!latestUser.attachments ||
+          latestUser.attachments.length === 0)
+          ? pptxFileRequest(latestUser.content)
+          : false;
+
+      if (wantsPptxFile && latestUser) {
+        setStatusLabel("Creating presentation...");
+        const presentationContent =
+          requestedPresentationContent(latestUser.content);
+
+        void generatedPptxFile(
+          presentationContent,
+          controller.signal,
+        )
+          .then((file) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            patchAssistant({
+              content: "Created the presentation as requested.",
+              generatedFiles: [file],
+              status: "complete",
+              model: "mabojolu-pptx",
+            });
+          })
+          .catch((cause) => {
+            if (!isCurrent()) return;
+            setIsStreaming(false);
+            setStatusLabel(null);
+            controllerRef.current = null;
+            if (controller.signal.aborted) {
+              patchAssistant({ status: "interrupted" });
+              return;
+            }
+            patchAssistant({
+              status: "failed",
+              error: {
+                code: "internal_error",
+                message:
+                  cause instanceof Error
+                    ? cause.message
+                    : "Mabojolu could not create that presentation.",
+                retryable: true,
+              },
+            });
+          });
+        return;
+      }
 
       if (wantsXlsxFile && latestUser) {
         setStatusLabel("Creating spreadsheet...");
