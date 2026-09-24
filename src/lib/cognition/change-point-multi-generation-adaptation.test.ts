@@ -20,6 +20,7 @@ function program(id: string, coefficient: number): HierarchicalCausalProgram {
         sourceMechanismId: `${id}:source`,
         terms: [
           {
+            id: `${id}:x:linear`,
             kind: "linear",
             variables: ["x"],
             coefficient,
