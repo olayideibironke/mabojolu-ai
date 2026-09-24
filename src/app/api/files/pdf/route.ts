@@ -9,11 +9,21 @@ function pdfEscape(value: string): string {
     .replace(/\)/g, "\\)");
 }
 
-function latin1Safe(value: string): string {
-  return value
-    .normalize("NFKD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .replace(/[^\x20-\x7E]/g, "?");
+function winAnsiSafe(value: string): string {
+  return value.replace(/[^\u0020-\u00FF]/g, (character) => {
+    const replacements: Record<string, string> = {
+      "₦": "NGN ",
+      "€": "EUR ",
+      "£": "GBP ",
+      "¥": "JPY ",
+      "—": "-",
+      "–": "-",
+      "“": '"',
+      "”": '"',
+      "’": "'",
+    };
+    return replacements[character] ?? "?";
+  });
 }
 
 function makePdf(content: string): Buffer {
@@ -21,7 +31,7 @@ function makePdf(content: string): Buffer {
     .replace(/\r\n/g, "\n")
     .split("\n")
     .flatMap((line) => {
-      const text = latin1Safe(line);
+      const text = winAnsiSafe(line);
       if (text.length <= 88) return [text];
       const parts: string[] = [];
       for (let i = 0; i < text.length; i += 88) parts.push(text.slice(i, i + 88));
