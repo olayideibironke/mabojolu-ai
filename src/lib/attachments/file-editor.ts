@@ -87,61 +87,163 @@ function replaceAcrossXmlTextRuns(
   findText: string,
   replaceText: string,
 ): { value: string; count: number } {
-  let value = xml;
-  let count = 0;
+  const nodes =
+    xmlTextNodes(
+      xml,
+    );
 
-  while (true) {
-    const nodes = xmlTextNodes(value);
-    if (nodes.length === 0) break;
-
-    const visibleText = nodes.map((node) => node.text).join("");
-    const matchStart = visibleText.indexOf(findText);
-    if (matchStart < 0) break;
-
-    const matchEnd = matchStart + findText.length;
-    let cursor = 0;
-    let firstNode = -1;
-    let lastNode = -1;
-    let firstOffset = 0;
-    let lastOffset = 0;
-
-    for (let index = 0; index < nodes.length; index += 1) {
-      const next = cursor + nodes[index].text.length;
-      if (firstNode < 0 && matchStart >= cursor && matchStart < next) {
-        firstNode = index;
-        firstOffset = matchStart - cursor;
-      }
-      if (matchEnd > cursor && matchEnd <= next) {
-        lastNode = index;
-        lastOffset = matchEnd - cursor;
-        break;
-      }
-      cursor = next;
-    }
-
-    if (firstNode < 0 || lastNode < 0) break;
-
-    const first = nodes[firstNode];
-    const last = nodes[lastNode];
-    const prefix = first.text.slice(0, firstOffset);
-    const suffix = last.text.slice(lastOffset);
-    const replacement = xmlEscapeText(prefix + replaceText + suffix);
-
-    let rebuilt = value.slice(0, first.start);
-    rebuilt += first.openTag + replacement + first.closeTag;
-
-    for (let index = firstNode + 1; index <= lastNode; index += 1) {
-      const node = nodes[index];
-      rebuilt += value.slice(nodes[index - 1].end, node.start);
-      rebuilt += node.openTag + node.closeTag;
-    }
-
-    rebuilt += value.slice(last.end);
-    value = rebuilt;
-    count += 1;
+  if (nodes.length === 0) {
+    return {
+      value: xml,
+      count: 0,
+    };
   }
 
-  return { value, count };
+  const visibleText =
+    nodes
+      .map(
+        (node) =>
+          node.text,
+      )
+      .join("");
+
+  const matchStart =
+    visibleText.indexOf(
+      findText,
+    );
+
+  if (matchStart < 0) {
+    return {
+      value: xml,
+      count: 0,
+    };
+  }
+
+  const matchEnd =
+    matchStart +
+    findText.length;
+
+  let cursor = 0;
+  let firstNode = -1;
+  let lastNode = -1;
+  let firstOffset = 0;
+  let lastOffset = 0;
+
+  for (
+    let index = 0;
+    index < nodes.length;
+    index += 1
+  ) {
+    const next =
+      cursor +
+      nodes[index].text.length;
+
+    if (
+      firstNode < 0 &&
+      matchStart >= cursor &&
+      matchStart < next
+    ) {
+      firstNode =
+        index;
+
+      firstOffset =
+        matchStart -
+        cursor;
+    }
+
+    if (
+      matchEnd > cursor &&
+      matchEnd <= next
+    ) {
+      lastNode =
+        index;
+
+      lastOffset =
+        matchEnd -
+        cursor;
+
+      break;
+    }
+
+    cursor =
+      next;
+  }
+
+  if (
+    firstNode < 0 ||
+    lastNode < 0
+  ) {
+    return {
+      value: xml,
+      count: 0,
+    };
+  }
+
+  const first =
+    nodes[firstNode];
+
+  const last =
+    nodes[lastNode];
+
+  const prefix =
+    first.text.slice(
+      0,
+      firstOffset,
+    );
+
+  const suffix =
+    last.text.slice(
+      lastOffset,
+    );
+
+  const replacement =
+    xmlEscapeText(
+      prefix +
+      replaceText +
+      suffix,
+    );
+
+  let rebuilt =
+    xml.slice(
+      0,
+      first.start,
+    );
+
+  rebuilt +=
+    first.openTag +
+    replacement +
+    first.closeTag;
+
+  for (
+    let index =
+      firstNode + 1;
+    index <= lastNode;
+    index += 1
+  ) {
+    const node =
+      nodes[index];
+
+    rebuilt +=
+      xml.slice(
+        nodes[index - 1]
+          .end,
+        node.start,
+      );
+
+    rebuilt +=
+      node.openTag +
+      node.closeTag;
+  }
+
+  rebuilt +=
+    xml.slice(
+      last.end,
+    );
+
+  return {
+    value: rebuilt,
+    count: 1,
+  };
 }
 
 export function editFileBytes(input: {
@@ -197,37 +299,99 @@ export function editFileBytes(input: {
     };
   }
 
-  const findXml = xmlEscapeText(input.findText);
-  const replaceXml = xmlEscapeText(input.replaceText);
   let replacements = 0;
-  const output: Record<string, Uint8Array> = {};
+  const output: Record<string, Uint8Array> = {
+    ...archive,
+  };
 
-  for (const [name, bytes] of Object.entries(archive)) {
-    if (!name.toLowerCase().endsWith(".xml")) {
-      output[name] = bytes;
-      continue;
-    }
+  const editablePartNames =
+    Object.keys(archive).filter((name) => {
+      const normalized =
+        name.toLowerCase();
 
-    const xml = strFromU8(bytes);
-    const contiguous = replaceAll(xml, findXml, replaceXml);
+      if (
+        input.mimeType ===
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+      ) {
+        return (
+          normalized ===
+            "word/document.xml" ||
+          /^word\/(?:header|footer)\d+\.xml$/.test(
+            normalized,
+          )
+        );
+      }
 
-    if (contiguous.count > 0) {
-      replacements += contiguous.count;
-      output[name] = strToU8(contiguous.value);
-      continue;
-    }
+      if (
+        input.mimeType ===
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+      ) {
+        return /^ppt\/slides\/slide\d+\.xml$/.test(
+          normalized,
+        );
+      }
 
-    const splitRuns = replaceAcrossXmlTextRuns(
-      xml,
-      input.findText,
-      input.replaceText,
+      return (
+        normalized ===
+          "xl/sharedstrings.xml" ||
+        /^xl\/worksheets\/sheet\d+\.xml$/.test(
+          normalized,
+        )
+      );
+    });
+
+  editablePartNames.sort((first, second) => {
+    const priority = (name: string): number => {
+      const normalized =
+        name.toLowerCase();
+
+      if (
+        normalized ===
+          "word/document.xml" ||
+        normalized ===
+          "xl/sharedstrings.xml"
+      ) {
+        return 0;
+      }
+
+      return 1;
+    };
+
+    return (
+      priority(first) -
+        priority(second) ||
+      first.localeCompare(
+        second,
+        undefined,
+        {
+          numeric: true,
+        },
+      )
     );
+  });
 
-    replacements += splitRuns.count;
-    output[name] =
-      splitRuns.count > 0
-        ? strToU8(splitRuns.value)
-        : bytes;
+  for (const name of editablePartNames) {
+    const bytes =
+      archive[name];
+
+    const edited =
+      replaceAcrossXmlTextRuns(
+        strFromU8(bytes),
+        input.findText,
+        input.replaceText,
+      );
+
+    if (edited.count > 0) {
+      output[name] =
+        strToU8(
+          edited.value,
+        );
+
+      replacements =
+        1;
+
+      break;
+    }
   }
 
   if (replacements === 0) {
