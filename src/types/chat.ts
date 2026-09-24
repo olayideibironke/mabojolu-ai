@@ -169,7 +169,8 @@ export interface ChatGeneratedFile {
   mimeType:
     | "text/plain"
     | "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-    | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+    | "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    | "application/vnd.openxmlformats-officedocument.presentationml.presentation";
   sizeBytes: number;
   dataUrl: string;
 }
