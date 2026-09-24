@@ -27,13 +27,13 @@ const XML_TEXT_PATTERN =
   /<(w:t|a:t|t)(\s[^>]*)?>([\s\S]*?)<\/\1>/g;
 
 const XLSX_INLINE_TEXT_PATTERN =
-  /<(?:[A-Za-z_][\\w.-]*:)?t(\\s[^>]*)?>([\\s\\S]*?)<\\/(?:[A-Za-z_][\\w.-]*:)?t>/g;
+  /<(?:[A-Za-z_][\w.-]*:)?t(\s[^>]*)?>([\s\S]*?)<\/(?:[A-Za-z_][\w.-]*:)?t>/g;
 
 const XLSX_STRING_VALUE_PATTERN =
-  /<((?:[A-Za-z_][\\w.-]*:)?c)\\b([^>]*\\bt=["']str["'][^>]*)>([\\s\\S]*?)<\\/\\1>/g;
+  /<((?:[A-Za-z_][\w.-]*:)?c)\b([^>]*\bt=["']str["'][^>]*)>([\s\S]*?)<\/\1>/g;
 
 const XLSX_VALUE_PATTERN =
-  /<((?:[A-Za-z_][\\w.-]*:)?v)(\\s[^>]*)?>([\\s\\S]*?)<\\/\\1>/;
+  /<((?:[A-Za-z_][\w.-]*:)?v)(\s[^>]*)?>([\s\S]*?)<\/\1>/;
 
 interface XmlTextNode {
   start: number;
