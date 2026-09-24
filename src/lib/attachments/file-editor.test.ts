@@ -261,4 +261,48 @@ describe("editFileBytes", () => {
       code: "text_not_found",
     });
   });
+  it("edits one equal-width direct PDF string without changing any unrelated byte", () => {
+    const source = new TextEncoder().encode(
+      "%PDF-1.4\n1 0 obj\n<< /Length 54 >>\nstream\nBT (Quarterly) Tj (Control Quarterly) Tj ET\nendstream\nendobj\n%%EOF",
+    );
+
+    const result = editFileBytes({
+      mimeType: "application/pdf",
+      bytes: source,
+      findText: "Quarterly",
+      replaceText: "YearlyPlan",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const before = new TextDecoder().decode(source);
+    const after = new TextDecoder().decode(result.bytes);
+    expect(after).toContain("(YearlyPlan) Tj");
+    expect(after).toContain("(Control Quarterly) Tj");
+    expect(result.bytes.byteLength).toBe(source.byteLength);
+    expect(result.replacements).toBe(1);
+
+    const expected = before.replace("(Quarterly)", "(YearlyPlan)");
+    expect(after).toBe(expected);
+  });
+
+  it("refuses unequal-width PDF edits instead of rebuilding the PDF", () => {
+    const source = new TextEncoder().encode(
+      "%PDF-1.4\nstream\nBT (Quarterly) Tj ET\nendstream\n%%EOF",
+    );
+
+    const result = editFileBytes({
+      mimeType: "application/pdf",
+      bytes: source,
+      findText: "Quarterly",
+      replaceText: "Annual",
+    });
+
+    expect(result).toMatchObject({
+      ok: false,
+      code: "unsupported_format",
+    });
+  });
+
 });
