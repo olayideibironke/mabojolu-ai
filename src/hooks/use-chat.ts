@@ -207,7 +207,7 @@ const EXACT_TEXT_FILE_PATTERN =
   /(?:containing|with)\s+exactly\s+(?:these|the following)\s+\w*\s*(?:lines?|paragraphs?)\s*:\s*([\s\S]*?)(?:\n\s*(?:give|provide|save|download|return)\b[\s\S]*|$)/i;
 
 const EXACT_SPREADSHEET_PATTERN =
-  /(?:containing|with)\s+exactly\s+(?:(?:these|the following)\s+)?(?:rows?\s+and\s+columns?|rows?|table)\s*:\s*([\s\S]*?)(?:\n\s*(?:give|provide|save|download|return)\b[\s\S]*|$)/i;
+  /(?:containing|with)\s+exactly\s+(?:(?:these|the following|this)\s+)?(?:rows?\s+and\s+columns?|rows?|table)\s*:\s*([\s\S]*?)(?:\n\s*(?:give|provide|save|download|return)\b[\s\S]*|$)/i;
 
 function requestedSpreadsheetContent(
   request: string,
