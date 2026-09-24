@@ -126,6 +126,41 @@ describe("editFileBytes", () => {
     );
   });
 
+
+  it("edits the first visible Word occurrence even when it is split and a later copy is contiguous", () => {
+    const documentXml =
+      '<w:document><w:p><w:r><w:t>Qualification target: Westforge </w:t></w:r>' +
+      '<w:r><w:rPr><w:i/></w:rPr><w:t>Quarterly </w:t></w:r>' +
+      '<w:r><w:t>Target is currently $25,000.</w:t></w:r></w:p>' +
+      '<w:p><w:r><w:t>Instruction: Change &quot;Westforge Quarterly Target&quot; to something else.</w:t></w:r></w:p></w:document>';
+    const original = zipSync({
+      "word/document.xml": strToU8(documentXml),
+    });
+
+    const result = editFileBytes({
+      mimeType:
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      bytes: original,
+      findText: "Westforge Quarterly Target",
+      replaceText: "Westforge Annual Target",
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const edited = strFromU8(
+      unzipSync(result.bytes)["word/document.xml"],
+    );
+
+    expect(edited).toContain(
+      "<w:t>Qualification target: Westforge Annual Target is currently $25,000.</w:t>",
+    );
+    expect(edited).toContain(
+      "Instruction: Change &quot;Westforge Quarterly Target&quot; to something else.",
+    );
+    expect(result.replacements).toBe(1);
+  });
+
   it("leaves the Office package untouched when the requested visible text is absent", () => {
     const original = zipSync({
       "word/document.xml": strToU8(
