@@ -708,7 +708,9 @@ function AssistantMessage({
         : mimeType ===
             "application/vnd.openxmlformats-officedocument.presentationml.presentation"
           ? "PPTX"
-          : "TXT";
+          : mimeType === "application/pdf"
+            ? "PDF"
+            : "TXT";
 
   const generatedFileDescription = (
     mimeType: string,
@@ -722,7 +724,9 @@ function AssistantMessage({
         : mimeType ===
             "application/vnd.openxmlformats-officedocument.presentationml.presentation"
           ? "PowerPoint presentation"
-          : "Text file";
+          : mimeType === "application/pdf"
+            ? "PDF document"
+            : "Text file";
 
   const sourcePanelId =
     `sources-${message.id}`;
@@ -838,7 +842,9 @@ function AssistantMessage({
                           : file.mimeType ===
                               "application/vnd.openxmlformats-officedocument.presentationml.presentation"
                             ? "Presentation preview is available after download. The generated PPTX opens in Microsoft PowerPoint and compatible presentation applications."
-                            : "Word document preview is available after download. The generated DOCX opens in Microsoft Word and compatible Office applications."}
+                            : file.mimeType === "application/pdf"
+                              ? "PDF preview is available after download. The generated PDF opens in standard PDF readers."
+                              : "Word document preview is available after download. The generated DOCX opens in Microsoft Word and compatible Office applications."}
                       </div>
                     )
                   ) : null}
