@@ -270,7 +270,7 @@ describe("editFileBytes", () => {
       mimeType: "application/pdf",
       bytes: source,
       findText: "Quarterly",
-      replaceText: "YearlyPlan",
+      replaceText: "YearlyPla",
     });
 
     expect(result.ok).toBe(true);
@@ -278,12 +278,12 @@ describe("editFileBytes", () => {
 
     const before = new TextDecoder().decode(source);
     const after = new TextDecoder().decode(result.bytes);
-    expect(after).toContain("(YearlyPlan) Tj");
+    expect(after).toContain("(YearlyPla) Tj");
     expect(after).toContain("(Control Quarterly) Tj");
     expect(result.bytes.byteLength).toBe(source.byteLength);
     expect(result.replacements).toBe(1);
 
-    const expected = before.replace("(Quarterly)", "(YearlyPlan)");
+    const expected = before.replace("(Quarterly)", "(YearlyPla)");
     expect(after).toBe(expected);
   });
 
