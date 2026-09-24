@@ -116,6 +116,17 @@ export interface ChatTextDocumentAttachment {
    * it is allowed into model context.
    */
   textContent: string;
+
+  /**
+   * Optional original stored attachment identifier.
+   *
+   * Transient analysis-only attachments omit this. When present, Mabojolu may
+   * use the authenticated original bytes for preservation-safe file editing.
+   */
+  sourceAttachmentId?: string;
+
+  /** Original MIME type when textContent is extracted from an Office/PDF file. */
+  sourceMimeType?: string;
 }
 
 export type ChatAttachment =
