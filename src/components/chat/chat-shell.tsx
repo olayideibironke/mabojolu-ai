@@ -339,7 +339,27 @@ export function ChatShell({
     setFeedback,
     reset,
     loadMessages,
+    adoptConversation,
   } = chat;
+
+  const handlePreparedConversation =
+    useCallback(
+      (
+        conversationId: string,
+      ) => {
+        adoptConversation(
+          conversationId,
+        );
+
+        handleConversationChanged(
+          conversationId,
+        );
+      },
+      [
+        adoptConversation,
+        handleConversationChanged,
+      ],
+    );
 
   const streamedLength =
     messages.at(-1)
@@ -1136,6 +1156,9 @@ export function ChatShell({
           <Composer
             conversationId={
               activeConversationId
+            }
+            onConversationPrepared={
+              handlePreparedConversation
             }
             isStreaming={
               isStreaming
