@@ -146,6 +146,160 @@ describe("useChat", () => {
     expect(body.messages[0].content).toBe("");
   });
 
+  it.each([
+    {
+      label: "PDF",
+      prompt:
+        "Create a PDF document containing exactly these three lines:\nMabojolu PDF Output Qualification\nThis is a genuine PDF document.\nUnicode check: café, ₦42,500, Maryland.\nGive me the file as a downloadable .pdf file.",
+      endpoint: "/api/files/pdf",
+      expectedContent:
+        "Mabojolu PDF Output Qualification\nThis is a genuine PDF document.\nUnicode check: café, ₦42,500, Maryland.",
+      file: {
+        name: "mabojolu-output.pdf",
+        mimeType: "application/pdf",
+      },
+    },
+    {
+      label: "DOCX",
+      prompt:
+        "Create a Word document containing exactly these three paragraphs:\nMabojolu DOCX Output Qualification\nThis is a genuine Microsoft Word document.\nUnicode check: café, ₦42,500, Maryland.\nGive me the file as a downloadable .docx file.",
+      endpoint: "/api/files/docx",
+      expectedContent:
+        "Mabojolu DOCX Output Qualification\nThis is a genuine Microsoft Word document.\nUnicode check: café, ₦42,500, Maryland.",
+      file: {
+        name: "mabojolu-output.docx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      },
+    },
+    {
+      label: "XLSX",
+      prompt:
+        "Create an Excel spreadsheet containing exactly this table:\nProject|State|Target|Status\nFuseHarbor|Maryland|25000|Active\nKoruva|Lagos|70000|Validation\nGive me the file as a downloadable .xlsx file.",
+      endpoint: "/api/files/xlsx",
+      expectedContent:
+        "Project|State|Target|Status\nFuseHarbor|Maryland|25000|Active\nKoruva|Lagos|70000|Validation",
+      file: {
+        name: "mabojolu-output.xlsx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      },
+    },
+    {
+      label: "PPTX",
+      prompt:
+        "Create a PowerPoint presentation containing exactly these slides:\nSlide 1: Mabojolu PPTX Output Qualification\nGenuine PowerPoint\n\nSlide 2: Westforge Holdings Inc.\nUnicode café, ₦42,500\nGive me the file as a downloadable .pptx file.",
+      endpoint: "/api/files/pptx",
+      expectedContent:
+        "Slide 1: Mabojolu PPTX Output Qualification\nGenuine PowerPoint\n\nSlide 2: Westforge Holdings Inc.\nUnicode café, ₦42,500",
+      file: {
+        name: "mabojolu-output.pptx",
+        mimeType:
+          "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+      },
+    },
+  ])(
+    "routes exact $label requests to the matching generated-file endpoint",
+    async ({ prompt, endpoint, expectedContent, file }) => {
+      fetchMock.mockImplementation(async (input) => {
+        if (input === endpoint) {
+          return Response.json({
+            file: {
+              ...file,
+              sizeBytes: 8,
+              dataUrl: `data:${file.mimeType};base64,VEVTVA==`,
+            },
+          });
+        }
+        return successfulReply();
+      });
+
+      const { result } = renderHook(() => useChat());
+
+      await act(async () => {
+        result.current.send(prompt);
+      });
+
+      await waitFor(() => {
+        expect(result.current.isStreaming).toBe(false);
+      });
+
+      const calls = fetchMock.mock.calls.filter(
+        (call) => call[0] === endpoint,
+      );
+      expect(calls).toHaveLength(1);
+      expect(chatCalls()).toHaveLength(0);
+
+      const init = calls[0][1] as RequestInit;
+      expect(JSON.parse(String(init.body))).toEqual({
+        content: expectedContent,
+      });
+
+      expect(result.current.messages[1]).toMatchObject({
+        role: "assistant",
+        status: "complete",
+        generatedFiles: [
+          {
+            name: file.name,
+            mimeType: file.mimeType,
+          },
+        ],
+      });
+    },
+  );
+
+  it("creates exact UTF-8 text artifacts without leaking the instruction wrapper", async () => {
+    fetchMock.mockImplementation(async () =>
+      sseResponse([
+        JSON.stringify({
+          type: "start",
+          messageId: "text-file-msg",
+          model: "mabojolu-mock",
+        }),
+        JSON.stringify({
+          type: "delta",
+          text: "Model chatter that must not enter the exact file.",
+        }),
+        JSON.stringify({
+          type: "done",
+          finishReason: "end_turn",
+        }),
+      ]),
+    );
+
+    const { result } = renderHook(() => useChat());
+    const prompt =
+      "Create a text file containing exactly these three lines:\nMabojolu TXT Output Qualification\nUnicode check: café, ₦42,500\nNo instruction text\nGive me the file as a downloadable .txt file.";
+
+    await act(async () => {
+      result.current.send(prompt);
+    });
+
+    await waitFor(() => {
+      expect(result.current.isStreaming).toBe(false);
+    });
+
+    const file = result.current.messages[1].generatedFiles?.[0];
+    expect(file).toMatchObject({
+      name: "mabojolu-output.txt",
+      mimeType: "text/plain",
+    });
+    expect(file?.dataUrl).toBeTruthy();
+
+    const base64 = file?.dataUrl.split(",")[1] ?? "";
+    const decoded = new TextDecoder().decode(
+      Uint8Array.from(atob(base64), (character) =>
+        character.charCodeAt(0),
+      ),
+    );
+
+    expect(decoded).toBe(
+      "Mabojolu TXT Output Qualification\nUnicode check: café, ₦42,500\nNo instruction text",
+    );
+    expect(decoded).not.toContain("Give me the file");
+    expect(decoded).not.toContain("Model chatter");
+  });
+
   it("adopts the server's conversation id exactly once", async () => {
     // Reported once per conversation, not once per double-invoked updater.
     const onConversationChanged = vi.fn();
