@@ -300,6 +300,77 @@ describe("useChat", () => {
     expect(decoded).not.toContain("Model chatter");
   });
 
+  it("routes natural attachment replacement requests to the file editor", async () => {
+    fetchMock.mockImplementation(async (input) => {
+      if (input === "/api/files/edit") {
+        return Response.json({
+          file: {
+            name: "proposal-modified.docx",
+            mimeType:
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+            sizeBytes: 24,
+            dataUrl:
+              "data:application/vnd.openxmlformats-officedocument.wordprocessingml.document;base64,VEVTVA==",
+          },
+        });
+      }
+
+      return successfulReply();
+    });
+
+    const { result } = renderHook(() => useChat());
+
+    await act(async () => {
+      result.current.send(
+        'Change "Old value" to "New value" in the attached Word document and return the modified file.',
+        [
+          {
+            kind: "document",
+            id: "doc-evidence-1",
+            name: "proposal.docx",
+            mimeType: "text/plain",
+            sizeBytes: 32,
+            textContent: "Old value\nKeep me",
+            sourceAttachmentId: "attachment-123",
+            sourceMimeType:
+              "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          },
+        ],
+      );
+    });
+
+    await waitFor(() => {
+      expect(result.current.isStreaming).toBe(false);
+    });
+
+    const editCalls = fetchMock.mock.calls.filter(
+      (call) => call[0] === "/api/files/edit",
+    );
+
+    expect(editCalls).toHaveLength(1);
+    expect(chatCalls()).toHaveLength(0);
+
+    const init = editCalls[0][1] as RequestInit;
+
+    expect(JSON.parse(String(init.body))).toEqual({
+      attachmentId: "attachment-123",
+      findText: "Old value",
+      replaceText: "New value",
+    });
+
+    expect(result.current.messages[1]).toMatchObject({
+      role: "assistant",
+      status: "complete",
+      generatedFiles: [
+        {
+          name: "proposal-modified.docx",
+          mimeType:
+            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        },
+      ],
+    });
+  });
+
   it("adopts the server's conversation id exactly once", async () => {
     // Reported once per conversation, not once per double-invoked updater.
     const onConversationChanged = vi.fn();
