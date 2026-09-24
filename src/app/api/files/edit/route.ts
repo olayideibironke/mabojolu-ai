@@ -22,9 +22,10 @@ const EDITABLE_MIMES = new Set<string>([
 
 function modifiedName(filename: string): string {
   const dot = filename.lastIndexOf(".");
-  return dot > 0
-    ? `${filename.slice(0, dot)}-modified${filename.slice(dot)}`
-    : `${filename}-modified`;
+  const stem = dot > 0 ? filename.slice(0, dot) : filename;
+  const extension = dot > 0 ? filename.slice(dot) : "";
+  const cleanStem = stem.replace(/(?:-modified)+$/i, "");
+  return cleanStem + "-modified" + extension;
 }
 
 export async function POST(request: Request): Promise<Response> {
