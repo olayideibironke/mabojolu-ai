@@ -22,6 +22,7 @@ import type {
   ChatGeneratedFile,
   ChatGeneratedImage,
   ChatMessage,
+  ChatTextDocumentAttachment,
   ChatSource,
   FeedbackRating,
 } from "@/types/chat";
