@@ -204,8 +204,38 @@ export function inferStructuralChangePoint(
       left.index - right.index,
   );
 
-  const best = candidates[0]!;
-  const runnerUp = candidates[1];
+  const maximumScore =
+    candidates[0]!
+      .score;
+
+  const nearBest =
+    candidates
+      .filter(
+        (candidate) =>
+          maximumScore -
+            candidate.score <=
+          Math.max(
+            minimumMseImprovement,
+            Math.abs(
+              maximumScore,
+            ) * 0.15,
+          ),
+      )
+      .sort(
+        (left, right) =>
+          left.index -
+          right.index,
+      );
+
+  const best =
+    nearBest[0] ??
+    candidates[0]!;
+  const runnerUp =
+    candidates.find(
+      (candidate) =>
+        candidate.index !==
+        best.index,
+    );
   const posteriorGap = runnerUp
     ? best.posterior - runnerUp.posterior
     : best.posterior;
