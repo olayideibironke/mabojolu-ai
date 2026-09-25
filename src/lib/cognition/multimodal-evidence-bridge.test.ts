@@ -16,7 +16,7 @@ function evidence(
     filename: "observation.txt",
     mimeType: "text/plain",
     modality: "text",
-    capabilityId: "text-reading",
+    capabilityId: "document-understanding",
     processor: {
       id: "mabojolu-direct-text-v1",
       local: true,
@@ -48,7 +48,7 @@ describe("multimodal evidence cognitive bridge", () => {
       filename: "observation.txt",
       mimeType: "text/plain",
       modality: "text",
-      capabilityId: "text-reading",
+      capabilityId: "document-understanding",
       processorId: "mabojolu-direct-text-v1",
       processorLocal: true,
       evidenceRole: "direct",
