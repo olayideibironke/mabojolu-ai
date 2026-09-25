@@ -84,8 +84,7 @@ export interface ChatImageAttachment {
   mimeType:
     | "image/jpeg"
     | "image/png"
-    | "image/webp"
-    | "image/svg+xml";
+    | "image/webp";
 
   /** Original file size before base64 encoding. */
   sizeBytes: number;
