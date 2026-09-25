@@ -73,6 +73,34 @@ export function runChangePointAwareStructuralRecovery(
     >[7];
   },
 ): ChangePointRecoveryResult {
+  const orderedEvidence = [...inputs.evidence].sort(
+    (left, right) => left.sequence - right.sequence,
+  );
+  const maximumObservedSequence = orderedEvidence.at(-1)?.sequence ?? -1;
+  const evidenceIdSet = new Set(evidenceIds(inputs.evidence));
+  const protectedIdList = evidenceIds(inputs.protectedEvidence);
+  const protectedIdSet = new Set(protectedIdList);
+
+  if (protectedIdSet.size !== protectedIdList.length) {
+    throw new Error(
+      "v1.37 protected validation evidence must contain unique experiment ids.",
+    );
+  }
+
+  for (const entry of inputs.protectedEvidence) {
+    const id = entry.observation.experiment.id;
+    if (evidenceIdSet.has(id)) {
+      throw new Error(
+        "v1.37 protected validation evidence must be disjoint from change-detection and synthesis evidence.",
+      );
+    }
+    if (entry.sequence <= maximumObservedSequence) {
+      throw new Error(
+        "v1.37 protected validation evidence must be freshly collected after the observed change sequence.",
+      );
+    }
+  }
+
   const adaptation =
     chooseMultiGenerationStructuralAdaptation(
       inputs.activeFamily,
