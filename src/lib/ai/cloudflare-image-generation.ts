@@ -19,7 +19,7 @@ export interface CloudflareGeneratedImage {
     string;
 
   processor:
-    "cloudflare-workers-ai-flux-schnell-v1";
+    "cloudflare-workers-ai-lucid-origin-v1";
 }
 
 export type CloudflareImageGenerationResult =
@@ -80,7 +80,7 @@ function generatedImage(
       base64Data,
 
       processor:
-        "cloudflare-workers-ai-flux-schnell-v1",
+        "cloudflare-workers-ai-lucid-origin-v1",
     },
   };
 }
@@ -169,7 +169,7 @@ export async function generateCloudflareImage(
       await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
           accountId,
-        )}/ai/run/@cf/black-forest-labs/flux-1-schnell`,
+        )}/ai/run/@cf/leonardo/lucid-origin`,
         {
           method:
             "POST",
@@ -191,10 +191,16 @@ export async function generateCloudflareImage(
           body:
             JSON.stringify({
               prompt:
-                prompt.slice(
-                  0,
-                  2048,
-                ),
+                [
+                  "Create a polished, professional, high-end image that follows the user's request exactly.",
+                  "Do not invent people, faces, portraits, names, dates, ages, logos, or written details that the user did not request.",
+                  "If the request is a flyer, poster, invitation, card, banner, or other graphic design, prioritize clean composition and highly legible typography.",
+                  "Render every requested word, name, number, and date exactly as supplied. Do not add filler text, pseudo-text, gibberish, or extra copy.",
+                  "If the user did not request a person or provide a reference image, do not depict a person.",
+                  "",
+                  "USER REQUEST:",
+                  prompt.slice(0, 2048),
+                ].join("\\n"),
 
               seed:
                 randomInt(
@@ -202,8 +208,17 @@ export async function generateCloudflareImage(
                   2_147_483_647,
                 ),
 
-              steps:
-                4,
+              width:
+                1024,
+
+              height:
+                1024,
+
+              guidance:
+                6,
+
+              num_steps:
+                24,
             }),
 
           cache:
