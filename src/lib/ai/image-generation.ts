@@ -23,7 +23,8 @@ export interface GeneratedImage {
   processor:
     "comfyui-local-v1" |
     "cloudflare-workers-ai-flux-schnell-v1" |
-    "cloudflare-workers-ai-lucid-origin-v1";
+    "cloudflare-workers-ai-lucid-origin-v1" |
+    "cloudflare-workers-ai-phoenix-v1";
 }
 
 export type ImageGenerationResult =
