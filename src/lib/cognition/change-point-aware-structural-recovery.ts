@@ -42,6 +42,7 @@ export interface ChangePointRecoveryResult {
     | "abstained";
   adaptation: MultiGenerationAdaptationDecision;
   selectedFamily?: StructuralFamilyGeneration;
+  archivedFamily?: StructuralFamilyGeneration;
   recovery?: AutomaticStructuralRecoveryResult;
   reason:
     | "active-family-retained"
@@ -114,11 +115,29 @@ export function runChangePointAwareStructuralRecovery(
       );
     }
 
+    const nextGeneration =
+      Math.max(
+        inputs.activeFamily.generation,
+        ...inputs.archivedFamilies.map(
+          (family) => family.generation,
+        ),
+      ) + 1;
+
     return {
       decision: "resurrect-archived",
       adaptation,
+      archivedFamily: {
+        ...inputs.activeFamily,
+        protectedEvidenceIds: [
+          ...inputs.activeFamily.protectedEvidenceIds,
+        ],
+        status: "archived",
+      },
       selectedFamily: {
-        ...selectedFamily,
+        familyId: selectedFamily.familyId,
+        generation: nextGeneration,
+        parentFamilyId: inputs.activeFamily.familyId,
+        program: selectedFamily.program,
         protectedEvidenceIds:
           evidenceIds(
             inputs.protectedEvidence,
