@@ -183,6 +183,9 @@ export async function generateCloudflareImage(
 
             "Content-Type":
               "application/json",
+
+            "cf-aig-gateway-id":
+              "default",
           },
 
           body:
