@@ -345,6 +345,93 @@ describe("change-point-aware structural recovery integration", () => {
     );
   });
 
+  it("fails closed when protected validation overlaps change-detection evidence", () => {
+    const A = family("family-A", 1, 0.4, "archived");
+    const C = family("family-C", 3, 1, "active");
+    const old = evidence("c-old", 0, 1);
+    const returned = evidence("a-return", 4, 0.4);
+
+    expect(() =>
+      runChangePointAwareStructuralRecovery(
+        {
+          activeFamily: C,
+          archivedFamilies: [A],
+          evidence: [...old, ...returned],
+          protectedEvidence: returned,
+          failedCandidates: [],
+          collapse: collapse(returned),
+          actualProgram: A.program,
+        },
+        {
+          adaptation: {
+            ambiguityMargin: 0,
+            familyTemperature: 0.005,
+          },
+        },
+      ),
+    ).toThrow(/protected validation evidence must be disjoint/);
+  });
+
+  it("fails closed when protected validation predates completion of observed regime evidence", () => {
+    const A = family("family-A", 1, 0.4, "archived");
+    const C = family("family-C", 3, 1, "active");
+    const old = evidence("c-old", 0, 1);
+    const returned = evidence("a-return", 4, 0.4);
+    const staleProtected = evidence("stale-protected-a", 2, 0.4);
+
+    expect(() =>
+      runChangePointAwareStructuralRecovery(
+        {
+          activeFamily: C,
+          archivedFamilies: [A],
+          evidence: [...old, ...returned],
+          protectedEvidence: staleProtected,
+          failedCandidates: [],
+          collapse: collapse(returned),
+          actualProgram: A.program,
+        },
+        {
+          adaptation: {
+            ambiguityMargin: 0,
+            familyTemperature: 0.005,
+          },
+        },
+      ),
+    ).toThrow(/freshly collected after the observed change sequence/);
+  });
+
+  it("uses only fresh post-observation protected evidence to validate an archived-family recurrence", () => {
+    const A = family("family-A", 1, 0.4, "archived");
+    const C = family("family-C", 3, 1, "active");
+    const old = evidence("c-old", 0, 1);
+    const returned = evidence("a-return", 4, 0.4);
+    const freshProtected = evidence("fresh-protected-a", 8, 0.4);
+
+    const result = runChangePointAwareStructuralRecovery(
+      {
+        activeFamily: C,
+        archivedFamilies: [A],
+        evidence: [...old, ...returned],
+        protectedEvidence: freshProtected,
+        failedCandidates: [],
+        collapse: collapse(returned),
+        actualProgram: A.program,
+      },
+      {
+        adaptation: {
+          ambiguityMargin: 0,
+          familyTemperature: 0.005,
+        },
+      },
+    );
+
+    expect(result.decision).toBe("resurrect-archived");
+    expect(result.selectedFamily?.familyId).toBe("family-A");
+    expect(result.selectedFamily?.protectedEvidenceIds).toEqual(
+      freshProtected.map((entry) => entry.observation.experiment.id),
+    );
+  });
+
   it("fails closed if stale pre-change evidence reaches the synthesis collapse", () => {
     const A =
       family(
