@@ -156,4 +156,48 @@ describe("governed multimodal reasoning", () => {
     expect(state.beliefs).toEqual([]);
     expect(state.hypotheses).toEqual([]);
   });
+
+  it("fails closed before revision when protected evidence contaminates live reasoning", () => {
+    const state = createCognitiveState("2026-09-25T20:00:00.000Z");
+    const evidence = observed(
+      "held-out",
+      "2026-09-25T21:00:00.000Z",
+      "protected-subject",
+    );
+
+    expect(() =>
+      runGovernedMultimodalReasoning(
+        state,
+        {
+          id: "protected-claim",
+          statement: "Held-out evidence supports this claim.",
+          supportingObservationIds: ["held-out"],
+        },
+        [evidence],
+        "2026-09-25T21:01:00.000Z",
+        { protectedEvidenceIds: ["held-out"] },
+      ),
+    ).toThrow(/cannot participate in live belief revision/);
+
+    expect(state.beliefs).toEqual([]);
+    expect(state.hypotheses).toEqual([]);
+  });
+
+  it("rejects duplicate protected evidence ids", () => {
+    const state = createCognitiveState("2026-09-25T20:00:00.000Z");
+
+    expect(() =>
+      runGovernedMultimodalReasoning(
+        state,
+        {
+          id: "claim",
+          statement: "The event occurred.",
+          supportingObservationIds: [],
+        },
+        [],
+        "2026-09-25T21:01:00.000Z",
+        { protectedEvidenceIds: ["held-out", "held-out"] },
+      ),
+    ).toThrow(/must be unique/);
+  });
 });
