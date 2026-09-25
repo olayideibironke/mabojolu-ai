@@ -50,10 +50,39 @@ interface WorkersAiResponse {
       string;
   };
 
+  image?:
+    string;
+
   errors?: Array<{
+    code?:
+      number;
+
     message?:
       string;
   }>;
+}
+
+function generatedImage(
+  base64Data:
+    string,
+): CloudflareImageGenerationResult {
+  return {
+    ok:
+      true,
+
+    image: {
+      filename:
+        `mabojolu-${Date.now()}.jpg`,
+
+      mimeType:
+        "image/jpeg",
+
+      base64Data,
+
+      processor:
+        "cloudflare-workers-ai-flux-schnell-v1",
+    },
+  };
 }
 
 export async function generateCloudflareImage(
@@ -83,11 +112,13 @@ export async function generateCloudflareImage(
 
   const accountId =
     envResult.env
-      .CLOUDFLARE_ACCOUNT_ID;
+      .CLOUDFLARE_ACCOUNT_ID
+      ?.trim();
 
   const apiToken =
     envResult.env
-      .CLOUDFLARE_WORKERS_AI_API_TOKEN;
+      .CLOUDFLARE_WORKERS_AI_API_TOKEN
+      ?.trim();
 
   if (
     !accountId ||
@@ -147,6 +178,9 @@ export async function generateCloudflareImage(
             Authorization:
               `Bearer ${apiToken}`,
 
+            Accept:
+              "application/json, image/jpeg",
+
             "Content-Type":
               "application/json",
           },
@@ -177,89 +211,139 @@ export async function generateCloudflareImage(
         },
       );
 
+    const contentType =
+      response.headers
+        .get(
+          "content-type",
+        )
+        ?.toLowerCase() ??
+      "";
+
+    if (
+      response.ok &&
+      contentType.startsWith(
+        "image/",
+      )
+    ) {
+      const bytes =
+        new Uint8Array(
+          await response
+            .arrayBuffer(),
+        );
+
+      if (
+        bytes.length ===
+        0
+      ) {
+        return {
+          ok:
+            false,
+
+          code:
+            "workers_ai_empty_response",
+
+          message:
+            "Cloudflare Workers AI returned an empty image.",
+        };
+      }
+
+      return generatedImage(
+        Buffer.from(
+          bytes,
+        ).toString(
+          "base64",
+        ),
+      );
+    }
+
+    const rawBody =
+      await response
+        .text();
+
     let payload:
-      WorkersAiResponse;
+      WorkersAiResponse |
+      null =
+        null;
 
     try {
       payload =
-        await response
-          .json() as
-          WorkersAiResponse;
+        rawBody
+          ? JSON.parse(
+              rawBody,
+            ) as
+              WorkersAiResponse
+          : null;
     } catch {
-      return {
-        ok:
-          false,
-
-        code:
-          "workers_ai_invalid_response",
-
-        message:
-          "Cloudflare Workers AI returned an unreadable response.",
-      };
+      payload =
+        null;
     }
 
     const image =
-      payload.result
-        ?.image;
+      payload?.result
+        ?.image ??
+      payload?.image;
 
     if (
-      !response.ok ||
-      payload.success ===
-        false ||
-      typeof image !==
-        "string" ||
-      !image
+      response.ok &&
+      typeof image ===
+        "string" &&
+      image.length >
+        0
     ) {
-      const detail =
-        payload.errors
-          ?.map(
-            (
-              error,
-            ) =>
-              error.message,
-          )
-          .filter(
-            (
-              message,
-            ): message is string =>
-              Boolean(
-                message,
-              ),
-          )
-          .join(
-            "; ",
-          );
-
-      return {
-        ok:
-          false,
-
-        code:
-          "workers_ai_generation_failed",
-
-        message:
-          detail ||
-          `Cloudflare Workers AI returned HTTP ${response.status}.`,
-      };
+      return generatedImage(
+        image,
+      );
     }
+
+    const detail =
+      payload?.errors
+        ?.map(
+          (
+            error,
+          ) => {
+            const message =
+              error.message
+                ?.trim();
+
+            if (!message) {
+              return null;
+            }
+
+            return typeof error.code ===
+              "number"
+              ? `${message} (Cloudflare ${error.code})`
+              : message;
+          },
+        )
+        .filter(
+          (
+            message,
+          ): message is string =>
+            Boolean(
+              message,
+            ),
+        )
+        .join(
+          "; ",
+        );
 
     return {
       ok:
-        true,
+        false,
 
-      image: {
-        filename:
-          `mabojolu-${Date.now()}.jpg`,
+      code:
+        response.status ===
+          401 ||
+        response.status ===
+          403
+          ? "workers_ai_authentication_failed"
+          : "workers_ai_generation_failed",
 
-        mimeType:
-          "image/jpeg",
-
-        base64Data:
-          image,
-
-        processor:
-          "cloudflare-workers-ai-flux-schnell-v1",
-      },
+      message:
+        detail ||
+        (response.ok
+          ? "Cloudflare Workers AI returned no generated image."
+          : `Cloudflare Workers AI returned HTTP ${response.status}.`),
     };
   } catch (
     cause
