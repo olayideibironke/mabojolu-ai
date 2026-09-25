@@ -37,7 +37,7 @@ describe("multimodal evidence independence", () => {
     const transcript = observed(
       "transcript",
       "audio-transcript",
-      "audio-transcription",
+      "audio-understanding",
       "meeting-recording",
     );
     const document = observed(
@@ -60,7 +60,7 @@ describe("multimodal evidence independence", () => {
     const first = observed(
       "audio",
       "audio-derived",
-      "audio-transcription",
+      "audio-understanding",
       "recording-1",
     );
     const second = observed(
@@ -99,7 +99,7 @@ describe("multimodal evidence independence", () => {
     const second = observed(
       "recording-b",
       "recording-b",
-      "audio-transcription",
+      "audio-understanding",
     );
 
     const one = assessMultimodalReasoningCandidate(
@@ -131,7 +131,7 @@ describe("multimodal evidence independence", () => {
     const against = observed(
       "audio",
       "audio",
-      "audio-transcription",
+      "audio-understanding",
     );
 
     const assessment = assessMultimodalReasoningCandidate(
