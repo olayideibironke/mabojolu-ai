@@ -228,6 +228,81 @@ describe("change-point-aware multi-generation structural adaptation", () => {
     ).toThrow(/disjoint/);
   });
 
+  it("selects only the newest incarnation of a recurring family across long-lived history", () => {
+    const A1 = family("family-A", 1, 0.4, "archived");
+    const B2 = family("family-B", 2, 0.7, "archived", "family-A");
+    const C3 = family("family-C", 3, 1.0, "archived", "family-B");
+    const A4 = family("family-A", 4, 0.4, "archived", "family-C");
+    const B5 = family("family-B", 5, 0.7, "active", "family-A");
+    const recent = [
+      ...evidence("b5-old", 40, 0.7, 4),
+      ...evidence("a-return-again", 44, 0.4, 4),
+    ];
+    const freshProtected = evidence("protected-a-again", 100, 0.4, 4);
+
+    const decision = chooseMultiGenerationStructuralAdaptation(
+      B5,
+      [A1, B2, C3, A4],
+      recent,
+      freshProtected,
+      { ambiguityMargin: 0, familyTemperature: 0.005 },
+    );
+
+    expect(decision.decision).toBe("resurrect-archived");
+    expect(decision.selectedFamilyId).toBe("family-A");
+    expect(decision.selectedGeneration).toBe(4);
+    expect(
+      decision.familyPosteriors.filter(
+        (posterior) => posterior.familyId === "family-A",
+      ),
+    ).toHaveLength(1);
+    expect(
+      decision.familyPosteriors.some(
+        (posterior) =>
+          posterior.familyId === "family-A" && posterior.generation === 1,
+      ),
+    ).toBe(false);
+  });
+
+  it("fails closed on duplicate generation numbers in retained structural history", () => {
+    const A = family("family-A", 1, 0.4, "archived");
+    const duplicate = family("family-B", 1, 0.7, "archived", "family-A");
+    const C = family("family-C", 3, 1.0, "active", "family-B");
+    const recent = [
+      ...evidence("c-old", 0, 1.0, 4),
+      ...evidence("a-return", 4, 0.4, 4),
+    ];
+
+    expect(() =>
+      chooseMultiGenerationStructuralAdaptation(
+        C,
+        [A, duplicate],
+        recent,
+        evidence("protected-a", 100, 0.4, 4),
+        { ambiguityMargin: 0, familyTemperature: 0.005 },
+      ),
+    ).toThrow(/Duplicate structural family generation 1/);
+  });
+
+  it("fails closed when retained structural history contains multiple active generations", () => {
+    const A = family("family-A", 1, 0.4, "active");
+    const C = family("family-C", 3, 1.0, "active", "family-A");
+    const recent = [
+      ...evidence("c-old", 0, 1.0, 4),
+      ...evidence("a-return", 4, 0.4, 4),
+    ];
+
+    expect(() =>
+      chooseMultiGenerationStructuralAdaptation(
+        C,
+        [A],
+        recent,
+        evidence("protected-a", 100, 0.4, 4),
+        { ambiguityMargin: 0, familyTemperature: 0.005 },
+      ),
+    ).toThrow(/exactly one active family generation/);
+  });
+
   it("advances ancestry without mutating the archived generation", () => {
     const A = family("family-A", 1, 0.4, "active");
     const advanced = archiveAndAdvanceStructuralFamily(
