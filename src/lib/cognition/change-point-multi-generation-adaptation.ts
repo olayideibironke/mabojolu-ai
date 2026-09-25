@@ -307,6 +307,49 @@ export function inferStructuralChangePoint(
   };
 }
 
+function canonicalRetainedFamilies(
+  activeFamily: StructuralFamilyGeneration,
+  archivedFamilies: readonly StructuralFamilyGeneration[],
+): StructuralFamilyGeneration[] {
+  const all = [activeFamily, ...archivedFamilies];
+  const generations = new Set<number>();
+  let activeCount = 0;
+
+  for (const family of all) {
+    if (!family.familyId.trim()) {
+      throw new Error("Structural family id cannot be empty.");
+    }
+    if (!Number.isInteger(family.generation) || family.generation < 1) {
+      throw new Error("Structural family generation must be a positive integer.");
+    }
+    if (generations.has(family.generation)) {
+      throw new Error(
+        `Duplicate structural family generation ${family.generation}.`,
+      );
+    }
+    generations.add(family.generation);
+    if (family.status === "active") {
+      activeCount += 1;
+    }
+  }
+
+  if (activeFamily.status !== "active" || activeCount !== 1) {
+    throw new Error(
+      "Retained structural history must contain exactly one active family generation.",
+    );
+  }
+
+  const latestByFamilyId = new Map<string, StructuralFamilyGeneration>();
+  for (const family of all) {
+    const existing = latestByFamilyId.get(family.familyId);
+    if (!existing || family.generation > existing.generation) {
+      latestByFamilyId.set(family.familyId, family);
+    }
+  }
+
+  return [...latestByFamilyId.values()];
+}
+
 function posteriorOverFamilies(
   families: readonly StructuralFamilyGeneration[],
   evidence: readonly SequencedStructuralEvidence[],
@@ -418,7 +461,10 @@ export function chooseMultiGenerationStructuralAdaptation(
     };
   }
 
-  const retained = [activeFamily, ...archivedFamilies];
+  const retained = canonicalRetainedFamilies(
+    activeFamily,
+    archivedFamilies,
+  );
   const posteriors = posteriorOverFamilies(
     retained,
     protectedSorted,
