@@ -1,5 +1,6 @@
 import type { CognitiveMultimodalObservation } from "./multimodal-evidence-bridge";
 import type { Belief, Hypothesis } from "./types";
+import { independentMultimodalEvidenceWeight } from "./multimodal-evidence-independence";
 
 export interface MultimodalReasoningCandidate {
   id: string;
@@ -22,7 +23,7 @@ function unique(values: readonly string[]): string[] {
   return [...new Set(values)];
 }
 
-function evidenceWeight(
+export function evidenceWeight(
   observation: CognitiveMultimodalObservation,
 ): number {
   switch (observation.evidenceRole) {
@@ -72,13 +73,15 @@ export function assessMultimodalReasoningCandidate(
     (id) => byId.get(id)!.evidenceRole === "derived",
   );
 
-  const supportWeight = supporting.reduce(
-    (sum, id) => sum + evidenceWeight(byId.get(id)!),
-    0,
+  const supportWeight = independentMultimodalEvidenceWeight(
+    supporting,
+    observations,
+    evidenceWeight,
   );
-  const contradictionWeight = contradicting.reduce(
-    (sum, id) => sum + evidenceWeight(byId.get(id)!),
-    0,
+  const contradictionWeight = independentMultimodalEvidenceWeight(
+    contradicting,
+    observations,
+    evidenceWeight,
   );
 
   const confidence =
