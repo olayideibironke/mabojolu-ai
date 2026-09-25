@@ -8,8 +8,8 @@ import {
   normalizeError,
 } from "@/lib/ai/errors";
 import {
-  generateLocalImage,
-} from "@/lib/ai/local-image-generation";
+  generateImage,
+} from "@/lib/ai/image-generation";
 import {
   errorResponse,
 } from "@/lib/ai/stream";
@@ -182,7 +182,7 @@ export async function POST(
     }
 
     const generated =
-      await generateLocalImage(
+      await generateImage(
         {
           prompt,
 
