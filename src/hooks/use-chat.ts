@@ -507,7 +507,7 @@ async function generateChatImage(prompt: string, signal: AbortSignal): Promise<C
     throw new Error(message);
   }
   const { filename, mimeType, dataUrl } = payload.image;
-  if (typeof filename !== "string" || typeof mimeType !== "string" || typeof dataUrl !== "string" || !["image/jpeg","image/png","image/webp","image/svg+xml"].includes(mimeType)) throw new Error("Mabojolu returned invalid generated-image data.");
+  if (typeof filename !== "string" || typeof mimeType !== "string" || typeof dataUrl !== "string" || !["image/jpeg","image/png","image/webp"].includes(mimeType)) throw new Error("Mabojolu returned invalid generated-image data.");
   const base64 = dataUrl.slice(dataUrl.indexOf(",") + 1);
   const padding = base64.endsWith("==") ? 2 : base64.endsWith("=") ? 1 : 0;
   return { id: createId(), name: filename, mimeType: mimeType as ChatGeneratedImage["mimeType"], sizeBytes: Math.max(0, Math.floor(base64.length * 3 / 4 - padding)), dataUrl, prompt };
