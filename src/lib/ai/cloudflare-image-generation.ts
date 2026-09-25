@@ -19,7 +19,7 @@ export interface CloudflareGeneratedImage {
     string;
 
   processor:
-    "cloudflare-workers-ai-lucid-origin-v1";
+    "cloudflare-workers-ai-phoenix-v1";
 }
 
 export type CloudflareImageGenerationResult =
@@ -80,7 +80,7 @@ function generatedImage(
       base64Data,
 
       processor:
-        "cloudflare-workers-ai-lucid-origin-v1",
+        "cloudflare-workers-ai-phoenix-v1",
     },
   };
 }
@@ -169,7 +169,7 @@ export async function generateCloudflareImage(
       await fetch(
         `https://api.cloudflare.com/client/v4/accounts/${encodeURIComponent(
           accountId,
-        )}/ai/run/@cf/leonardo/lucid-origin`,
+        )}/ai/run/@cf/leonardo/phoenix-1.0`,
         {
           method:
             "POST",
@@ -215,10 +215,13 @@ export async function generateCloudflareImage(
                 1024,
 
               guidance:
-                6,
+                9,
 
               num_steps:
-                24,
+                40,
+
+              negative_prompt:
+                "person, people, child, boy, girl, man, woman, face, portrait, photograph, human figure, fake text, gibberish text, misspelled words, extra words, random letters, watermark, logo",
             }),
 
           cache:
