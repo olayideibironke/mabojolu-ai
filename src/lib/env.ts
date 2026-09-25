@@ -217,6 +217,17 @@ const serverEnvSchema = z.object({
       .min(1)
       .optional(),
 
+  /** Cloudflare Workers AI credentials used by the production image backend. */
+  CLOUDFLARE_ACCOUNT_ID:
+    z.string()
+      .min(1)
+      .optional(),
+
+  CLOUDFLARE_WORKERS_AI_API_TOKEN:
+    z.string()
+      .min(1)
+      .optional(),
+
   /**
    * Where conversations are stored.
    *
