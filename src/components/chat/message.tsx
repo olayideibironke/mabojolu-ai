@@ -748,9 +748,34 @@ function AssistantMessage({
         {generatedImages.length > 0 ? (
           <div className="mb-3 grid max-w-[640px] gap-3 sm:grid-cols-2" aria-label="Generated images">
             {generatedImages.map((image) => (
-              <figure key={image.id} className="relative m-0 aspect-square overflow-hidden rounded-2xl border border-border-subtle bg-surface-base">
-                <Image src={image.dataUrl} alt={image.prompt ?? image.name} fill unoptimized sizes="(max-width: 640px) 100vw, 320px" className="object-contain" />
-                <figcaption className="sr-only">{image.prompt ?? image.name}</figcaption>
+              <figure key={image.id} className="m-0 overflow-hidden rounded-2xl border border-border-subtle bg-surface-base shadow-sm">
+                <button
+                  type="button"
+                  onClick={() => window.open(image.dataUrl, "_blank", "noopener,noreferrer")}
+                  className="relative block aspect-square w-full cursor-zoom-in bg-surface-base"
+                  aria-label={`Open ${image.name} full size`}
+                >
+                  <Image src={image.dataUrl} alt={image.prompt ?? image.name} fill unoptimized sizes="(max-width: 640px) 100vw, 320px" className="object-contain" />
+                </button>
+                <figcaption className="flex items-center justify-between gap-3 border-t border-border-subtle px-3 py-2">
+                  <span className="min-w-0 truncate text-xs text-text-muted">{image.name}</span>
+                  <span className="flex shrink-0 items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => window.open(image.dataUrl, "_blank", "noopener,noreferrer")}
+                      className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      View
+                    </button>
+                    <a
+                      href={image.dataUrl}
+                      download={image.name}
+                      className="rounded-lg px-2.5 py-1.5 text-xs font-semibold text-text-secondary transition hover:bg-surface-raised hover:text-text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent"
+                    >
+                      Download
+                    </a>
+                  </span>
+                </figcaption>
               </figure>
             ))}
           </div>
