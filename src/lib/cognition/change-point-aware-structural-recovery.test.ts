@@ -212,6 +212,25 @@ describe("change-point-aware structural recovery integration", () => {
     );
 
     expect(
+      result.selectedFamily?.generation,
+    ).toBe(4);
+
+    expect(
+      result.selectedFamily?.parentFamilyId,
+    ).toBe("family-C");
+
+    expect(
+      result.archivedFamily,
+    ).toEqual({
+      ...C,
+      status: "archived",
+    });
+
+    expect(
+      result.selectedFamily,
+    ).not.toBe(A);
+
+    expect(
       runControlledAutomaticStructuralRecovery,
     ).not.toHaveBeenCalled();
   });
