@@ -201,6 +201,17 @@ export async function POST(
       );
 
     if (!generated.ok) {
+      console.error(
+        "[mabojolu:image-generation]",
+        {
+          code:
+            generated.code,
+
+          message:
+            generated.message,
+        },
+      );
+
       return errorResponse(
         chatError(
           "provider_unavailable",
