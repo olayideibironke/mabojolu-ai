@@ -33,6 +33,10 @@ const semantic: SemanticMemory = {
   consolidatedAt: "2026-09-26T13:00:00.000Z",
 };
 
+function evidence(id: string, sourceId: string, observedAt: string) {
+  return { id, sourceId, observedAt };
+}
+
 describe("persistent memory lifecycle", () => {
   it("records episodes and semantic knowledge without conflating them", () => {
     const store = recordPersistentMemories({
@@ -65,7 +69,7 @@ describe("persistent memory lifecycle", () => {
     expect(result[0].supportingEpisodes[0].id).toBe("episode-controls");
   });
 
-  it("revises persistent knowledge and preserves auditable lineage", () => {
+  it("revises persistent knowledge only after guarded independent evidence", () => {
     const initial = recordPersistentMemories({
       store: createPersistentMemoryStore(),
       autobiographical: [episode],
@@ -75,11 +79,15 @@ describe("persistent memory lifecycle", () => {
     const revised = revisePersistentSemanticMemory({
       store: initial,
       memoryId: "semantic-feedback",
-      contradictingEvidenceIds: ["obs-3"],
+      evidence: [
+        evidence("obs-3", "robotics-a", "2026-09-26T13:30:00.000Z"),
+        evidence("obs-4", "robotics-b", "2026-09-26T13:35:00.000Z"),
+      ],
+      contradictingEvidenceIds: ["obs-3", "obs-4"],
       revisedStatement:
         "Delayed feedback can destabilize adaptive systems under high gain.",
       revisedConfidence: 0.7,
-      revisionReason: "A later robotics experiment narrowed the rule.",
+      revisionReason: "Later robotics experiments narrowed the rule.",
       revisedAt: "2026-09-26T14:00:00.000Z",
     });
 
@@ -90,6 +98,53 @@ describe("persistent memory lifecycle", () => {
     expect(initial.semantic[0]).toEqual(semantic);
   });
 
+  it("prevents callers from bypassing the contamination guard", () => {
+    const initial = recordPersistentMemories({
+      store: createPersistentMemoryStore(),
+      semantic: [semantic],
+    });
+
+    expect(() =>
+      revisePersistentSemanticMemory({
+        store: initial,
+        memoryId: "semantic-feedback",
+        evidence: [
+          evidence("obs-3", "same-source", "2026-09-26T13:30:00.000Z"),
+          evidence("obs-4", "same-source", "2026-09-26T13:31:00.000Z"),
+        ],
+        contradictingEvidenceIds: ["obs-3", "obs-4"],
+        revisedConfidence: 0.5,
+        revisionReason: "Correlated evidence.",
+        revisedAt: "2026-09-26T14:00:00.000Z",
+      }),
+    ).toThrow(/at least 2 independent evidence sources/);
+
+    expect(initial.semantic[0]).toEqual(semantic);
+    expect(initial.revisions).toEqual([]);
+  });
+
+  it("rejects revision ids that were not supplied to the guard", () => {
+    const initial = recordPersistentMemories({
+      store: createPersistentMemoryStore(),
+      semantic: [semantic],
+    });
+
+    expect(() =>
+      revisePersistentSemanticMemory({
+        store: initial,
+        memoryId: "semantic-feedback",
+        evidence: [
+          evidence("obs-3", "source-a", "2026-09-26T13:30:00.000Z"),
+          evidence("obs-4", "source-b", "2026-09-26T13:31:00.000Z"),
+        ],
+        contradictingEvidenceIds: ["obs-3", "missing"],
+        revisedConfidence: 0.5,
+        revisionReason: "Unsupplied evidence.",
+        revisedAt: "2026-09-26T14:00:00.000Z",
+      }),
+    ).toThrow(/was not supplied to the memory contamination guard/);
+  });
+
   it("replays revision history deterministically", () => {
     const initial = recordPersistentMemories({
       store: createPersistentMemoryStore(),
@@ -98,15 +153,23 @@ describe("persistent memory lifecycle", () => {
     const first = revisePersistentSemanticMemory({
       store: initial,
       memoryId: "semantic-feedback",
-      contradictingEvidenceIds: ["obs-3"],
+      evidence: [
+        evidence("obs-3", "experiment-a", "2026-09-26T13:30:00.000Z"),
+        evidence("obs-3b", "experiment-b", "2026-09-26T13:35:00.000Z"),
+      ],
+      contradictingEvidenceIds: ["obs-3", "obs-3b"],
       revisedConfidence: 0.6,
-      revisionReason: "Contradictory evidence.",
+      revisionReason: "Independent contradictory evidence.",
       revisedAt: "2026-09-26T14:00:00.000Z",
     });
     const second = revisePersistentSemanticMemory({
       store: first,
       memoryId: "semantic-feedback",
-      contradictingEvidenceIds: ["obs-4"],
+      evidence: [
+        evidence("obs-4", "experiment-c", "2026-09-26T14:30:00.000Z"),
+        evidence("obs-4b", "experiment-d", "2026-09-26T14:35:00.000Z"),
+      ],
+      contradictingEvidenceIds: ["obs-4", "obs-4b"],
       revisedConfidence: 0,
       revisionReason: "Independent falsification.",
       revisedAt: "2026-09-26T15:00:00.000Z",
@@ -144,9 +207,13 @@ describe("persistent memory lifecycle", () => {
     const revised = revisePersistentSemanticMemory({
       store: initial,
       memoryId: "semantic-feedback",
-      contradictingEvidenceIds: ["obs-3"],
+      evidence: [
+        evidence("obs-3", "experiment-a", "2026-09-26T13:30:00.000Z"),
+        evidence("obs-3b", "experiment-b", "2026-09-26T13:35:00.000Z"),
+      ],
+      contradictingEvidenceIds: ["obs-3", "obs-3b"],
       revisedConfidence: 0.5,
-      revisionReason: "Contradiction.",
+      revisionReason: "Independent contradiction.",
       revisedAt: "2026-09-26T14:00:00.000Z",
     });
 
