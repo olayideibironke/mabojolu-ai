@@ -44,15 +44,23 @@ export function retrieveSemanticMemory(input: {
         .filter(Boolean),
     ),
   ];
-  const limit = input.query.limit ?? input.semantic.length;
 
-  if (!Number.isInteger(limit) || limit < 1) {
-    throw new Error("Memory retrieval limit must be a positive integer.");
-  }
   if (terms.length === 0 && domains.length === 0) {
     throw new Error("Memory retrieval requires terms or domains.");
   }
 
+  if (
+    input.query.limit !== undefined &&
+    (!Number.isInteger(input.query.limit) || input.query.limit < 1)
+  ) {
+    throw new Error("Memory retrieval limit must be a positive integer.");
+  }
+
+  if (input.semantic.length === 0) {
+    return [];
+  }
+
+  const limit = input.query.limit ?? input.semantic.length;
   const episodes = input.autobiographical ?? [];
 
   return input.semantic
