@@ -11,6 +11,10 @@ import {
   reviseSemanticMemory,
   type SemanticMemoryRevision,
 } from "./semantic-memory-revision";
+import {
+  guardSemanticMemoryRevision,
+  type MemoryRevisionEvidence,
+} from "./memory-revision-guard";
 
 export interface PersistentMemoryStore {
   autobiographical: AutobiographicalMemory[];
@@ -72,12 +76,14 @@ export function retrievePersistentMemory(input: {
 export function revisePersistentSemanticMemory(input: {
   store: PersistentMemoryStore;
   memoryId: string;
+  evidence: readonly MemoryRevisionEvidence[];
   supportingEvidenceIds?: readonly string[];
   contradictingEvidenceIds?: readonly string[];
   revisedStatement?: string;
   revisedConfidence: number;
   revisionReason: string;
   revisedAt: string;
+  minimumIndependentSources?: number;
 }): PersistentMemoryStore {
   ensureUniqueMemoryIds(input.store);
   const index = input.store.semantic.findIndex(
@@ -88,6 +94,29 @@ export function revisePersistentSemanticMemory(input: {
       `Unknown semantic memory ${input.memoryId} during persistent revision.`,
     );
   }
+
+  const requestedEvidenceIds = new Set([
+    ...(input.supportingEvidenceIds ?? []),
+    ...(input.contradictingEvidenceIds ?? []),
+  ]);
+  const suppliedEvidenceIds = new Set(
+    input.evidence.map((entry) => entry.id),
+  );
+  for (const id of requestedEvidenceIds) {
+    if (!suppliedEvidenceIds.has(id)) {
+      throw new Error(
+        `Revision evidence ${id} was not supplied to the memory contamination guard.`,
+      );
+    }
+  }
+
+  guardSemanticMemoryRevision({
+    memory: input.store.semantic[index],
+    evidence: input.evidence.filter((entry) =>
+      requestedEvidenceIds.has(entry.id),
+    ),
+    minimumIndependentSources: input.minimumIndependentSources,
+  });
 
   const revision = reviseSemanticMemory({
     memory: input.store.semantic[index],
