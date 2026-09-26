@@ -37,6 +37,18 @@ function assertTimestamp(value: unknown, message: string): asserts value is stri
   }
 }
 
+function sameSemanticState(left: Record<string, unknown>, right: Record<string, unknown>): boolean {
+  return (
+    left.id === right.id &&
+    left.kind === right.kind &&
+    left.statement === right.statement &&
+    left.confidence === right.confidence &&
+    JSON.stringify(left.derivedFromIds) === JSON.stringify(right.derivedFromIds) &&
+    JSON.stringify(left.domains) === JSON.stringify(right.domains) &&
+    left.consolidatedAt === right.consolidatedAt
+  );
+}
+
 function validateStore(store: unknown): asserts store is PersistentMemoryStore {
   assertRecord(store, "Persistent memory snapshot store is invalid.");
   if (
@@ -66,6 +78,7 @@ function validateStore(store: unknown): asserts store is PersistentMemoryStore {
     globalIds.add(episode.id);
   }
 
+  const semanticById = new Map<string, Record<string, unknown>>();
   for (const memory of store.semantic) {
     assertRecord(memory, "Semantic memory is invalid.");
     assertString(memory.id, "Semantic memory id is invalid.");
@@ -88,8 +101,10 @@ function validateStore(store: unknown): asserts store is PersistentMemoryStore {
       throw new Error("Persistent memory snapshot contains duplicate memory ids.");
     }
     globalIds.add(memory.id);
+    semanticById.set(memory.id, memory);
   }
 
+  const latestRevisionById = new Map<string, Record<string, unknown>>();
   for (const revision of store.revisions) {
     assertRecord(revision, "Semantic memory revision is invalid.");
     assertRecord(revision.previous, "Semantic memory revision previous state is invalid.");
@@ -103,6 +118,22 @@ function validateStore(store: unknown): asserts store is PersistentMemoryStore {
     assertStringArray(revision.contradictingEvidenceIds, "Revision contradiction provenance is invalid.");
     assertString(revision.revisionReason, "Semantic memory revision reason is invalid.");
     assertTimestamp(revision.revisedAt, "Semantic memory revision timestamp is invalid.");
+
+    const previousRevision = latestRevisionById.get(revision.previous.id);
+    if (
+      previousRevision &&
+      !sameSemanticState(previousRevision, revision.previous)
+    ) {
+      throw new Error("Persistent memory revision lineage is discontinuous.");
+    }
+    latestRevisionById.set(revision.current.id, revision.current);
+  }
+
+  for (const [id, latestRevision] of latestRevisionById) {
+    const current = semanticById.get(id);
+    if (!current || !sameSemanticState(latestRevision, current)) {
+      throw new Error("Persistent memory current state does not match revision history.");
+    }
   }
 }
 
