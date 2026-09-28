@@ -91,6 +91,11 @@ export function runGovernedInductionCycle(input: {
     task,
     discovery,
     beliefUpdate,
-    next: beliefUpdate.decision === "act" ? "act" : "experiment",
+    next:
+      beliefUpdate.decision === "act"
+        ? "act"
+        : beliefUpdate.decision === "model-set-failure"
+          ? "observe"
+          : "experiment",
   };
 }
