@@ -119,6 +119,32 @@ describe("v1.42 integrated general-agent cycle", () => {
     expect(result.decision).toBe("completed");
   });
 
+  it("returns to observation instead of acting when every environment model is contradicted", () => {
+    const result = runIntegratedGeneralAgentCycle({
+      environmentId: "apparatus",
+      observations,
+      models,
+      experiments,
+      experimentObservation: {
+        actionKind: "inspect",
+        outcome: "unexpected-third-outcome",
+        observedAt: "2026-09-28T16:17:00.000Z",
+      },
+      state,
+      memory,
+      candidates,
+      experience: () => {
+        throw new Error("execution must not occur after model-set failure");
+      },
+    });
+
+    expect(result.induction.beliefUpdate?.modelSetFailure).toBe(true);
+    expect(result.induction.beliefUpdate?.confidence).toBe(0);
+    expect(result.induction.next).toBe("observe");
+    expect(result.decision).toBe("observe");
+    expect(result.learning).toBeUndefined();
+  });
+
   it("keeps safety governance active during integrated recovery", () => {
     expect(() =>
       runIntegratedGeneralAgentCycle({
