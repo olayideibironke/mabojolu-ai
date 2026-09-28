@@ -15,14 +15,37 @@ import type {
   DiscoveryExperiment,
 } from "./active-environment-discovery";
 import type { EnvironmentExperimentObservation } from "./environment-belief-update";
+import {
+  planLongHorizonDualControl,
+  type LongHorizonDualControlPlan,
+} from "./hierarchical-causal-program";
+import type {
+  ProbabilisticCausalMechanism,
+  WorldModelAction,
+  WorldModelExperiment,
+} from "./probabilistic-causal-world-model";
+
+export interface IntegratedGeneralAgentPlanningInput {
+  mechanisms: readonly ProbabilisticCausalMechanism[];
+  prior: ReadonlyMap<string, number>;
+  initialState: number;
+  goalState: number;
+  experiments: readonly WorldModelExperiment[];
+  actions: readonly WorldModelAction[];
+  horizon?: number;
+  costPenalty?: number;
+  partialProgressWeight?: number;
+}
 
 export interface IntegratedGeneralAgentResult {
   induction: GovernedInductionCycle;
+  plan?: LongHorizonDualControlPlan;
   learning?: AdaptiveLongHorizonResult;
-  decision: "observe" | "experiment" | "act" | "completed";
+  decision: "observe" | "experiment" | "abstain" | "act" | "completed";
   reason:
     | "environment-unresolved"
     | "experiment-required"
+    | "no-safe-long-horizon-policy"
     | "objective-executed"
     | "objective-completed";
 }
@@ -37,6 +60,7 @@ export function runIntegratedGeneralAgentCycle(input: {
   memory: PersistentMemoryStore;
   candidates: readonly LongHorizonStrategyCandidate[];
   experience: Parameters<typeof runAdaptiveLongHorizonLearning>[0]["experience"];
+  planning?: IntegratedGeneralAgentPlanningInput;
   maximumRisk?: number;
   actionConfidenceThreshold?: number;
   memoryWeight?: number;
@@ -58,6 +82,33 @@ export function runIntegratedGeneralAgentCycle(input: {
     return { induction, decision: "experiment", reason: "experiment-required" };
   }
 
+  let plan: LongHorizonDualControlPlan | undefined;
+  if (input.planning) {
+    plan = planLongHorizonDualControl(
+      input.planning.mechanisms,
+      input.planning.prior,
+      input.planning.initialState,
+      input.planning.goalState,
+      input.planning.experiments,
+      input.planning.actions,
+      {
+        horizon: input.planning.horizon,
+        maximumRisk: input.maximumRisk,
+        costPenalty: input.planning.costPenalty,
+        partialProgressWeight: input.planning.partialProgressWeight,
+      },
+    );
+
+    if (plan.decision === "abstained") {
+      return {
+        induction,
+        plan,
+        decision: "abstain",
+        reason: "no-safe-long-horizon-policy",
+      };
+    }
+  }
+
   const learning = runAdaptiveLongHorizonLearning({
     initialState: input.state,
     memory: input.memory,
@@ -69,6 +120,7 @@ export function runIntegratedGeneralAgentCycle(input: {
 
   return {
     induction,
+    plan,
     learning,
     decision: learning.state.status === "succeeded" ? "completed" : "act",
     reason:
