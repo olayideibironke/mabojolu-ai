@@ -29,7 +29,7 @@ export function selectMemoryInformedLongHorizonStrategy(input: {
   }
 
   const maximumRisk = input.maximumRisk ?? 0.2;
-  const memoryWeight = input.memoryWeight ?? 0.25;
+  const memoryWeight = input.memoryWeight ?? 0.5;
   if (!Number.isFinite(maximumRisk) || maximumRisk < 0 || maximumRisk > 1) {
     throw new Error("maximumRisk must be in [0, 1].");
   }
