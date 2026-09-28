@@ -10,7 +10,8 @@ export interface EnvironmentBeliefUpdate {
   models: CompetingEnvironmentModel[];
   contradictedModelIds: string[];
   confidence: number;
-  decision: "act" | "experiment-again";
+  decision: "act" | "experiment-again" | "model-set-failure";
+  modelSetFailure: boolean;
 }
 
 export function updateEnvironmentModelBeliefs(input: {
@@ -57,9 +58,30 @@ export function updateEnvironmentModelBeliefs(input: {
     throw new Error("Competing model probabilities must sum to one.");
   }
 
-  const distinctOutcomes = new Set(
-    input.models.map((model) => model.predictedOutcomes[input.observation.actionKind]),
+  const predictedOutcomes = input.models.map(
+    (model) => model.predictedOutcomes[input.observation.actionKind],
   );
+  const distinctOutcomes = new Set(predictedOutcomes);
+  const outcomeWasPredicted = distinctOutcomes.has(input.observation.outcome);
+
+  if (!outcomeWasPredicted) {
+    return {
+      models: input.models
+        .map((model) => ({
+          ...model,
+          predictedOutcomes: { ...model.predictedOutcomes },
+        }))
+        .sort(
+          (left, right) =>
+            right.probability - left.probability || left.id.localeCompare(right.id),
+        ),
+      contradictedModelIds: input.models.map((model) => model.id).sort(),
+      confidence: 0,
+      decision: "model-set-failure",
+      modelSetFailure: true,
+    };
+  }
+
   const mismatchLikelihood =
     distinctOutcomes.size > 1
       ? (1 - reliability) / (distinctOutcomes.size - 1)
@@ -67,9 +89,8 @@ export function updateEnvironmentModelBeliefs(input: {
 
   const weighted = input.models.map((model) => {
     const predicted = model.predictedOutcomes[input.observation.actionKind];
-    const likelihood = predicted === input.observation.outcome
-      ? reliability
-      : mismatchLikelihood;
+    const likelihood =
+      predicted === input.observation.outcome ? reliability : mismatchLikelihood;
     return { model, weight: model.probability * likelihood, predicted };
   });
 
@@ -100,5 +121,6 @@ export function updateEnvironmentModelBeliefs(input: {
     contradictedModelIds,
     confidence,
     decision: confidence >= threshold ? "act" : "experiment-again",
+    modelSetFailure: false,
   };
 }
