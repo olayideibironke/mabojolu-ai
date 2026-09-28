@@ -21,7 +21,7 @@ function evidence(id: string): Observation {
   };
 }
 
-const observations = [evidence("obs-1"), evidence("obs-2")];
+const observations = [evidence("obs-1"), evidence("obs-2"), evidence("obs-3")];
 const models = [
   {
     id: "model-a",
