@@ -145,6 +145,114 @@ describe("v1.42 integrated general-agent cycle", () => {
     expect(result.learning).toBeUndefined();
   });
 
+  it("requires a safe long-horizon causal policy before adaptive execution", () => {
+    let executed = false;
+    const result = runIntegratedGeneralAgentCycle({
+      environmentId: "apparatus",
+      observations,
+      models,
+      experiments,
+      experimentObservation: {
+        actionKind: "inspect",
+        outcome: "marker-present",
+        observedAt: "2026-09-28T17:35:00.000Z",
+      },
+      state,
+      memory,
+      candidates,
+      maximumRisk: 0.2,
+      planning: {
+        mechanisms: [
+          { id: "m1", effects: { advance: 1 }, observationStdDev: 0.1 },
+          { id: "m2", effects: { advance: 1 }, observationStdDev: 0.1 },
+        ],
+        prior: new Map([["m1", 0.5], ["m2", 0.5]]),
+        initialState: 0,
+        goalState: 1,
+        experiments: [],
+        actions: [
+          {
+            id: "unsafe-advance",
+            interventions: { advance: 1 },
+            risk: 0.9,
+            cost: 0,
+            reversible: true,
+          },
+        ],
+        horizon: 2,
+      },
+      experience: (current) => {
+        executed = true;
+        return {
+          strategyId: current.strategyId,
+          observedSignals: ["stable", "unlocked"],
+        };
+      },
+    });
+
+    expect(result.induction.next).toBe("act");
+    expect(result.plan?.decision).toBe("abstained");
+    expect(result.decision).toBe("abstain");
+    expect(result.reason).toBe("no-safe-long-horizon-policy");
+    expect(result.learning).toBeUndefined();
+    expect(executed).toBe(false);
+  });
+
+  it("executes adaptive learning when the causal planner finds a safe policy", () => {
+    const result = runIntegratedGeneralAgentCycle({
+      environmentId: "apparatus",
+      observations,
+      models,
+      experiments,
+      experimentObservation: {
+        actionKind: "inspect",
+        outcome: "marker-present",
+        observedAt: "2026-09-28T17:36:00.000Z",
+      },
+      state: beginLongHorizonLearning({
+        objective: {
+          id: "planned-objective",
+          description: "Reach a safely planned stable state.",
+          successSignals: ["stable"],
+          maximumSteps: 2,
+        },
+        strategyId: "force",
+      }),
+      memory,
+      candidates,
+      maximumRisk: 0.2,
+      planning: {
+        mechanisms: [
+          { id: "m1", effects: { advance: 1 }, observationStdDev: 0.1 },
+          { id: "m2", effects: { advance: 1 }, observationStdDev: 0.1 },
+        ],
+        prior: new Map([["m1", 0.5], ["m2", 0.5]]),
+        initialState: 0,
+        goalState: 1,
+        experiments: [],
+        actions: [
+          {
+            id: "safe-advance",
+            interventions: { advance: 1 },
+            risk: 0.05,
+            cost: 0,
+            reversible: true,
+          },
+        ],
+        horizon: 2,
+      },
+      experience: (current) => ({
+        strategyId: current.strategyId,
+        observedSignals: ["stable"],
+      }),
+    });
+
+    expect(result.plan?.decision).toBe("plan");
+    expect(result.plan?.root?.selectedId).toBe("safe-advance");
+    expect(result.learning?.state.status).toBe("succeeded");
+    expect(result.decision).toBe("completed");
+  });
+
   it("keeps safety governance active during integrated recovery", () => {
     expect(() =>
       runIntegratedGeneralAgentCycle({
