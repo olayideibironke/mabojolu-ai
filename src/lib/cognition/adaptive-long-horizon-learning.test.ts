@@ -119,4 +119,48 @@ describe("adaptive long-horizon learning", () => {
       }),
     ).toThrow(/No safe memory-informed replacement/);
   });
+
+  it("tracks repeated failures and never cycles back to an exhausted strategy", () => {
+    const result = runAdaptiveLongHorizonLearning({
+      initialState: initialState(4),
+      memory,
+      candidates,
+      experience: (state) => {
+        if (state.strategyId === "force") {
+          return { strategyId: "force", observedSignals: ["stable"], failed: true };
+        }
+        if (state.strategyId === "probe") {
+          return { strategyId: "probe", observedSignals: [], failed: true };
+        }
+        return { strategyId: state.strategyId, observedSignals: ["unlocked"] };
+      },
+    });
+
+    expect(result.state.status).toBe("succeeded");
+    expect(result.state.failedStrategyIds).toEqual(["force", "probe"]);
+    expect(result.steps.map((step) => step.afterStrategyId)).toEqual([
+      "probe",
+      "wait",
+      "wait",
+    ]);
+    expect(result.state.completedSignals).toEqual(["stable", "unlocked"]);
+  });
+
+  it("fails closed after repeated failures exhaust every safe novel strategy", () => {
+    expect(() =>
+      runAdaptiveLongHorizonLearning({
+        initialState: initialState(5),
+        memory,
+        candidates: [
+          { id: "force", terms: ["force"], baseUtility: 1, risk: 0.05 },
+          { id: "probe", terms: ["probe"], baseUtility: 0.9, risk: 0.05 },
+        ],
+        experience: (state) => ({
+          strategyId: state.strategyId,
+          observedSignals: [],
+          failed: true,
+        }),
+      }),
+    ).toThrow(/No safe memory-informed replacement/);
+  });
 });
