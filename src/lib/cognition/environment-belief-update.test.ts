@@ -30,6 +30,7 @@ describe("environment belief update", () => {
     expect(update.models[0]?.probability).toBeCloseTo(0.95);
     expect(update.contradictedModelIds).toEqual(["model-b"]);
     expect(update.decision).toBe("act");
+    expect(update.modelSetFailure).toBe(false);
   });
 
   it("continues experimentation when posterior confidence is insufficient", () => {
@@ -109,5 +110,22 @@ describe("environment belief update", () => {
         },
       }),
     ).toThrow(/must predict/);
+  });
+
+  it("detects when every current model is contradicted by an unexpected outcome", () => {
+    const update = updateEnvironmentModelBeliefs({
+      models,
+      observation: {
+        actionKind: "inspect",
+        outcome: "signal-purple",
+        observedAt: "2026-09-28T15:16:00.000Z",
+      },
+    });
+
+    expect(update.modelSetFailure).toBe(true);
+    expect(update.decision).toBe("model-set-failure");
+    expect(update.confidence).toBe(0);
+    expect(update.contradictedModelIds).toEqual(["model-a", "model-b"]);
+    expect(update.models.map((model) => model.probability)).toEqual([0.5, 0.5]);
   });
 });
