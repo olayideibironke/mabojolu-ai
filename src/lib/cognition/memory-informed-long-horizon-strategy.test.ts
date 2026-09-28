@@ -97,4 +97,62 @@ describe("memory-informed long-horizon strategy selection", () => {
     expect(selection.selectedStrategyId).toBeUndefined();
     expect(selection.reason).toBe("no-safe-novel-strategy");
   });
+
+  it("does not let irrelevant high-confidence memory distort strategy choice", () => {
+    const misleadingMemory: PersistentMemoryStore = {
+      autobiographical: [],
+      semantic: [
+        {
+          id: "irrelevant-memory",
+          kind: "semantic",
+          statement: "Ocean salinity predicts marine buoyancy.",
+          domains: ["marine"],
+          confidence: 1,
+          derivedFromIds: ["marine-a", "marine-b"],
+          consolidatedAt: "2026-09-28T15:55:00.000Z",
+        },
+      ],
+      revisions: [],
+    };
+    const selection = selectMemoryInformedLongHorizonStrategy({
+      state,
+      memory: misleadingMemory,
+      candidates: [
+        { id: "wait", terms: ["wait"], baseUtility: 0.7, risk: 0 },
+        { id: "probe", terms: ["probe", "stabilizes"], baseUtility: 0.55, risk: 0.05 },
+      ],
+    });
+
+    expect(selection.selectedStrategyId).toBe("wait");
+    expect(selection.supportingMemoryIds).toEqual([]);
+  });
+
+  it("ignores retracted semantic memory during strategy selection", () => {
+    const retracted: PersistentMemoryStore = {
+      autobiographical: [],
+      semantic: [
+        {
+          id: "retracted-probe",
+          kind: "semantic",
+          statement: "Low energy probe stabilizes unfamiliar apparatus.",
+          domains: ["apparatus"],
+          confidence: 0,
+          derivedFromIds: ["old-a", "old-b"],
+          consolidatedAt: "2026-09-28T15:55:00.000Z",
+        },
+      ],
+      revisions: [],
+    };
+    const selection = selectMemoryInformedLongHorizonStrategy({
+      state,
+      memory: retracted,
+      candidates: [
+        { id: "wait", terms: ["wait"], baseUtility: 0.7, risk: 0 },
+        { id: "probe", terms: ["probe", "stabilizes"], baseUtility: 0.55, risk: 0.05 },
+      ],
+    });
+
+    expect(selection.selectedStrategyId).toBe("wait");
+    expect(selection.supportingMemoryIds).toEqual([]);
+  });
 });
