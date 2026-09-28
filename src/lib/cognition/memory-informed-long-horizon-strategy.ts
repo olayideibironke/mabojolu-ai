@@ -71,7 +71,7 @@ export function selectMemoryInformedLongHorizonStrategy(input: {
 
     const supportingMemoryIds = retrieved.map((entry) => entry.memory.id).sort();
     const memorySupport = retrieved.reduce(
-      (total, entry) => total + entry.memory.confidence,
+      (total, entry) => total + entry.score,
       0,
     );
     const score = candidate.baseUtility + memorySupport * memoryWeight;
