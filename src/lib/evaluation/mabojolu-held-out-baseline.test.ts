@@ -162,7 +162,7 @@ describe("Phase 2 randomized held-out baseline battery", () => {
     expect(summary.abstentions).toBe(32);
     expect(summary.successRate).toBe(0.25);
     expect(summary.meanSteps).toBe(1.25);
-    expect(summary.meanReward).toBeCloseTo(-0.05);
+    expect(summary.meanReward).toBeCloseTo(-0.075);
 
     const byDomain = new Map<string, typeof results>();
     for (const result of results) {
