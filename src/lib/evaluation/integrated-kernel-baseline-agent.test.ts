@@ -10,7 +10,7 @@ import {
 function evidence(id: string): Observation {
   return {
     id,
-    source: "phase2-environment",
+    source: "environment",
     content: "Unfamiliar system evidence.",
     observedAt: "2026-10-04T00:00:00.000Z",
     metadata: {
@@ -66,7 +66,7 @@ function scenario() {
     initialStrategyId: "amber",
     maximumRisk: 0.2,
     actionConfidenceThreshold: 0.9,
-  } as const;
+  };
 }
 
 describe("Phase 2 frozen v1.42 integrated-kernel bridge", () => {
