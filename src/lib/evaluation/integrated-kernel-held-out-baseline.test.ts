@@ -161,7 +161,11 @@ describe("Phase 2 randomized frozen integrated-kernel battery", () => {
 
     expect(summary.tasks).toBe(64);
 
-    expect(summary.successes).toBe(32);\n    expect(summary.abstentions).toBe(16);\n    expect(summary.successRate).toBe(0.5);\n    expect(summary.meanSteps).toBe(1.75);\n    expect(summary.meanReward).toBeCloseTo(0.15);
+    expect(summary.successes).toBe(32);
+    expect(summary.abstentions).toBe(16);
+    expect(summary.successRate).toBe(0.5);
+    expect(summary.meanSteps).toBe(1.75);
+    expect(summary.meanReward).toBeCloseTo(0.15);
 
     const modelSetFailures = results.filter(
       (result) => result.domain === "kernel-mode-1",
