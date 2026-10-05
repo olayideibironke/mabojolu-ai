@@ -159,7 +159,18 @@ describe("Phase 2 randomized frozen integrated-kernel battery", () => {
 
     const summary = summarizeGeneralizationEvaluation(results);
 
-    expect(summary.tasks).toBe(64);\n\n    // Print the first frozen integrated-kernel measurements before locking them.\n    console.info("PHASE2_INTEGRATED_KERNEL_BASELINE", JSON.stringify(summary));\n\n    expect(summary.successes).toBeGreaterThanOrEqual(0);\n    expect(summary.successes).toBeLessThanOrEqual(64);\n    expect(summary.abstentions).toBeGreaterThanOrEqual(0);\n    expect(summary.abstentions).toBeLessThanOrEqual(64);\n    expect(summary.meanSteps).toBeGreaterThanOrEqual(0);\n    expect(summary.meanSteps).toBeLessThanOrEqual(2);\n    expect(Number.isFinite(summary.meanReward)).toBe(true);
+    expect(summary.tasks).toBe(64);
+
+    // Print the first frozen integrated-kernel measurements before locking them.
+    console.info("PHASE2_INTEGRATED_KERNEL_BASELINE", JSON.stringify(summary));
+
+    expect(summary.successes).toBeGreaterThanOrEqual(0);
+    expect(summary.successes).toBeLessThanOrEqual(64);
+    expect(summary.abstentions).toBeGreaterThanOrEqual(0);
+    expect(summary.abstentions).toBeLessThanOrEqual(64);
+    expect(summary.meanSteps).toBeGreaterThanOrEqual(0);
+    expect(summary.meanSteps).toBeLessThanOrEqual(2);
+    expect(Number.isFinite(summary.meanReward)).toBe(true);
 
     const modelSetFailures = results.filter(
       (result) => result.domain === "kernel-mode-1",
