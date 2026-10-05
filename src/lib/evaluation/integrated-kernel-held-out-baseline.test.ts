@@ -161,16 +161,7 @@ describe("Phase 2 randomized frozen integrated-kernel battery", () => {
 
     expect(summary.tasks).toBe(64);
 
-    // Print the first frozen integrated-kernel measurements before locking them.
-    console.info("PHASE2_INTEGRATED_KERNEL_BASELINE", JSON.stringify(summary));
-
-    expect(summary.successes).toBeGreaterThanOrEqual(0);
-    expect(summary.successes).toBeLessThanOrEqual(64);
-    expect(summary.abstentions).toBeGreaterThanOrEqual(0);
-    expect(summary.abstentions).toBeLessThanOrEqual(64);
-    expect(summary.meanSteps).toBeGreaterThanOrEqual(0);
-    expect(summary.meanSteps).toBeLessThanOrEqual(2);
-    expect(Number.isFinite(summary.meanReward)).toBe(true);
+    expect(summary.successes).toBe(32);\n    expect(summary.abstentions).toBe(16);\n    expect(summary.successRate).toBe(0.5);\n    expect(summary.meanSteps).toBe(1.75);\n    expect(summary.meanReward).toBeCloseTo(0.15);
 
     const modelSetFailures = results.filter(
       (result) => result.domain === "kernel-mode-1",
