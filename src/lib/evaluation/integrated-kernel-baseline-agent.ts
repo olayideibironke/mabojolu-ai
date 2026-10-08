@@ -45,6 +45,7 @@ export interface IntegratedKernelBaselineAgent
 export function createIntegratedKernelBaselineAgent(
   scenario: IntegratedKernelEvaluationScenario,
 ): IntegratedKernelBaselineAgent {
+  let pendingExperimentAction: string | undefined;
   let lastKernelDecision:
     | ReturnType<typeof runIntegratedGeneralAgentCycle>
     | undefined;
@@ -52,10 +53,11 @@ export function createIntegratedKernelBaselineAgent(
   return {
     reset() {
       lastKernelDecision = undefined;
+      pendingExperimentAction = undefined;
     },
 
     act({ observation, availableActions }) {
-      const discovery = scenario.experiments[0];
+      const discovery = scenario.experiments.find((item) => item.actionKind === pendingExperimentAction);
       const experimentObservation =
         observation.kind === "experiment-outcome" && discovery && observation.outcome
           ? {
@@ -65,6 +67,8 @@ export function createIntegratedKernelBaselineAgent(
             }
           : undefined;
 
+      // The frozen kernel remains unchanged. This adapter must not claim that
+      // an action succeeded before the external evaluator has scored it.
       const result = runIntegratedGeneralAgentCycle({
         environmentId: scenario.environmentId,
         observations: scenario.observations,
@@ -81,13 +85,14 @@ export function createIntegratedKernelBaselineAgent(
         actionConfidenceThreshold: scenario.actionConfidenceThreshold,
         experience: (state) => ({
           strategyId: state.strategyId,
-          observedSignals: scenario.objective.successSignals,
+          observedSignals: [],
         }),
       });
       lastKernelDecision = result;
 
       if (result.decision === "experiment") {
         const action = result.induction.discovery.experiment?.actionKind;
+        pendingExperimentAction = action;
         return action && availableActions.includes(action) ? action : undefined;
       }
 
