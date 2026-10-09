@@ -57,7 +57,7 @@ export function createIntegratedKernelBaselineAgent(
     },
 
     act({ observation, availableActions }) {
-      const discovery = scenario.experiments.find((item) => item.actionKind === pendingExperimentAction);
+      const discovery = scenario.experiments.find((item) => item.actionKind === pendingExperimentAction) ?? (observation.kind === "experiment-outcome" ? scenario.experiments.find((item) => item.actionKind === "inspect") : undefined);
       const experimentObservation =
         observation.kind === "experiment-outcome" && discovery && observation.outcome
           ? {
