@@ -27,6 +27,14 @@ export interface GeneralizationAgent<Action = string, Observation = unknown> {
     step: number;
     availableActions: readonly Action[];
   }): Action | undefined;
+  onOutcome?(input: {
+    action: Action;
+    step: number;
+    observation: Observation;
+    reward: number;
+    success: boolean;
+    terminal: boolean;
+  }): void;
 }
 
 export interface GeneralizationEvaluationResult<Action = string> {
@@ -100,6 +108,14 @@ export function evaluateGeneralizationTask<Action, Observation>(input: {
     actions.push(action);
     const outcome = task.transition({ action, step });
     totalReward += outcome.reward;
+    agent.onOutcome?.({
+      action,
+      step,
+      observation: outcome.observation,
+      reward: outcome.reward,
+      success: outcome.success,
+      terminal: Boolean(outcome.terminal),
+    });
     observation = outcome.observation;
 
     if (outcome.success) {
