@@ -53,7 +53,7 @@ export interface Phase3KernelComparison {
   taskCount: number;
   kernel: GeneralizationEvaluationSummary;
   baselines: SealedBaselineResult[];
-  kernelDecisions: { experiment: number; act: number; observe: number; abstain: number; none: number };
+  kernelDecisions: { experiment: number; act: number; observe: number; abstain: number; completed: number; none: number };
 }
 
 /**
@@ -66,7 +66,7 @@ export function evaluatePhase3KernelComparison(seed: number, taskCount: number):
   if (!Number.isInteger(taskCount) || taskCount < 1 || taskCount > 10000) {
     throw new Error("Task count must be an integer between 1 and 10000.");
   }
-  const kernelDecisions = { experiment: 0, act: 0, observe: 0, abstain: 0, none: 0 };
+  const kernelDecisions = { experiment: 0, act: 0, observe: 0, abstain: 0, completed: 0, none: 0 };
   const results = Array.from({ length: taskCount }, (_, index) => {
     const sealed = createSealedProbeTask(seed, index);
     const kernel = createIntegratedKernelBaselineAgent(scenario(index));
