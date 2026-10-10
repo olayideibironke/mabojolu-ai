@@ -1,7 +1,7 @@
 import type { Observation } from "../cognition/types";
 import { evaluateGeneralizationTask, summarizeGeneralizationEvaluation, type GeneralizationEvaluationSummary } from "./generalization-harness";
 import { createIntegratedKernelBaselineAgent, type IntegratedKernelExternalObservation, type IntegratedKernelEvaluationScenario } from "./integrated-kernel-baseline-agent";
-import { createSealedProbeTask, type ProbeObservation } from "./sealed-probe-task";
+import { createSealedProbeTask } from "./sealed-probe-task";
 import { evaluateSealedBaselines, type SealedBaselineResult } from "./sealed-probe-baselines";
 
 const symbols = ["amber", "violet", "cobalt", "silver", "cedar", "quartz"] as const;
