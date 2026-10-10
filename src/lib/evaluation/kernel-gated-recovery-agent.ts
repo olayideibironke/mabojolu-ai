@@ -16,6 +16,7 @@ export function createKernelGatedRecoveryAgent(scenario: IntegratedKernelEvaluat
   let session: ConsequenceGroundedLearningSession | undefined;
   let issued: string | undefined;
   let inspected = false;
+  let kernelApproved = false;
   return {
     reset(input) {
       kernel.reset(input);
@@ -28,6 +29,7 @@ export function createKernelGatedRecoveryAgent(scenario: IntegratedKernelEvaluat
       );
       issued = undefined;
       inspected = false;
+      kernelApproved = false;
     },
     act(input) {
       if (!session) throw new Error("Agent must be reset.");
@@ -41,9 +43,15 @@ export function createKernelGatedRecoveryAgent(scenario: IntegratedKernelEvaluat
           issued = decision;
           return decision;
         }
+        kernelApproved = true;
         if (!input.availableActions.includes(state.strategyId)) return undefined;
         issued = state.strategyId;
         return issued;
+      }
+      if (!kernelApproved) {
+        const decision = kernel.act(input);
+        if (decision === undefined || scenario.experiments.some((experiment) => experiment.actionKind === decision)) return undefined;
+        kernelApproved = true;
       }
       if (!input.availableActions.includes(state.strategyId)) return undefined;
       issued = state.strategyId;
